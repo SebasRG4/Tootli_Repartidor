@@ -74,7 +74,7 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CustomAppBarWidget(
-        title: 'tootli_requests'.tr,
+        title: 'centro_de_pedidos'.tr, // Antes 'tootli_requests'.tr
         isBackButtonExist: false,
       ),
       body: RefreshIndicator(
@@ -821,7 +821,9 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
                                     const SizedBox(
                                       height: Dimensions.paddingSizeDefault,
                                     ),
-                                    TitleWidget(title: 'new_requests'.tr),
+                                    TitleWidget(
+                                      title: 'pedidos_disponibles'.tr,
+                                    ), // Antes 'new_requests'.tr
                                   ],
                                 ),
                               ),

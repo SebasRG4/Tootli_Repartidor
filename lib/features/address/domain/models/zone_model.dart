@@ -30,15 +30,21 @@ class ZoneModel {
   ZoneModel.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     name = json['name'];
-    coordinates = json['coordinates'] != null ? Coordinates.fromJson(json['coordinates']) : null;
+    coordinates = json['coordinates'] != null
+        ? Coordinates.fromJson(json['coordinates'])
+        : null;
     status = json['status'];
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
     restaurantWiseTopic = json['restaurant_wise_topic'];
     customerWiseTopic = json['customer_wise_topic'];
     deliverymanWiseTopic = json['deliveryman_wise_topic'];
-    minimumShippingCharge = json['minimum_shipping_charge'] != null ? json['minimum_shipping_charge']?.toDouble() : 0;
-    perKmShippingCharge = json['per_km_shipping_charge'] != null ? json['per_km_shipping_charge']?.toDouble() : 0;
+    minimumShippingCharge = json['minimum_shipping_charge'] != null
+        ? json['minimum_shipping_charge']?.toDouble()
+        : 0;
+    perKmShippingCharge = json['per_km_shipping_charge'] != null
+        ? json['per_km_shipping_charge']?.toDouble()
+        : 0;
   }
 
   Map<String, dynamic> toJson() {
@@ -71,7 +77,9 @@ class Coordinates {
     if (json['coordinates'] != null) {
       coordinates = <LatLng>[];
       json['coordinates'][0].forEach((v) {
-        coordinates!.add(LatLng(double.parse(v[0].toString()), double.parse(v[1].toString())));
+        coordinates!.add(
+          LatLng(double.parse(v[1].toString()), double.parse(v[0].toString())),
+        );
       });
     }
   }

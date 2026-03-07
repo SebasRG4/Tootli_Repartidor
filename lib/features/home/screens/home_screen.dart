@@ -17,7 +17,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sixam_mart_delivery/features/address/controllers/address_controller.dart';
 import 'package:sixam_mart_delivery/features/address/domain/models/zone_model.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
-import 'package:sixam_mart_delivery/helper/grid_helper.dart';
+import 'package:sixam_mart_delivery/features/order/widgets/order_requset_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.onNavigateToOrders});
@@ -32,8 +32,11 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isNotificationPermissionGranted = true;
   bool _isBatteryOptimizationGranted = true;
   GoogleMapController? _mapController;
+  Timer? _gridTimer;
+  double _currentZoom = 16;
   final Set<Polygon> _polygons = {};
   final Set<Marker> _markers = {};
+  int _previousOrderCount = 0;
 
   @override
   void initState() {
@@ -43,27 +46,43 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _listener = AppLifecycleListener(onStateChange: _onStateChanged);
 
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+      Get.find<AddressController>().getZoneList();
+    });
 
     Future.delayed(const Duration(milliseconds: 200), () {
       checkPermission();
     });
 
-    Get.find<AddressController>().getZoneList();
+    _gridTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _refreshGrids();
+    });
+  }
+
+  void _refreshGrids() {
+    int? zoneId = Get.find<ProfileController>().profileModel?.zoneId;
+    if (zoneId != null) {
+      Get.find<AddressController>().getGridList(zoneId);
+    }
   }
 
   Future<void> _loadData() async {
+    // These methods are synchronous or return void, call them separately
     Get.find<OrderController>().getIgnoreList();
     Get.find<OrderController>().removeFromIgnoreList();
-    await Get.find<ProfileController>().getProfile();
+
+    // Parallelize independent asynchronous data loading
+    await Future.wait([
+      Get.find<ProfileController>().getProfile(),
+      Get.find<OrderController>().getRunningOrders(1),
+      Get.find<NotificationController>().getNotificationList(),
+    ]);
 
     int? zoneId = Get.find<ProfileController>().profileModel?.zoneId;
     if (zoneId != null) {
       Get.find<AddressController>().getGridList(zoneId);
     }
-
-    await Get.find<OrderController>().getRunningOrders(1);
-    await Get.find<NotificationController>().getNotificationList();
   }
 
   Future<void> _checkSystemNotification() async {
@@ -145,9 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
     checkPermission();
   }
 
-  void _getPolygons(List<ZoneModel> zoneList, List<dynamic>? gridList) {
+  void _getPolygons(List<ZoneModel> zoneList) {
     _polygons.clear();
-    _markers.clear();
     int? profileZoneId = Get.find<ProfileController>().profileModel?.zoneId;
 
     for (var zone in zoneList) {
@@ -156,74 +174,22 @@ class _HomeScreenState extends State<HomeScreen> {
           Polygon(
             polygonId: PolygonId('zone_${zone.id}'),
             points: zone.coordinates!.coordinates!,
-            strokeWidth: zone.id == profileZoneId ? 3 : 1,
+            strokeWidth: zone.id == profileZoneId ? 5 : 2,
             strokeColor: zone.id == profileZoneId
-                ? Colors.blueAccent
-                : Colors.blueGrey.withValues(alpha: 0.5),
+                ? Theme.of(context).primaryColor
+                : Colors.blueGrey.withOpacity(0.3),
             fillColor: zone.id == profileZoneId
-                ? Colors.blueAccent.withValues(alpha: 0.1)
-                : Colors.transparent, // Restoring the zone fill color
+                ? Theme.of(context).primaryColor.withOpacity(0.05)
+                : Colors.transparent,
           ),
         );
-      }
-    }
-
-    if (gridList != null) {
-      for (var grid in gridList) {
-        try {
-          String hexId = grid['hexagon_id'].toString();
-          String deliveryType = grid['delivery_type'].toString();
-          List<LatLng> points = GridHelper.getHexagonPoints(hexId);
-
-          if (points.isNotEmpty) {
-            Color fillColor = Colors.transparent;
-            Color strokeColor = Colors.orangeAccent;
-            double width = 1;
-
-            if (deliveryType == 'minutes') {
-              fillColor = Colors.orange.withValues(alpha: 0.3);
-              strokeColor = Colors.orange;
-              width = 2;
-
-              // Add a surge marker to the center
-              if (grid['center'] != null) {
-                double clat = double.parse(grid['center']['lat'].toString());
-                double clng = double.parse(grid['center']['lng'].toString());
-                _markers.add(
-                  Marker(
-                    markerId: MarkerId('surge_marker_$hexId'),
-                    position: LatLng(clat, clng),
-                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                      BitmapDescriptor.hueOrange,
-                    ),
-                    infoWindow: const InfoWindow(title: 'Alta Demanda'),
-                  ),
-                );
-              }
-            } else if (deliveryType == 'standard') {
-              fillColor = Colors.blue.withValues(alpha: 0.1);
-              strokeColor = Colors.blueAccent;
-            }
-
-            _polygons.add(
-              Polygon(
-                polygonId: PolygonId('grid_$hexId'),
-                points: points,
-                strokeWidth: width.toInt(),
-                strokeColor: strokeColor,
-                fillColor: fillColor,
-              ),
-            );
-          }
-        } catch (e) {
-          debugPrint('Error processing grid: $e');
-        }
       }
     }
   }
 
   @override
   void dispose() {
+    _gridTimer?.cancel();
     _listener.dispose();
     super.dispose();
   }
@@ -233,190 +199,312 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: null,
 
-      body: GetBuilder<ProfileController>(
-        builder: (profileController) {
-          LatLng? currentLatLng;
-          if (profileController.recordLocationBody != null) {
-            currentLatLng = LatLng(
-              profileController.recordLocationBody!.latitude!,
-              profileController.recordLocationBody!.longitude!,
-            );
-            _mapController?.animateCamera(
-              CameraUpdate.newLatLng(currentLatLng),
-            );
+      body: GetBuilder<OrderController>(
+        builder: (orderController) {
+          // Check for new orders to show dialog
+          if (orderController.latestOrderList != null &&
+              orderController.latestOrderList!.length > _previousOrderCount) {
+            _previousOrderCount = orderController.latestOrderList!.length;
+            if (orderController.latestOrderList!.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (BuildContext context) {
+                    return Dialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          Dimensions.radiusDefault,
+                        ),
+                      ),
+                      insetPadding: const EdgeInsets.all(
+                        Dimensions.paddingSizeSmall,
+                      ),
+                      child: OrderRequestWidget(
+                        orderModel: orderController.latestOrderList![0],
+                        index: 0,
+                        onTap: () {
+                          Get.back(); // close dialog
+                        },
+                      ),
+                    );
+                  },
+                );
+              });
+            }
+          } else if (orderController.latestOrderList != null) {
+            _previousOrderCount = orderController.latestOrderList!.length;
           }
 
-          return GetBuilder<AddressController>(
-            builder: (addressController) {
-              if (addressController.zoneList != null) {
-                _getPolygons(
-                  addressController.zoneList!,
-                  addressController.gridList,
+          return GetBuilder<ProfileController>(
+            builder: (profileController) {
+              LatLng? currentLatLng;
+              if (profileController.recordLocationBody != null) {
+                currentLatLng = LatLng(
+                  profileController.recordLocationBody!.latitude!,
+                  profileController.recordLocationBody!.longitude!,
                 );
               }
 
-              return Stack(
-                children: [
-                  GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: currentLatLng ?? const LatLng(0, 0),
-                      zoom: 16,
-                    ),
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: false,
-                    zoomControlsEnabled: false,
-                    polygons: _polygons,
-                    markers: _markers,
-                    onMapCreated: (controller) {
-                      _mapController = controller;
-                      _mapController?.setMapStyle(AppConstants.darkStyle);
-                    },
-                  ),
+              return GetBuilder<AddressController>(
+                builder: (addressController) {
+                  if (addressController.zoneList != null) {
+                    _getPolygons(addressController.zoneList!);
+                  }
 
-                  // Notification Button
-                  Positioned(
-                    top:
-                        context.mediaQueryPadding.top +
-                        Dimensions.paddingSizeSmall,
-                    right: Dimensions.paddingSizeDefault,
-                    child: GetBuilder<NotificationController>(
-                      builder: (notificationController) {
-                        return InkWell(
-                          onTap: () =>
-                              Get.toNamed(RouteHelper.getNotificationRoute()),
+                  return Stack(
+                    children: [
+                      GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target:
+                              currentLatLng ??
+                              const LatLng(
+                                19.4326,
+                                -99.1332,
+                              ), // Default to CDMX if location unknown
+                          zoom: 16,
+                        ),
+                        myLocationEnabled: true,
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                        polygons: {
+                          ..._polygons,
+                          ...addressController.gridPolygons,
+                        },
+                        markers: {
+                          ..._markers,
+                          if (_currentZoom > 14)
+                            ...addressController.gridMarkers,
+                        },
+                        onCameraMove: (position) {
+                          // Only trigger setState if we cross the zoom threshold (14.5)
+                          bool wasVisible = _currentZoom > 14.5;
+                          bool isVisible = position.zoom > 14.5;
+
+                          if (wasVisible != isVisible) {
+                            setState(() {
+                              _currentZoom = position.zoom;
+                            });
+                          }
+                        },
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                          _mapController?.setMapStyle(AppConstants.darkStyle);
+
+                          // Animate to current location once map is ready
+                          if (profileController.recordLocationBody != null) {
+                            _mapController?.animateCamera(
+                              CameraUpdate.newLatLng(
+                                LatLng(
+                                  profileController
+                                      .recordLocationBody!
+                                      .latitude!,
+                                  profileController
+                                      .recordLocationBody!
+                                      .longitude!,
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+
+                      // Notification Button
+                      Positioned(
+                        top:
+                            context.mediaQueryPadding.top +
+                            Dimensions.paddingSizeSmall,
+                        right: Dimensions.paddingSizeDefault,
+                        child: GetBuilder<NotificationController>(
+                          builder: (notificationController) {
+                            return InkWell(
+                              onTap: () => Get.toNamed(
+                                RouteHelper.getNotificationRoute(),
+                              ),
+                              child: Container(
+                                height: 40,
+                                width: 40,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).cardColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Center(
+                                      child: Icon(
+                                        Icons.notifications,
+                                        size: 25,
+                                        color: Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge!.color,
+                                      ),
+                                    ),
+                                    if (notificationController.hasNotification)
+                                      Positioned(
+                                        top: 5,
+                                        right: 5,
+                                        child: Container(
+                                          height: 10,
+                                          width: 10,
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(
+                                              context,
+                                            ).colorScheme.error,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              width: 1,
+                                              color: Theme.of(
+                                                context,
+                                              ).cardColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+
+                      // Earnings Button
+                      Positioned(
+                        top:
+                            context.mediaQueryPadding.top +
+                            Dimensions.paddingSizeSmall,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: GestureDetector(
+                            onTap: () => _showEarningsBottomSheet(
+                              context,
+                              profileController,
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: Dimensions.paddingSizeLarge,
+                                vertical: Dimensions.paddingSizeSmall,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(50),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.3),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    PriceConverterHelper.convertPrice(
+                                      profileController.profileModel?.balance ??
+                                          0,
+                                    ),
+                                    style: robotoMedium.copyWith(
+                                      color: Colors.white,
+                                      fontSize: Dimensions.fontSizeSmall,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      if (!_isNotificationPermissionGranted)
+                        Positioned(
+                          top: 70,
+                          left: 0,
+                          right: 0,
+                          child: permissionWarning(
+                            isBatteryPermission: false,
+                            onTap: requestNotificationPermission,
+                            closeOnTap: () {
+                              setState(() {
+                                _isNotificationPermissionGranted = true;
+                              });
+                            },
+                          ),
+                        ),
+
+                      if (!_isBatteryOptimizationGranted)
+                        Positioned(
+                          top: 70,
+                          left: 0,
+                          right: 0,
+                          child: permissionWarning(
+                            isBatteryPermission: true,
+                            onTap: requestBatteryOptimization,
+                            closeOnTap: () {
+                              setState(() {
+                                _isBatteryOptimizationGranted = true;
+                              });
+                            },
+                          ),
+                        ),
+
+                      // My Location Button
+                      Positioned(
+                        bottom: 20,
+                        right: 20,
+                        child: InkWell(
+                          onTap: () {
+                            if (profileController.recordLocationBody != null) {
+                              _mapController?.animateCamera(
+                                CameraUpdate.newLatLngZoom(
+                                  LatLng(
+                                    profileController
+                                        .recordLocationBody!
+                                        .latitude!,
+                                    profileController
+                                        .recordLocationBody!
+                                        .longitude!,
+                                  ),
+                                  17,
+                                ),
+                              );
+                            }
+                          },
                           child: Container(
-                            height: 40,
-                            width: 40,
+                            height: 50,
+                            width: 50,
                             decoration: BoxDecoration(
                               color: Theme.of(context).cardColor,
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.1),
+                                  color: Colors.black.withOpacity(0.1),
                                   blurRadius: 10,
                                   offset: const Offset(0, 5),
                                 ),
                               ],
                             ),
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Center(
-                                  child: Icon(
-                                    Icons.notifications,
-                                    size: 25,
-                                    color: Theme.of(
-                                      context,
-                                    ).textTheme.bodyLarge!.color,
-                                  ),
-                                ),
-                                if (notificationController.hasNotification)
-                                  Positioned(
-                                    top: 5,
-                                    right: 5,
-                                    child: Container(
-                                      height: 10,
-                                      width: 10,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          width: 1,
-                                          color: Theme.of(context).cardColor,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                            child: Icon(
+                              Icons.my_location,
+                              color: Theme.of(context).primaryColor,
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Earnings Button
-                  Positioned(
-                    top:
-                        context.mediaQueryPadding.top +
-                        Dimensions.paddingSizeSmall,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: () => _showEarningsBottomSheet(
-                          context,
-                          profileController,
-                        ),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: Dimensions.paddingSizeLarge,
-                            vertical: Dimensions.paddingSizeSmall,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black,
-                            borderRadius: BorderRadius.circular(50),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                PriceConverterHelper.convertPrice(
-                                  profileController.profileModel?.balance ?? 0,
-                                ),
-                                style: robotoMedium.copyWith(
-                                  color: Colors.white,
-                                  fontSize: Dimensions.fontSizeSmall,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
-                    ),
-                  ),
-
-                  if (!_isNotificationPermissionGranted)
-                    Positioned(
-                      top: 70,
-                      left: 0,
-                      right: 0,
-                      child: permissionWarning(
-                        isBatteryPermission: false,
-                        onTap: requestNotificationPermission,
-                        closeOnTap: () {
-                          setState(() {
-                            _isNotificationPermissionGranted = true;
-                          });
-                        },
-                      ),
-                    ),
-
-                  if (!_isBatteryOptimizationGranted)
-                    Positioned(
-                      top: 70,
-                      left: 0,
-                      right: 0,
-                      child: permissionWarning(
-                        isBatteryPermission: true,
-                        onTap: requestBatteryOptimization,
-                        closeOnTap: () {
-                          setState(() {
-                            _isBatteryOptimizationGranted = true;
-                          });
-                        },
-                      ),
-                    ),
-                ],
+                    ],
+                  );
+                },
               );
             },
           );

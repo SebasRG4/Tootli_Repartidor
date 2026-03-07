@@ -9,7 +9,9 @@ import 'package:sixam_mart_delivery/features/address/domain/models/zone_model.da
 import 'package:sixam_mart_delivery/features/address/domain/models/zone_response_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
+import 'package:sixam_mart_delivery/helper/grid_helper.dart';
 import 'package:sixam_mart_delivery/features/address/domain/services/address_service_interface.dart';
+import 'package:sixam_mart_delivery/helper/marker_helper.dart';
 
 class AddressController extends GetxController implements GetxService {
   final AddressServiceInterface addressServiceInterface;
@@ -32,6 +34,12 @@ class AddressController extends GetxController implements GetxService {
 
   List<dynamic>? _gridList;
   List<dynamic>? get gridList => _gridList;
+
+  Set<Polygon> _gridPolygons = {};
+  Set<Polygon> get gridPolygons => _gridPolygons;
+
+  Set<Marker> _gridMarkers = {};
+  Set<Marker> get gridMarkers => _gridMarkers;
 
   bool _loading = false;
   bool get loading => _loading;
@@ -63,12 +71,70 @@ class AddressController extends GetxController implements GetxService {
 
   Future<void> getGridList(int zoneId) async {
     _gridList = null;
+    _gridPolygons = {};
+    _gridMarkers = {};
     Response response = await addressServiceInterface.getGridList(zoneId);
     if (response.statusCode == 200) {
       _gridList = [];
-      response.body.forEach((grid) {
+      final dynamic body = response.body;
+      List<dynamic> gridData = [];
+      if (body is List) {
+        gridData = body;
+      } else if (body is String) {
+        gridData = jsonDecode(body);
+      }
+
+      for (var grid in gridData) {
         _gridList!.add(grid);
-      });
+
+        try {
+          String hexId = grid['hexagon_id'].toString();
+          double surgeAmount =
+              double.tryParse(grid['surge_amount'].toString()) ?? 0;
+
+          if (surgeAmount > 0) {
+            List<LatLng> points = GridHelper.getHexagonPoints(hexId);
+            Color baseColor = surgeAmount >= 20
+                ? Colors.red
+                : Colors.orangeAccent;
+
+            // Add the "Geofence" Polygon
+            if (points.isNotEmpty) {
+              _gridPolygons.add(
+                Polygon(
+                  polygonId: PolygonId('geofence_$hexId'),
+                  points: points,
+                  strokeWidth: 4,
+                  strokeColor: baseColor,
+                  fillColor: baseColor.withOpacity(0.12),
+                ),
+              );
+            }
+
+            // Add the Custom Pill Marker
+            if (grid['center'] != null) {
+              double lat = double.parse(grid['center']['lat'].toString());
+              double lng = double.parse(grid['center']['lng'].toString());
+
+              _gridMarkers.add(
+                Marker(
+                  markerId: MarkerId('surge_marker_$hexId'),
+                  position: LatLng(lat, lng),
+                  anchor: const Offset(0.5, 0.5), // Center the flat marker
+                  icon: await MarkerHelper.createCustomMarkerBitmap(
+                    '+MX\$${surgeAmount.toStringAsFixed(0)}',
+                    color: baseColor,
+                  ),
+                ),
+              );
+            }
+          }
+        } catch (e) {
+          debugPrint('Error processing grid incentive: $e');
+        }
+      }
+    } else {
+      debugPrint('Grid API Failed with body: ${response.body}');
     }
     update();
   }

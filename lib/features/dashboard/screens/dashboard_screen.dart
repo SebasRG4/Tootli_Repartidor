@@ -61,7 +61,9 @@ class DashboardScreenState extends State<DashboardScreen> {
     ];
 
     showDisbursementWarningMessage();
-    Get.find<OrderController>().getLatestOrders();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Get.find<OrderController>().getLatestOrders();
+    });
 
     _stream = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       String? type = message.data['body_loc_key'] ?? message.data['type'];

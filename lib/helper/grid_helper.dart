@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class GridHelper {
-  static const double gridSize = 0.0001;
+  static const double gridSize = 0.005;
 
   static List<LatLng> getHexagonPoints(String hexId) {
     List<String> parts = hexId.split('_');
