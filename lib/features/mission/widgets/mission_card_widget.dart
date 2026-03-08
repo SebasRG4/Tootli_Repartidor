@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sixam_mart_delivery/features/mission/domain/models/mission_model.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
+import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
 import 'package:get/get.dart';
 
 class MissionCardWidget extends StatelessWidget {
@@ -87,7 +88,7 @@ class MissionCardWidget extends StatelessWidget {
                 ),
               ),
               Text(
-                '${'reward'.tr}: \$${mission.rewardAmount}',
+                '${'reward'.tr}: ${PriceConverterHelper.convertPrice(mission.rewardAmount ?? 0)}',
                 style: robotoBold.copyWith(
                   fontSize: Dimensions.fontSizeDefault,
                   color: Theme.of(context).primaryColor,

@@ -12,6 +12,7 @@ import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_alert_dialog_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/new_request_dialog_widget.dart';
 import 'package:sixam_mart_delivery/features/home/screens/home_screen.dart';
+import 'package:sixam_mart_delivery/features/mission/controllers/mission_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/screens/profile_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_request_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_screen.dart';
@@ -60,6 +61,7 @@ class DashboardScreenState extends State<DashboardScreen> {
     showDisbursementWarningMessage();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Get.find<OrderController>().getLatestOrders();
+      Get.find<MissionController>().getMissionList();
     });
 
     _stream = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -327,6 +329,7 @@ class DashboardScreenState extends State<DashboardScreen> {
                                 profileController.updateActiveStatus(
                                   back: false,
                                 );
+                                Get.find<MissionController>().getMissionList();
                               },
                             )
                           : OnlinePanelWidget(

@@ -303,10 +303,6 @@ class OnlinePanelWidget extends StatelessWidget {
                 // Missions Section
                 GetBuilder<MissionController>(
                   builder: (missionController) {
-                    if (missionController.missionList == null) {
-                      missionController.getMissionList();
-                    }
-
                     List<MissionModel> activeMissions =
                         missionController.missionList
                             ?.where(
@@ -431,7 +427,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                                 ),
                                               ),
                                               Text(
-                                                '+${PriceConverterHelper.convertPrice(mission.rewardAmount)}',
+                                                '+${PriceConverterHelper.convertPrice(mission.rewardAmount ?? 0)}',
                                                 style: robotoBold.copyWith(
                                                   fontSize: 10,
                                                   color: Theme.of(
