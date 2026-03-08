@@ -61,6 +61,11 @@ import 'package:sixam_mart_delivery/features/refer_and_earn/domain/repositories/
 import 'package:sixam_mart_delivery/features/refer_and_earn/domain/repositories/refer_and_earn_repository_interface.dart';
 import 'package:sixam_mart_delivery/features/refer_and_earn/domain/services/refer_and_earn_service.dart';
 import 'package:sixam_mart_delivery/features/refer_and_earn/domain/services/refer_and_earn_service_interface.dart';
+import 'package:sixam_mart_delivery/features/mission/controllers/mission_controller.dart';
+import 'package:sixam_mart_delivery/features/mission/domain/repositories/mission_repository.dart';
+import 'package:sixam_mart_delivery/features/mission/domain/repositories/mission_repository_interface.dart';
+import 'package:sixam_mart_delivery/features/mission/domain/services/mission_service.dart';
+import 'package:sixam_mart_delivery/features/mission/domain/services/mission_service_interface.dart';
 import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart_delivery/features/splash/domain/repositories/splash_repository.dart';
 import 'package:sixam_mart_delivery/features/splash/domain/repositories/splash_repository_interface.dart';
@@ -73,101 +78,181 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:get/get.dart';
 
 Future<Map<String, Map<String, String>>> init() async {
-
   /// Core
   final sharedPreferences = await SharedPreferences.getInstance();
   Get.lazyPut(() => sharedPreferences);
-  Get.lazyPut(() => ApiClient(appBaseUrl: AppConstants.baseUrl, sharedPreferences: Get.find()));
+  Get.lazyPut(
+    () => ApiClient(
+      appBaseUrl: AppConstants.baseUrl,
+      sharedPreferences: Get.find(),
+    ),
+  );
 
   /// Repository Interface
-  HtmlRepositoryInterface htmlRepositoryInterface = HtmlRepository(apiClient: Get.find());
+  HtmlRepositoryInterface htmlRepositoryInterface = HtmlRepository(
+    apiClient: Get.find(),
+  );
   Get.lazyPut(() => htmlRepositoryInterface);
 
-  DisbursementRepositoryInterface disbursementRepositoryInterface = DisbursementRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  DisbursementRepositoryInterface disbursementRepositoryInterface =
+      DisbursementRepository(
+        apiClient: Get.find(),
+        sharedPreferences: Get.find(),
+      );
   Get.lazyPut(() => disbursementRepositoryInterface);
 
-  MyAccountRepositoryInterface myAccountRepositoryInterface = MyAccountRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  MyAccountRepositoryInterface myAccountRepositoryInterface =
+      MyAccountRepository(apiClient: Get.find(), sharedPreferences: Get.find());
   Get.lazyPut(() => myAccountRepositoryInterface);
 
-  ForgotPasswordRepositoryInterface forgotPasswordRepositoryInterface = ForgotPasswordRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  ForgotPasswordRepositoryInterface forgotPasswordRepositoryInterface =
+      ForgotPasswordRepository(
+        apiClient: Get.find(),
+        sharedPreferences: Get.find(),
+      );
   Get.lazyPut(() => forgotPasswordRepositoryInterface);
 
-  ChatRepositoryInterface chatRepositoryInterface = ChatRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  ChatRepositoryInterface chatRepositoryInterface = ChatRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => chatRepositoryInterface);
 
-  LanguageRepositoryInterface languageRepositoryInterface = LanguageRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  LanguageRepositoryInterface languageRepositoryInterface = LanguageRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => languageRepositoryInterface);
 
-  SplashRepositoryInterface splashRepositoryInterface = SplashRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  SplashRepositoryInterface splashRepositoryInterface = SplashRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => splashRepositoryInterface);
 
-  NotificationRepositoryInterface notificationRepositoryInterface = NotificationRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  NotificationRepositoryInterface notificationRepositoryInterface =
+      NotificationRepository(
+        apiClient: Get.find(),
+        sharedPreferences: Get.find(),
+      );
   Get.lazyPut(() => notificationRepositoryInterface);
 
-  ProfileRepositoryInterface profileRepositoryInterface = ProfileRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  ProfileRepositoryInterface profileRepositoryInterface = ProfileRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => profileRepositoryInterface);
 
-  AddressRepositoryInterface addressRepositoryInterface = AddressRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  AddressRepositoryInterface addressRepositoryInterface = AddressRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => addressRepositoryInterface);
 
-  AuthRepositoryInterface authRepositoryInterface = AuthRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  AuthRepositoryInterface authRepositoryInterface = AuthRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => authRepositoryInterface);
 
-  OrderRepositoryInterface orderRepositoryInterface = OrderRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  OrderRepositoryInterface orderRepositoryInterface = OrderRepository(
+    apiClient: Get.find(),
+    sharedPreferences: Get.find(),
+  );
   Get.lazyPut(() => orderRepositoryInterface);
 
-  ReferEarnRepositoryInterface referEarnRepositoryInterface = ReferEarnRepository(apiClient: Get.find(), sharedPreferences: Get.find());
+  ReferEarnRepositoryInterface referEarnRepositoryInterface =
+      ReferEarnRepository(apiClient: Get.find(), sharedPreferences: Get.find());
   Get.lazyPut(() => referEarnRepositoryInterface);
 
+  MissionRepositoryInterface missionRepositoryInterface = MissionRepository(
+    apiClient: Get.find(),
+  );
+  Get.lazyPut(() => missionRepositoryInterface);
+
   /// Service Interface
-  HtmlServiceInterface htmlServiceInterface = HtmlService(htmlRepositoryInterface: Get.find());
+  HtmlServiceInterface htmlServiceInterface = HtmlService(
+    htmlRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => htmlServiceInterface);
 
-  DisbursementServiceInterface disbursementServiceInterface = DisbursementService(disbursementRepositoryInterface: Get.find());
+  DisbursementServiceInterface disbursementServiceInterface =
+      DisbursementService(disbursementRepositoryInterface: Get.find());
   Get.lazyPut(() => disbursementServiceInterface);
 
-  MyAccountServiceInterface myAccountServiceInterface = MyAccountService(myAccountRepositoryInterface: Get.find());
+  MyAccountServiceInterface myAccountServiceInterface = MyAccountService(
+    myAccountRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => myAccountServiceInterface);
 
-  ForgotPasswordServiceInterface forgotPasswordServiceInterface = ForgotPasswordService(forgotPasswordRepositoryInterface: Get.find());
+  ForgotPasswordServiceInterface forgotPasswordServiceInterface =
+      ForgotPasswordService(forgotPasswordRepositoryInterface: Get.find());
   Get.lazyPut(() => forgotPasswordServiceInterface);
 
-  ChatServiceInterface chatServiceInterface = ChatService(chatRepositoryInterface: Get.find());
+  ChatServiceInterface chatServiceInterface = ChatService(
+    chatRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => chatServiceInterface);
 
-  LanguageServiceInterface languageServiceInterface = LanguageService(languageRepositoryInterface: Get.find());
+  LanguageServiceInterface languageServiceInterface = LanguageService(
+    languageRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => languageServiceInterface);
 
-  SplashServiceInterface splashServiceInterface = SplashService(splashRepositoryInterface: Get.find());
+  SplashServiceInterface splashServiceInterface = SplashService(
+    splashRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => splashServiceInterface);
 
-  NotificationServiceInterface notificationServiceInterface = NotificationService(notificationRepositoryInterface: Get.find());
+  NotificationServiceInterface notificationServiceInterface =
+      NotificationService(notificationRepositoryInterface: Get.find());
   Get.lazyPut(() => notificationServiceInterface);
 
-  ProfileServiceInterface profileServiceInterface = ProfileService(profileRepositoryInterface: Get.find());
+  ProfileServiceInterface profileServiceInterface = ProfileService(
+    profileRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => profileServiceInterface);
 
-  AddressServiceInterface addressServiceInterface = AddressService(addressRepositoryInterface: Get.find());
+  AddressServiceInterface addressServiceInterface = AddressService(
+    addressRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => addressServiceInterface);
 
-  AuthServiceInterface authServiceInterface = AuthService(authRepositoryInterface: Get.find());
+  AuthServiceInterface authServiceInterface = AuthService(
+    authRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => authServiceInterface);
 
-  OrderServiceInterface orderServiceInterface = OrderService(orderRepositoryInterface: Get.find());
+  OrderServiceInterface orderServiceInterface = OrderService(
+    orderRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => orderServiceInterface);
 
-  ReferEarnServiceInterface referEarnServiceInterface = ReferEarnService(referEarnRepositoryInterface: Get.find());
+  ReferEarnServiceInterface referEarnServiceInterface = ReferEarnService(
+    referEarnRepositoryInterface: Get.find(),
+  );
   Get.lazyPut(() => referEarnServiceInterface);
+
+  MissionServiceInterface missionServiceInterface = MissionService(
+    missionRepositoryInterface: Get.find(),
+  );
+  Get.lazyPut(() => missionServiceInterface);
 
   /// Service
   Get.lazyPut(() => HtmlService(htmlRepositoryInterface: Get.find()));
-  Get.lazyPut(() => DisbursementService(disbursementRepositoryInterface: Get.find()));
+  Get.lazyPut(
+    () => DisbursementService(disbursementRepositoryInterface: Get.find()),
+  );
   Get.lazyPut(() => MyAccountService(myAccountRepositoryInterface: Get.find()));
-  Get.lazyPut(() => ForgotPasswordService(forgotPasswordRepositoryInterface: Get.find()));
+  Get.lazyPut(
+    () => ForgotPasswordService(forgotPasswordRepositoryInterface: Get.find()),
+  );
   Get.lazyPut(() => ChatService(chatRepositoryInterface: Get.find()));
   Get.lazyPut(() => LanguageService(languageRepositoryInterface: Get.find()));
   Get.lazyPut(() => SplashService(splashRepositoryInterface: Get.find()));
-  Get.lazyPut(() => NotificationService(notificationRepositoryInterface: Get.find()));
+  Get.lazyPut(
+    () => NotificationService(notificationRepositoryInterface: Get.find()),
+  );
   Get.lazyPut(() => ProfileService(profileRepositoryInterface: Get.find()));
   Get.lazyPut(() => AddressService(addressRepositoryInterface: Get.find()));
   Get.lazyPut(() => AuthService(authRepositoryInterface: Get.find()));
@@ -175,30 +260,44 @@ Future<Map<String, Map<String, String>>> init() async {
 
   /// Controller
   Get.lazyPut(() => HtmlController(htmlServiceInterface: Get.find()));
-  Get.lazyPut(() => DisbursementController(disbursementServiceInterface: Get.find()));
+  Get.lazyPut(
+    () => DisbursementController(disbursementServiceInterface: Get.find()),
+  );
   Get.lazyPut(() => MyAccountController(myAccountServiceInterface: Get.find()));
   Get.lazyPut(() => ThemeController(sharedPreferences: Get.find()));
-  Get.lazyPut(() => ForgotPasswordController(forgotPasswordServiceInterface: Get.find()));
+  Get.lazyPut(
+    () => ForgotPasswordController(forgotPasswordServiceInterface: Get.find()),
+  );
   Get.lazyPut(() => ChatController(chatServiceInterface: Get.find()));
-  Get.lazyPut(() => LocalizationController(languageServiceInterface: Get.find()));
+  Get.lazyPut(
+    () => LocalizationController(languageServiceInterface: Get.find()),
+  );
   Get.lazyPut(() => SplashController(splashServiceInterface: Get.find()));
-  Get.lazyPut(() => NotificationController(notificationServiceInterface: Get.find()));
+  Get.lazyPut(
+    () => NotificationController(notificationServiceInterface: Get.find()),
+  );
   Get.lazyPut(() => ProfileController(profileServiceInterface: Get.find()));
   Get.lazyPut(() => AddressController(addressServiceInterface: Get.find()));
   Get.lazyPut(() => AuthController(authServiceInterface: Get.find()));
   Get.lazyPut(() => OrderController(orderServiceInterface: Get.find()));
-  Get.lazyPut(() => ReferAndEarnController(referEarnServiceInterface: Get.find()));
+  Get.lazyPut(
+    () => ReferAndEarnController(referEarnServiceInterface: Get.find()),
+  );
+  Get.lazyPut(() => MissionController(missionServiceInterface: Get.find()));
 
   /// Retrieving localized data
   Map<String, Map<String, String>> languages = {};
-  for(LanguageModel languageModel in AppConstants.languages) {
-    String jsonStringValues =  await rootBundle.loadString('assets/language/${languageModel.languageCode}.json');
+  for (LanguageModel languageModel in AppConstants.languages) {
+    String jsonStringValues = await rootBundle.loadString(
+      'assets/language/${languageModel.languageCode}.json',
+    );
     Map<String, dynamic> mappedJson = jsonDecode(jsonStringValues);
     Map<String, String> json = {};
     mappedJson.forEach((key, value) {
       json[key] = value.toString();
     });
-    languages['${languageModel.languageCode}_${languageModel.countryCode}'] = json;
+    languages['${languageModel.languageCode}_${languageModel.countryCode}'] =
+        json;
   }
   return languages;
 }

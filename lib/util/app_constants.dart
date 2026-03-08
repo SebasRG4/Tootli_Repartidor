@@ -99,6 +99,7 @@ class AppConstants {
   static const String pointConvertUri =
       '/api/v1/delivery-man/convert-loyalty-points';
   static const String orderCount = '/api/v1/delivery-man/orders-count';
+  static const String missionUri = '/api/v1/delivery-man/missions';
 
   ///chat url
   static const String getConversationListUri =

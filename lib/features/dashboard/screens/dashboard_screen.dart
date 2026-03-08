@@ -495,6 +495,26 @@ class DashboardScreenState extends State<DashboardScreen> {
               _setPage(3);
             },
           ),
+          ListTile(
+            leading: Icon(
+              Icons.military_tech,
+              color: Get.currentRoute == RouteHelper.mission
+                  ? Theme.of(context).primaryColor
+                  : null,
+            ),
+            title: Text(
+              'driver_missions'.tr,
+              style: robotoMedium.copyWith(
+                color: Get.currentRoute == RouteHelper.mission
+                    ? Theme.of(context).primaryColor
+                    : null,
+              ),
+            ),
+            onTap: () {
+              Get.back();
+              Get.toNamed(RouteHelper.getMissionRoute());
+            },
+          ),
           const Spacer(),
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.red),
