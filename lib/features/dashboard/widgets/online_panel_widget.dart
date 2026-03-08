@@ -3,6 +3,10 @@ import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/features/address/controllers/address_controller.dart';
+import 'package:sixam_mart_delivery/features/mission/controllers/mission_controller.dart';
+import 'package:sixam_mart_delivery/features/mission/domain/models/mission_model.dart';
+import 'package:sixam_mart_delivery/helper/route_helper.dart';
+import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
 
 class OnlinePanelWidget extends StatelessWidget {
   final VoidCallback onDisconnect;
@@ -296,13 +300,157 @@ class OnlinePanelWidget extends StatelessWidget {
 
                 const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                Center(
-                  child: Text(
-                    'ver_eventos'.tr.replaceFirst('%s', '2'),
-                    style: robotoMedium.copyWith(
-                      color: Theme.of(context).disabledColor,
-                    ),
-                  ),
+                // Missions Section
+                GetBuilder<MissionController>(
+                  builder: (missionController) {
+                    if (missionController.missionList == null) {
+                      missionController.getMissionList();
+                    }
+
+                    List<MissionModel> activeMissions =
+                        missionController.missionList
+                            ?.where(
+                              (m) =>
+                                  m.status == 1 &&
+                                  (m.isCompleted == false ||
+                                      m.isCompleted == null),
+                            )
+                            .toList() ??
+                        [];
+
+                    return activeMissions.isNotEmpty
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'driver_missions'.tr,
+                                    style: robotoBold.copyWith(
+                                      fontSize: Dimensions.fontSizeDefault,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () => Get.toNamed(
+                                      RouteHelper.getMissionRoute(),
+                                    ),
+                                    child: Text(
+                                      'ver_todas'.tr,
+                                      style: robotoMedium.copyWith(
+                                        fontSize: Dimensions.fontSizeSmall,
+                                        color: Colors.blue,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(
+                                height: Dimensions.paddingSizeExtraSmall,
+                              ),
+                              SizedBox(
+                                height: 100,
+                                child: ListView.builder(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: activeMissions.length,
+                                  itemBuilder: (context, index) {
+                                    final mission = activeMissions[index];
+                                    double progress =
+                                        (mission.currentProgress ?? 0) /
+                                        (mission.targetOrders ?? 1);
+                                    return Container(
+                                      width: 200,
+                                      margin: EdgeInsets.only(
+                                        right: Dimensions.paddingSizeSmall,
+                                      ),
+                                      padding: const EdgeInsets.all(
+                                        Dimensions.paddingSizeSmall,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(
+                                          context,
+                                        ).primaryColor.withValues(alpha: 0.05),
+                                        borderRadius: BorderRadius.circular(15),
+                                        border: Border.all(
+                                          color: Theme.of(
+                                            context,
+                                          ).primaryColor.withValues(alpha: 0.1),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            mission.title ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: robotoMedium.copyWith(
+                                              fontSize:
+                                                  Dimensions.fontSizeSmall,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          ClipRRect(
+                                            borderRadius: BorderRadius.circular(
+                                              Dimensions.radiusSmall,
+                                            ),
+                                            child: LinearProgressIndicator(
+                                              value: progress > 1
+                                                  ? 1
+                                                  : progress,
+                                              minHeight: 8,
+                                              backgroundColor: Theme.of(context)
+                                                  .disabledColor
+                                                  .withValues(alpha: 0.2),
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Theme.of(
+                                                      context,
+                                                    ).primaryColor,
+                                                  ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 5),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                '${mission.currentProgress}/${mission.targetOrders}',
+                                                style: robotoRegular.copyWith(
+                                                  fontSize: 10,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).disabledColor,
+                                                ),
+                                              ),
+                                              Text(
+                                                '+${PriceConverterHelper.convertPrice(mission.rewardAmount)}',
+                                                style: robotoBold.copyWith(
+                                                  fontSize: 10,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).primaryColor,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          )
+                        : const SizedBox();
+                  },
                 ),
 
                 const SizedBox(height: Dimensions.paddingSizeDefault),
