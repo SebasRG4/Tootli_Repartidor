@@ -1,5 +1,14 @@
 import 'dart:async';
+import 'package:intl/intl.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
+import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/controllers/notification_controller.dart';
@@ -11,23 +20,34 @@ import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/features/home/widgets/earning_widget.dart';
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:sixam_mart_delivery/features/dashboard/widgets/premium_order_request_widget.dart';
 import 'package:sixam_mart_delivery/features/address/controllers/address_controller.dart';
 import 'package:sixam_mart_delivery/features/address/domain/models/zone_model.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
+import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/order_requset_widget.dart';
+import 'package:sixam_mart_delivery/features/dashboard/widgets/accepted_order_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
+import 'dart:math';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.onNavigateToOrders});
+  const HomeScreen({
+    super.key,
+    this.onNavigateToOrders,
+    this.onTapMenu,
+    this.onOrderActiveStatusChanged,
+  });
   final Function()? onNavigateToOrders;
+  final Function()? onTapMenu;
+  final Function(bool isActive)? onOrderActiveStatusChanged;
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   late final AppLifecycleListener _listener;
   bool _isNotificationPermissionGranted = true;
   bool _isBatteryOptimizationGranted = true;
@@ -36,7 +56,16 @@ class _HomeScreenState extends State<HomeScreen> {
   double _currentZoom = 16;
   final Set<Polygon> _polygons = {};
   final Set<Marker> _markers = {};
+  final Set<Polyline> _polylines = {};
+  OrderModel? _activeOrderRequest;
   int _previousOrderCount = 0;
+  String _orderPhase = 'none'; // 'none', 'going_to_store', 'going_to_customer'
+  double? _lastLat;
+  double? _lastLng;
+  int _noMovementCount = 0;
+  String? _estimatedArrivalTime;
+  Timer? _noMovementTimer;
+  final AudioPlayer _governanceAudioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -164,6 +193,122 @@ class _HomeScreenState extends State<HomeScreen> {
     checkPermission();
   }
 
+  void _showSupportBottomSheet() {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 4,
+              width: 40,
+              decoration: BoxDecoration(
+                color: Theme.of(context).disabledColor.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 15),
+            Text('Centro de Soporte', style: robotoBold.copyWith(fontSize: 18)),
+            const SizedBox(height: 25),
+            _buildSupportOption(
+              'Soporte Tootli',
+              'Comunícate con nuestro equipo',
+              Icons.headset_mic,
+              Colors.blue,
+              () {
+                String? phone = Get.find<SplashController>().configModel?.phone;
+                if (phone != null && phone.isNotEmpty) {
+                  launchUrlString(
+                    'tel:$phone',
+                    mode: LaunchMode.externalApplication,
+                  );
+                } else {
+                  showCustomSnackBar('Número de soporte no configurado');
+                }
+              },
+            ),
+            const SizedBox(height: 15),
+            _buildSupportOption(
+              'Emergencia (911)',
+              'Solo para casos de gravedad',
+              Icons.emergency_share,
+              Colors.red,
+              () => launchUrlString(
+                'tel:911',
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSupportOption(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+    Function onTap,
+  ) {
+    return InkWell(
+      onTap: () {
+        Get.back();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 15),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: robotoBold.copyWith(fontSize: 16, color: color),
+                  ),
+                  Text(
+                    subtitle,
+                    style: robotoRegular.copyWith(
+                      fontSize: 12,
+                      color: Theme.of(context).disabledColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Theme.of(context).disabledColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _getPolygons(List<ZoneModel> zoneList) {
     _polygons.clear();
     int? profileZoneId = Get.find<ProfileController>().profileModel?.zoneId;
@@ -190,9 +335,13 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _gridTimer?.cancel();
+    _noMovementTimer?.cancel();
+    _governanceAudioPlayer.dispose();
     _listener.dispose();
     super.dispose();
   }
+
+  bool _hasCenteredOnLaunch = false;
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +387,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
           return GetBuilder<ProfileController>(
             builder: (profileController) {
+              // Auto-centro inicial cuando la ubicación llega por primera vez y no hay pedido activo
+              if (!_hasCenteredOnLaunch &&
+                  profileController.recordLocationBody != null &&
+                  _mapController != null &&
+                  _activeOrderRequest == null) {
+                _hasCenteredOnLaunch = true;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  animateToMyLocation();
+                });
+              }
+
               LatLng? currentLatLng;
               if (profileController.recordLocationBody != null) {
                 currentLatLng = LatLng(
@@ -276,6 +436,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (_currentZoom > 14)
                             ...addressController.gridMarkers,
                         },
+                        polylines: _polylines,
+                        padding: EdgeInsets.only(
+                          bottom: _activeOrderRequest != null ? 350 : 0,
+                        ),
                         onCameraMove: (position) {
                           // Only trigger setState if we cross the zoom threshold (14.5)
                           bool wasVisible = _currentZoom > 14.5;
@@ -307,6 +471,48 @@ class _HomeScreenState extends State<HomeScreen> {
                             );
                           }
                         },
+                      ),
+
+                      // Menu Button
+                      Positioned(
+                        top:
+                            context.mediaQueryPadding.top +
+                            Dimensions.paddingSizeSmall,
+                        left: Dimensions.paddingSizeDefault,
+                        child: Container(
+                          height: 40,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: _activeOrderRequest != null
+                                ? Colors.red
+                                : Theme.of(context).cardColor,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: Icon(
+                              _activeOrderRequest != null
+                                  ? Icons.close
+                                  : Icons.menu,
+                              size: 25,
+                              color: _activeOrderRequest != null
+                                  ? Colors.white
+                                  : Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge!.color,
+                            ),
+                            onPressed: _activeOrderRequest != null
+                                ? cancelOrderRequest
+                                : widget.onTapMenu,
+                          ),
+                        ),
                       ),
 
                       // Notification Button
@@ -459,49 +665,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
 
-                      // My Location Button
-                      Positioned(
-                        bottom: 20,
-                        right: 20,
-                        child: InkWell(
-                          onTap: () {
-                            if (profileController.recordLocationBody != null) {
-                              _mapController?.animateCamera(
-                                CameraUpdate.newLatLngZoom(
-                                  LatLng(
-                                    profileController
-                                        .recordLocationBody!
-                                        .latitude!,
-                                    profileController
-                                        .recordLocationBody!
-                                        .longitude!,
-                                  ),
-                                  17,
-                                ),
-                              );
-                            }
-                          },
-                          child: Container(
-                            height: 50,
-                            width: 50,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).cardColor,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.my_location,
-                              color: Theme.of(context).primaryColor,
-                            ),
-                          ),
-                        ),
-                      ),
+                      // Se eliminó el botón de ubicación de aquí, se movió a DashboardScreen
                     ],
                   );
                 },
@@ -510,7 +674,594 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
+
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(
+          bottom: 70,
+        ), // Avoid overlap with bottom info
+        child: FloatingActionButton(
+          onPressed: _showSupportBottomSheet,
+          backgroundColor: Colors.red,
+          child: const Icon(Icons.emergency, color: Colors.white),
+        ),
+      ),
+
+      bottomSheet: _activeOrderRequest != null
+          ? (_orderPhase == 'none'
+                ? () {
+                    double? storeLat = double.tryParse(
+                      _activeOrderRequest!.storeLat ?? '',
+                    );
+                    double? storeLng = double.tryParse(
+                      _activeOrderRequest!.storeLng ?? '',
+                    );
+                    double? dmLat = Get.find<ProfileController>()
+                        .recordLocationBody
+                        ?.latitude;
+                    double? dmLng = Get.find<ProfileController>()
+                        .recordLocationBody
+                        ?.longitude;
+                    double? distance;
+                    if (storeLat != null &&
+                        storeLng != null &&
+                        dmLat != null &&
+                        dmLng != null) {
+                      distance =
+                          _calculateDistance(dmLat, dmLng, storeLat, storeLng) /
+                          1000;
+                    }
+
+                    return PremiumOrderRequestWidget(
+                      orderModel: _activeOrderRequest!,
+                      distance: distance,
+                      onAccept: () {
+                        setState(() {
+                          _orderPhase = 'going_to_store';
+                          _startMovementTimer();
+                        });
+                        Get.find<OrderController>().getOrderDetails(
+                          _activeOrderRequest!.id,
+                          _activeOrderRequest!.orderType == 'parcel',
+                        );
+                        setPolyline(_activeOrderRequest!);
+                      },
+                      onReject: _performCancellation,
+                    );
+                  }()
+                : AcceptedOrderWidget(
+                    orderModel: _activeOrderRequest!,
+                    phase: _orderPhase,
+                    estimatedArrivalTime: _estimatedArrivalTime,
+                    onPickedUp: () {
+                      setState(() {
+                        _orderPhase = 'going_to_customer';
+                      });
+                      setPolyline(_activeOrderRequest!);
+                    },
+                    onDelivered: () async {
+                      bool success = await Get.find<OrderController>()
+                          .updateOrderStatus(_activeOrderRequest!, 'delivered');
+                      if (success) {
+                        showCustomSnackBar(
+                          'Pedido entregado con éxito',
+                          isError: false,
+                        );
+                        setState(() {
+                          _activeOrderRequest = null;
+                          _orderPhase = 'none';
+                          _stopMovementTimer();
+                        });
+                      }
+                    },
+                  ))
+          : null,
     );
+  }
+
+  void cancelOrderRequest() {
+    if (_orderPhase != 'none') {
+      Get.dialog(
+        Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange,
+                  size: 50,
+                ),
+                const SizedBox(height: Dimensions.paddingSizeDefault),
+                Text(
+                  '¿Cancelar pedido?',
+                  style: robotoBold.copyWith(
+                    fontSize: Dimensions.fontSizeLarge,
+                  ),
+                ),
+                const SizedBox(height: Dimensions.paddingSizeSmall),
+                Text(
+                  'Cancelar ordenes confirmadas puede afectar a tu tasa de rendimiento',
+                  textAlign: TextAlign.center,
+                  style: robotoRegular.copyWith(
+                    fontSize: Dimensions.fontSizeSmall,
+                  ),
+                ),
+                const SizedBox(height: Dimensions.paddingSizeLarge),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () => Get.back(),
+                        child: Text(
+                          'Volver',
+                          style: robotoMedium.copyWith(color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: Dimensions.paddingSizeSmall),
+                    Expanded(
+                      child: CustomButtonWidget(
+                        buttonText: 'Confirmar',
+                        onPressed: () {
+                          Get.back();
+                          _performCancellation();
+                        },
+                        height: 40,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    } else {
+      _performCancellation();
+    }
+  }
+
+  void _performCancellation() async {
+    if (_activeOrderRequest != null && _activeOrderRequest!.id != 999) {
+      Get.find<OrderController>().updateOrderStatus(
+        _activeOrderRequest!,
+        AppConstants.canceled,
+        back: false,
+      );
+    }
+
+    setState(() {
+      _activeOrderRequest = null;
+      _orderPhase = 'none';
+      _polylines.clear();
+      _markers.clear();
+      _noMovementCount = 0;
+      _estimatedArrivalTime = null;
+      _stopMovementTimer();
+    });
+    widget.onOrderActiveStatusChanged?.call(false);
+    animateToMyLocation();
+  }
+
+  void animateToMyLocation() {
+    LatLng dmLocation = LatLng(
+      Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
+      Get.find<ProfileController>().recordLocationBody?.longitude ?? 0,
+    );
+    if (dmLocation.latitude != 0) {
+      _mapController?.animateCamera(CameraUpdate.newLatLngZoom(dmLocation, 16));
+    }
+  }
+
+  Future<Uint8List> _convertAssetToUnit8List(
+    String imagePath, {
+    int width = 50,
+  }) async {
+    ByteData data = await rootBundle.load(imagePath);
+    ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
+    ui.FrameInfo fi = await codec.getNextFrame();
+    return (await fi.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    ))!.buffer.asUint8List();
+  }
+
+  Future<List<LatLng>> _getRoutePolyline(
+    LatLng origin,
+    LatLng destination,
+  ) async {
+    List<LatLng> polylineCoordinates = [];
+    PolylinePoints polylinePoints = PolylinePoints();
+
+    try {
+      PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+        googleApiKey: AppConstants.mapKey,
+        request: PolylineRequest(
+          origin: PointLatLng(origin.latitude, origin.longitude),
+          destination: PointLatLng(destination.latitude, destination.longitude),
+          mode: TravelMode.driving,
+        ),
+      );
+
+      if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
+        debugPrint("GOOGLE MAPS ERROR: ${result.errorMessage}");
+      }
+
+      if (result.points.isNotEmpty) {
+        for (var point in result.points) {
+          polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+        }
+      } else {
+        debugPrint(
+          "GOOGLE MAPS ERROR: No points found in result. Status: ${result.status}",
+        );
+      }
+    } catch (e) {
+      debugPrint("Error fetching polyline: $e");
+    }
+    return polylineCoordinates;
+  }
+
+  void simulateOrderRequest() {
+    // Datos de prueba para simular un pedido en Mexicaltzingo (DIF)
+    OrderModel mockOrder = OrderModel(
+      id: 999,
+      orderAmount: 150.0,
+      orderType: 'delivery',
+      deliveryCharge: 25.0,
+      storeName: 'Tootli Mexicaltzingo Store',
+      storeAddress: 'DIF Mexicaltzingo, Edo Mex',
+      storeLat: '19.2091',
+      storeLng: '-99.5858',
+      deliveryAddress: DeliveryAddress(
+        address: 'San Mateo Mexicaltzingo, Edo Mex',
+        latitude: '19.2120',
+        longitude: '-99.5880',
+      ),
+      customer: Customer(
+        fName: 'Usuario',
+        lName: 'Prueba',
+        phone: '1234567890',
+      ),
+    );
+
+    setState(() {
+      _activeOrderRequest = mockOrder;
+      _orderPhase = 'none';
+    });
+    widget.onOrderActiveStatusChanged?.call(true);
+
+    // Dibujar la ruta en el mapa
+    setPolyline(mockOrder);
+  }
+
+  bool get isOrderActive => _activeOrderRequest != null;
+
+  void setPolyline(OrderModel order) async {
+    _polylines.clear();
+    bool parcel = order.orderType == 'parcel';
+
+    LatLng dmLocation = LatLng(
+      Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
+      Get.find<ProfileController>().recordLocationBody?.longitude ?? 0,
+    );
+
+    LatLng storeLocation = LatLng(
+      double.parse(
+        parcel ? order.deliveryAddress?.latitude ?? '0' : order.storeLat ?? '0',
+      ),
+      double.parse(
+        parcel
+            ? order.deliveryAddress?.longitude ?? '0'
+            : order.storeLng ?? '0',
+      ),
+    );
+
+    LatLng destinationLocation = LatLng(
+      double.parse(
+        parcel
+            ? order.receiverDetails?.latitude ?? '0'
+            : order.deliveryAddress?.latitude ?? '0',
+      ),
+      double.parse(
+        parcel
+            ? order.receiverDetails?.longitude ?? '0'
+            : order.deliveryAddress?.longitude ?? '0',
+      ),
+    );
+
+    // Obtener puntos de ruta reales por carretera
+    List<LatLng> segment1Points = await _getRoutePolyline(
+      dmLocation,
+      storeLocation,
+    );
+    List<LatLng> segment2Points = await _getRoutePolyline(
+      storeLocation,
+      destinationLocation,
+    );
+
+    // Fallback a línea recta si falla la API
+    if (segment1Points.isEmpty) segment1Points = [dmLocation, storeLocation];
+    if (segment2Points.isEmpty)
+      segment2Points = [storeLocation, destinationLocation];
+
+    Uint8List storeMarker = await _convertAssetToUnit8List(
+      Images.store,
+      width: 40,
+    );
+    Uint8List destinationMarker = await _convertAssetToUnit8List(
+      Images.homeDelivery,
+      width: 40,
+    );
+
+    // Calcular distancia total del tramo relevante
+    double totalDistance = 0;
+    List<LatLng> activePoints = _orderPhase == 'going_to_customer'
+        ? segment2Points
+        : segment1Points;
+
+    for (int i = 0; i < activePoints.length - 1; i++) {
+      totalDistance += _calculateDistance(
+        activePoints[i].latitude,
+        activePoints[i].longitude,
+        activePoints[i + 1].latitude,
+        activePoints[i + 1].longitude,
+      );
+    }
+    setState(() {
+      int minutes = (totalDistance / 333).ceil();
+      if (minutes == 0 && totalDistance > 0) minutes = 1;
+
+      if (totalDistance > 0) {
+        DateTime arrivalTime = DateTime.now().add(Duration(minutes: minutes));
+        _estimatedArrivalTime = DateFormat('HH:mm').format(arrivalTime);
+      } else {
+        _estimatedArrivalTime = null;
+      }
+
+      _markers.clear();
+      // En la fase de ir a la tienda, mostramos el marcador de la tienda
+      if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('store'),
+            position: storeLocation,
+            icon: BitmapDescriptor.bytes(storeMarker),
+          ),
+        );
+      }
+
+      // En la fase de ir al cliente, mostramos el marcador del destino
+      if (_orderPhase == 'going_to_customer') {
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('destination'),
+            position: destinationLocation,
+            icon: BitmapDescriptor.bytes(destinationMarker),
+          ),
+        );
+      }
+
+      // Segmento 1: Repartidor -> Tienda (Solo si no hemos recogido)
+      if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('delivery_to_store'),
+            points: segment1Points,
+            color: Theme.of(Get.context!).primaryColor,
+            width: 5,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+        );
+      }
+
+      // Segmento 2: Tienda -> Cliente (Solo si ya recogimos el pedido)
+      if (_orderPhase == 'going_to_customer') {
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('store_to_destination'),
+            points: segment2Points,
+            color: Theme.of(Get.context!).primaryColor,
+            width: 5,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+        );
+      } else if (_orderPhase == 'none') {
+        // En vista previa mostramos la ruta al cliente punteada
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('store_to_destination'),
+            points: segment2Points,
+            color: Theme.of(Get.context!).primaryColor.withOpacity(0.6),
+            width: 5,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            patterns: [PatternItem.dash(15), PatternItem.gap(10)],
+          ),
+        );
+      }
+    });
+
+    // Ajustar cámara para mostrar solo el segmento relevante
+    List<LatLng> pointsToFit = [];
+    if (_orderPhase == 'going_to_store') {
+      pointsToFit = [dmLocation, storeLocation];
+    } else if (_orderPhase == 'going_to_customer') {
+      pointsToFit = [storeLocation, destinationLocation];
+    } else {
+      pointsToFit = [dmLocation, storeLocation, destinationLocation];
+    }
+
+    LatLngBounds bounds = LatLngBounds(
+      southwest: LatLng(
+        pointsToFit.map((p) => p.latitude).reduce(min),
+        pointsToFit.map((p) => p.longitude).reduce(min),
+      ),
+      northeast: LatLng(
+        pointsToFit.map((p) => p.latitude).reduce(max),
+        pointsToFit.map((p) => p.longitude).reduce(max),
+      ),
+    );
+
+    if (_orderPhase == 'going_to_store' || _orderPhase == 'going_to_customer') {
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: pointsToFit[0],
+            zoom: 17,
+            tilt: 45,
+            bearing: _calculateBearing(pointsToFit[0], pointsToFit[1]),
+          ),
+        ),
+      );
+    } else {
+      _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+    }
+  }
+
+  void _startMovementTimer() {
+    _noMovementTimer?.cancel();
+    _noMovementCount = 0;
+    _lastLat = Get.find<ProfileController>().recordLocationBody?.latitude;
+    _lastLng = Get.find<ProfileController>().recordLocationBody?.longitude;
+
+    _noMovementTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      double? currentLat =
+          Get.find<ProfileController>().recordLocationBody?.latitude;
+      double? currentLng =
+          Get.find<ProfileController>().recordLocationBody?.longitude;
+
+      if (currentLat != null &&
+          currentLng != null &&
+          _lastLat != null &&
+          _lastLng != null) {
+        double distance = _calculateDistance(
+          _lastLat!,
+          _lastLng!,
+          currentLat,
+          currentLng,
+        );
+
+        if (distance < 50) {
+          _noMovementCount++;
+          // A partir de 1.5 min (3 checks de 30s) empieza a sonar
+          if (_noMovementCount == 3) {
+            _governanceAudioPlayer.play(AssetSource('Dms_no_moving.mp3'));
+            showCustomSnackBar(
+              '¡Muévete pronto! Si no avanzas, el pedido se cancelará automáticamente',
+              isError: true,
+            );
+          } else if (_noMovementCount > 3 && _noMovementCount < 6) {
+            // Repetir cada 30s hasta llegar a los 3 min
+            _governanceAudioPlayer.play(AssetSource('Dms_no_moving.mp3'));
+          } else if (_noMovementCount >= 6) {
+            // Llegamos a los 3 min (6 checks de 30s)
+            _performCancellation();
+            _showUnassignedDialog();
+          }
+        } else {
+          _noMovementCount = 0;
+          _lastLat = currentLat;
+          _lastLng = currentLng;
+        }
+      } else {
+        _lastLat = currentLat;
+        _lastLng = currentLng;
+      }
+    });
+  }
+
+  void _showUnassignedDialog() {
+    _governanceAudioPlayer.play(AssetSource('pedido_reasingado.mp3'));
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.red,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 60),
+              const SizedBox(height: Dimensions.paddingSizeDefault),
+              Text(
+                'PEDIDO REASIGNADO',
+                style: robotoBold.copyWith(color: Colors.white, fontSize: 20),
+              ),
+              const SizedBox(height: Dimensions.paddingSizeSmall),
+              Text(
+                'El pedido se reasigno, cancelar ordenes por incatividad afecta a tu cuenta',
+                textAlign: TextAlign.center,
+                style: robotoMedium.copyWith(color: Colors.white, fontSize: 16),
+              ),
+              const SizedBox(height: Dimensions.paddingSizeExtraLarge),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        Dimensions.radiusSmall,
+                      ),
+                    ),
+                  ),
+                  onPressed: () => Get.back(),
+                  child: Text('ACEPTAR', style: robotoBold),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false, // Forzar a que de "Aceptar"
+    );
+  }
+
+  void _stopMovementTimer() {
+    _noMovementTimer?.cancel();
+  }
+
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
+    var p = 0.017453292519943295;
+    var c = cos;
+    var a =
+        0.5 -
+        c((lat2 - lat1) * p) / 2 +
+        c(lat1 * p) * c(lat2 * p) * (1 - c((lon2 - lon1) * p)) / 2;
+    return 12742 * asin(sqrt(a)) * 1000; // a metros
+  }
+
+  double _calculateBearing(LatLng start, LatLng end) {
+    double lat1 = start.latitude * pi / 180;
+    double lon1 = start.longitude * pi / 180;
+    double lat2 = end.latitude * pi / 180;
+    double lon2 = end.longitude * pi / 180;
+
+    double dLon = lon2 - lon1;
+    double y = sin(dLon) * cos(lat2);
+    double x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon);
+    double brng = atan2(y, x) * 180 / pi;
+    return (brng + 360) % 360;
   }
 
   void _showEarningsBottomSheet(
@@ -616,9 +1367,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ? Container(
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).textTheme.bodyLarge!.color?.withValues(alpha: 0.7),
+              color: isBatteryPermission
+                  ? Colors.orange.withOpacity(0.9)
+                  : Theme.of(
+                      context,
+                    ).textTheme.bodyLarge!.color?.withValues(alpha: 0.7),
             ),
             child: InkWell(
               onTap: onTap,
@@ -626,41 +1379,44 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
                 child: Row(
                   children: [
-                    if (isBatteryPermission)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Image.asset(
-                          Images.allertIcon,
-                          height: 20,
-                          width: 20,
-                        ),
-                      ),
+                    Icon(
+                      isBatteryPermission
+                          ? Icons.battery_alert
+                          : Icons.notifications_off,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: Dimensions.paddingSizeSmall),
 
                     Expanded(
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              isBatteryPermission
-                                  ? 'for_better_performance_allow_notification_to_run_in_background'
-                                        .tr
-                                  : 'notification_is_disabled_please_allow_notification'
-                                        .tr,
-                              maxLines: 2,
-                              style: robotoRegular.copyWith(
-                                fontSize: Dimensions.fontSizeSmall,
-                                color: Colors.white,
-                              ),
+                          Text(
+                            isBatteryPermission
+                                ? 'Optimización de batería activa'
+                                : 'Notificaciones desactivadas',
+                            style: robotoBold.copyWith(
+                              fontSize: Dimensions.fontSizeSmall,
+                              color: Colors.white,
                             ),
                           ),
-                          const SizedBox(width: Dimensions.paddingSizeSmall),
-                          const Icon(
-                            Icons.arrow_circle_right_rounded,
-                            color: Colors.white,
-                            size: 24,
+                          Text(
+                            isBatteryPermission
+                                ? 'Permite que Tootli funcione en segundo plano para rastreo constante.'
+                                : 'Por favor activa las notificaciones para recibir pedidos.',
+                            style: robotoRegular.copyWith(
+                              fontSize: Dimensions.fontSizeExtraSmall,
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
+                    ),
+                    const Icon(
+                      Icons.arrow_circle_right_rounded,
+                      color: Colors.white,
+                      size: 24,
                     ),
                   ],
                 ),

@@ -26,6 +26,7 @@ dependencies:
   geolocator: ^14.0.2
   geocoding: ^4.0.0
   google_maps_flutter: ^2.14.0
+  flutter_polyline_points: ^2.1.0
   url_launcher: ^6.3.2
   vibration: ^3.1.6
   image_picker: ^1.2.1
@@ -64,7 +65,9 @@ flutter:
   assets:
     - assets/image/
     - assets/language/
-    - assets/notification.mp3
+    - assets/alert_new_delivery.mp3
+    - assets/Dms_no_moving.mp3
+    - assets/pedido_reasingado.mp3
 
   fonts:
     - family: Roboto

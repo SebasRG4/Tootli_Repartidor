@@ -26,7 +26,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final Function()? onTapMenu;
+  const ProfileScreen({super.key, this.onTapMenu});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -100,6 +101,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ? const Center(child: CircularProgressIndicator())
               : ProfileBgWidget(
                   backButton: false,
+                  onMenuPressed: widget.onTapMenu,
                   circularImage: Container(
                     decoration: BoxDecoration(
                       border: Border.all(

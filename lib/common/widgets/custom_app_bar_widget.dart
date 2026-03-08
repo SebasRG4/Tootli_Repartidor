@@ -4,32 +4,60 @@ import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:flutter/material.dart';
 
-class CustomAppBarWidget extends StatelessWidget implements PreferredSizeWidget {
+class CustomAppBarWidget extends StatelessWidget
+    implements PreferredSizeWidget {
   final String title;
   final bool isBackButtonExist;
   final Function? onBackPressed;
+  final Function? onMenuPressed;
   final Widget? actionWidget;
   final TabBar? bottom;
-  const CustomAppBarWidget({super.key, required this.title, this.isBackButtonExist = true, this.onBackPressed, this.actionWidget, this.bottom});
+  const CustomAppBarWidget({
+    super.key,
+    required this.title,
+    this.isBackButtonExist = true,
+    this.onBackPressed,
+    this.onMenuPressed,
+    this.actionWidget,
+    this.bottom,
+  });
 
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      title: Text(title, style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).textTheme.bodyLarge!.color)),
+      title: Text(
+        title,
+        style: robotoMedium.copyWith(
+          fontSize: Dimensions.fontSizeLarge,
+          color: Theme.of(context).textTheme.bodyLarge!.color,
+        ),
+      ),
       centerTitle: true,
-      leading: isBackButtonExist ? IconButton(
-        icon: const Icon(Icons.arrow_back_ios),
-        color: Theme.of(context).textTheme.bodyLarge!.color,
-        onPressed: (){
-          if(onBackPressed != null){
-            onBackPressed!();
-          }else if(Get.previousRoute.isNotEmpty){
-            Get.back();
-          }else{
-            Get.offAllNamed(RouteHelper.getInitialRoute());
-          }
-        } ,
-      ) : const SizedBox(),
+      leading: isBackButtonExist
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios),
+              color: Theme.of(context).textTheme.bodyLarge!.color,
+              onPressed: () {
+                if (onBackPressed != null) {
+                  onBackPressed!();
+                } else if (Get.previousRoute.isNotEmpty) {
+                  Get.back();
+                } else {
+                  Get.offAllNamed(RouteHelper.getInitialRoute());
+                }
+              },
+            )
+          : IconButton(
+              icon: const Icon(Icons.menu),
+              color: Theme.of(context).textTheme.bodyLarge!.color,
+              onPressed: () {
+                if (onMenuPressed != null) {
+                  onMenuPressed!();
+                } else {
+                  Scaffold.of(context).openDrawer();
+                }
+              },
+            ),
       backgroundColor: Theme.of(context).cardColor,
       surfaceTintColor: Theme.of(context).cardColor,
       shadowColor: Theme.of(context).disabledColor.withValues(alpha: 0.5),
@@ -45,5 +73,10 @@ class CustomAppBarWidget extends StatelessWidget implements PreferredSizeWidget 
   }
 
   @override
-  Size get preferredSize => Size(1170, GetPlatform.isDesktop ? (bottom != null ? 120 : 70) : (bottom != null ? 100 : 60));
+  Size get preferredSize => Size(
+    1170,
+    GetPlatform.isDesktop
+        ? (bottom != null ? 120 : 70)
+        : (bottom != null ? 100 : 60),
+  );
 }

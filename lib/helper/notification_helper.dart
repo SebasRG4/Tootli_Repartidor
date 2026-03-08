@@ -18,6 +18,8 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationHelper {
   static Future<void> initialize(
@@ -52,9 +54,7 @@ class NotificationHelper {
                   fromNotification: true,
                 ),
               ),
-              // NotificationType.order_request: () => Get.toNamed(RouteHelper.getMainRoute('order-request')),
-              NotificationType.order_request: () =>
-                  null, // Anulamos redirección forzada
+              NotificationType.order_request: () => null,
               NotificationType.block: () =>
                   Get.offAllNamed(RouteHelper.getSignInRoute()),
               NotificationType.unblock: () =>
@@ -173,9 +173,7 @@ class NotificationHelper {
                 fromNotification: true,
               ),
             ),
-            // NotificationType.order_request: () => Get.toNamed(RouteHelper.getMainRoute('order-request')),
-            NotificationType.order_request: () =>
-                null, // Anulamos redirección forzada
+            NotificationType.order_request: () => null,
             NotificationType.block: () =>
                 Get.offAllNamed(RouteHelper.getSignInRoute()),
             NotificationType.unblock: () =>
@@ -201,6 +199,56 @@ class NotificationHelper {
         }
       } catch (_) {}
     });
+  }
+
+  static final AudioPlayer _audioPlayer = AudioPlayer();
+
+  /// Start Persistent Location Service
+  @pragma('vm:entry-point')
+  static Future<ServiceRequestResult> startLocationService() async {
+    if (await FlutterForegroundTask.isRunningService) {
+      return FlutterForegroundTask.restartService();
+    } else {
+      return FlutterForegroundTask.startService(
+        serviceId: 257,
+        notificationTitle: 'Tootli operativo',
+        notificationText: 'Rastreando ubicación en tiempo real',
+        callback: locationStartCallback,
+      );
+    }
+  }
+
+  /// Start Foreground Service
+  @pragma('vm:entry-point')
+  static Future<ServiceRequestResult> startService(
+    String? orderId,
+    NotificationType notificationType,
+  ) async {
+    if (await FlutterForegroundTask.isRunningService) {
+      return FlutterForegroundTask.restartService();
+    } else {
+      return FlutterForegroundTask.startService(
+        serviceId: 256,
+        notificationTitle: notificationType == NotificationType.order_request
+            ? 'Order Notification'
+            : 'Has sido asignado a un nuevo pedido ($orderId)',
+        notificationText: notificationType == NotificationType.order_request
+            ? 'Nueva solicitud de pedido.'
+            : 'Abre la app para ver los detalles.',
+        callback: startCallback,
+      );
+    }
+  }
+
+  /// Stop Foreground Service
+  @pragma('vm:entry-point')
+  static Future<ServiceRequestResult> stopService() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      customPrint('Audio stop error: $e');
+    }
+    return FlutterForegroundTask.stopService();
   }
 
   static Future<void> showNotification(
@@ -429,8 +477,6 @@ class NotificationHelper {
   }
 }
 
-final AudioPlayer _audioPlayer = AudioPlayer();
-
 /// Background FCM message handler
 @pragma('vm:entry-point')
 Future<void> myBackgroundMessageHandler(RemoteMessage message) async {
@@ -445,7 +491,7 @@ Future<void> myBackgroundMessageHandler(RemoteMessage message) async {
               NotificationType.order_request)) {
     FlutterForegroundTask.initCommunicationPort();
     await _initService();
-    await _startService(
+    await NotificationHelper.startService(
       notificationBody.orderId?.toString(),
       notificationBody.notificationType!,
     );
@@ -477,40 +523,6 @@ Future<void> _initService() async {
   );
 }
 
-/// Start Foreground Service
-@pragma('vm:entry-point')
-Future<ServiceRequestResult> _startService(
-  String? orderId,
-  NotificationType notificationType,
-) async {
-  if (await FlutterForegroundTask.isRunningService) {
-    return FlutterForegroundTask.restartService();
-  } else {
-    return FlutterForegroundTask.startService(
-      serviceId: 256,
-      notificationTitle: notificationType == NotificationType.order_request
-          ? 'Order Notification'
-          : 'You have been assigned a new order ($orderId)',
-      notificationText: notificationType == NotificationType.order_request
-          ? 'New order request arrived, you can confirm this.'
-          : 'Open app and check order details.',
-      callback: startCallback,
-    );
-  }
-}
-
-/// Stop Foreground Service
-@pragma('vm:entry-point')
-Future<ServiceRequestResult> stopService() async {
-  try {
-    await _audioPlayer.stop();
-    await _audioPlayer.dispose();
-  } catch (e) {
-    customPrint('Audio dispose error: $e');
-  }
-  return FlutterForegroundTask.stopService();
-}
-
 /// Foreground Service entry point
 @pragma('vm:entry-point')
 void startCallback() {
@@ -522,7 +534,7 @@ class MyTaskHandler extends TaskHandler {
   AudioPlayer? _localPlayer;
 
   void _playAudio() {
-    _localPlayer?.play(AssetSource('notification.mp3'));
+    _localPlayer?.play(AssetSource('alert_new_delivery.mp3'));
   }
 
   @override
@@ -539,7 +551,7 @@ class MyTaskHandler extends TaskHandler {
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     await _localPlayer?.dispose();
-    await stopService();
+    await NotificationHelper.stopService();
   }
 
   @override
@@ -553,14 +565,14 @@ class MyTaskHandler extends TaskHandler {
     if (id == '1') {
       FlutterForegroundTask.launchApp('/');
     }
-    stopService();
+    NotificationHelper.stopService();
   }
 
   @override
   void onNotificationPressed() {
     customPrint('onNotificationPressed');
     FlutterForegroundTask.launchApp('/');
-    stopService();
+    NotificationHelper.stopService();
   }
 
   @override
@@ -570,4 +582,55 @@ class MyTaskHandler extends TaskHandler {
       notificationText: 'Open app and check order details.',
     );
   }
+}
+
+@pragma('vm:entry-point')
+void locationStartCallback() {
+  FlutterForegroundTask.setTaskHandler(LocationTaskHandler());
+}
+
+class LocationTaskHandler extends TaskHandler {
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {
+    _recordLocation();
+  }
+
+  Future<void> _recordLocation() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? token = prefs.getString(AppConstants.token);
+      if (token == null || token.isEmpty) return;
+
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 10,
+        ),
+      );
+
+      final response = await http.post(
+        Uri.parse('${AppConstants.baseUrl}${AppConstants.recordLocationUri}'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'token': token,
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'location': 'Background Update',
+        }),
+      );
+
+      debugPrint('Background Location update: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('Background Location error: $e');
+    }
+  }
+
+  @override
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {}
 }

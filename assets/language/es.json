@@ -636,5 +636,21 @@
   "you_can_pay_the_amount_to_the_admin": "Puedes pagar el monto al administrador",
   "centro_de_pedidos": "Centro de Pedidos",
   "pedidos_disponibles": "Pedidos Disponibles",
-  "tootli_requests": "Centro de Pedidos"
+  "tootli_requests": "Centro de Pedidos",
+  "buscando_pedidos": "Buscando pedidos",
+  "ver_detalles_de_los_limites": "Ver detalles de los límites de zonas",
+  "Ver detalles de bonos": "Ver detalles de bonos",
+  "recompensa_de_busqueda": "Recompensa de búsqueda",
+  "elige_y_compra": "Elige y compra",
+  "acelerador_de_recompensa": "¡Acelerador de recompensa!",
+  "conoce_mas": "Conoce más",
+  "ver_eventos": "Ver %s evento(s)",
+  "desconectarse": "Desconectarse",
+  "conectarse": "Conectarse",
+  "puedes_conectarte_para_recibir_pedidos": "Puedes conectarte para comenzar a recibir pedidos",
+  "resumen_del_dia": "Resumen del día",
+  "pedidos_completados": "Pedidos completados",
+  "ganancias_estimadas": "Ganancias estimadas",
+  "consejo_del_dia": "Consejo del día",
+  "puedes_revisar_tus_zonas_de_calor_en_el_mapa": "Revisa tus zonas de calor para encontrar más pedidos"
 }

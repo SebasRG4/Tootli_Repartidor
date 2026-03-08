@@ -9,6 +9,7 @@ import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/domain/services/profile_service_interface.dart';
 
 class ProfileController extends GetxController implements GetxService {
@@ -116,6 +117,8 @@ class ProfileController extends GetxController implements GetxService {
 
   void startLocationRecord() {
     _timer?.cancel();
+    NotificationHelper.startLocationService();
+    recordLocation(); // Obtener ubicación inmediatamente
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
       recordLocation();
     });
@@ -123,6 +126,7 @@ class ProfileController extends GetxController implements GetxService {
 
   void stopLocationRecord() {
     _timer?.cancel();
+    NotificationHelper.stopService();
   }
 
   Future<void> recordLocation() async {

@@ -24,7 +24,8 @@ import 'package:permission_handler/permission_handler.dart';
 
 class OrderRequestScreen extends StatefulWidget {
   final Function onTap;
-  const OrderRequestScreen({super.key, required this.onTap});
+  final Function()? onTapMenu;
+  const OrderRequestScreen({super.key, required this.onTap, this.onTapMenu});
 
   @override
   OrderRequestScreenState createState() => OrderRequestScreenState();
@@ -76,6 +77,7 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
       appBar: CustomAppBarWidget(
         title: 'centro_de_pedidos'.tr, // Antes 'tootli_requests'.tr
         isBackButtonExist: false,
+        onMenuPressed: widget.onTapMenu,
       ),
       body: RefreshIndicator(
         onRefresh: () async {

@@ -10,22 +10,30 @@ import '../../../util/styles.dart';
 import 'running_order_screen.dart';
 
 class OrderScreen extends StatefulWidget {
-  const OrderScreen({super.key});
+  final Function()? onTapMenu;
+  const OrderScreen({super.key, this.onTapMenu});
 
   @override
   State<OrderScreen> createState() => _OrderScreenState();
 }
 
-class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStateMixin {
-
-
+class _OrderScreenState extends State<OrderScreen>
+    with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(length: 2, child: Scaffold(
-      backgroundColor: Theme.of(context).cardColor,
-      appBar: CustomAppBarWidget(title: 'my_orders'.tr, isBackButtonExist: false, bottom: _orderTabBar(context),),
-      body: TabBarView(children: [RunningOrderScreen(), MyOrderScreen()])
-    ));
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).cardColor,
+        appBar: CustomAppBarWidget(
+          title: 'my_orders'.tr,
+          isBackButtonExist: false,
+          onMenuPressed: widget.onTapMenu,
+          bottom: _orderTabBar(context),
+        ),
+        body: TabBarView(children: [RunningOrderScreen(), MyOrderScreen()]),
+      ),
+    );
   }
 }
 
@@ -72,4 +80,3 @@ TabBar _orderTabBar(BuildContext context) {
     ],
   );
 }
-

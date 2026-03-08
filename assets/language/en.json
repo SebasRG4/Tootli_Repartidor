@@ -638,5 +638,21 @@
   "you_can_pay_the_amount_to_the_admin": "You can pay the amount to the admin",
   "centro_de_pedidos": "Orders Center",
   "pedidos_disponibles": "Available Orders",
-  "tootli_requests": "Orders Center"
+  "tootli_requests": "Orders Center",
+  "buscando_pedidos": "Looking for orders",
+  "ver_detalles_de_los_limites": "View area limit details",
+  "Ver detalles de bonos": "View bonus details",
+  "recompensa_de_busqueda": "Search reward",
+  "elige_y_compra": "Pick and buy",
+  "acelerador_de_recompensa": "Reward Accelerator!",
+  "conoce_mas": "Learn more",
+  "ver_eventos": "View %s event(s)",
+  "desconectarse": "Go Offline",
+  "conectarse": "Go Online",
+  "puedes_conectarte_para_recibir_pedidos": "You can go online to start receiving orders",
+  "resumen_del_dia": "Daily Summary",
+  "pedidos_completados": "Completed Orders",
+  "ganancias_estimadas": "Estimated Earnings",
+  "consejo_del_dia": "Tip of the Day",
+  "puedes_revisar_tus_zonas_de_calor_en_el_mapa": "Check heat zones to find more orders"
 }

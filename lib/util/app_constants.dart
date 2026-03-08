@@ -9,6 +9,7 @@ class AppConstants {
   static const String fontFamily = 'Roboto';
 
   static const String baseUrl = 'http://15.235.73.88';
+  static const String mapKey = 'AIzaSyA9Ed3wGMFVZqgFpJFqOu2UeWMQshC5ozE';
 
   static const String configUri = '/api/v1/config';
   static const String forgetPasswordUri =
