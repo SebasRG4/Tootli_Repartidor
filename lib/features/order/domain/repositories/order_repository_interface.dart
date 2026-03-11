@@ -11,6 +11,7 @@ abstract class OrderRepositoryInterface implements RepositoryInterface {
   Future<dynamic> getCurrentOrders(int offset, {String orderStatus = 'all'});
   Future<dynamic> getLatestOrders();
   Future<dynamic> updateOrderStatus(UpdateStatusBodyModel updateStatusBody, List<MultipartBody> proofAttachment);
+  Future<dynamic> ignoreOrderApi(int orderId);
   Future<dynamic> getOrderDetails(int? orderID);
   Future<dynamic> acceptOrder(int? orderID);
   List<IgnoreModel> getIgnoreList();

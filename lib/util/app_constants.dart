@@ -29,6 +29,7 @@ class AppConstants {
   static const String profileUri = '/api/v1/delivery-man/profile?token=';
   static const String updateOrderStatusUri =
       '/api/v1/delivery-man/update-order-status';
+  static const String ignoreOrderUri = '/api/v1/delivery-man/ignore-order';
   static const String updatePaymentStatusUri =
       '/api/v1/delivery-man/update-payment-status';
   static const String orderDetailsUri =

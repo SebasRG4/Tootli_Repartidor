@@ -341,6 +341,22 @@ class OrderController extends GetxController implements GetxService {
     return responseModel.isSuccess;
   }
 
+  Future<bool> ignoreOrderApi(int orderId) async {
+    _isLoading = true;
+    update();
+    ResponseModel responseModel = await orderServiceInterface.ignoreOrderApi(orderId);
+    if (responseModel.isSuccess) {
+      Get.back(); // close the bottom sheet
+      Get.find<ProfileController>().getProfile();
+      getRunningOrders(1);
+    } else {
+      showCustomSnackBar(responseModel.message);
+    }
+    _isLoading = false;
+    update();
+    return responseModel.isSuccess;
+  }
+
   Future<void> getOrderDetails(int? orderID, bool parcel) async {
     if (parcel) {
       _orderDetailsModel = [];

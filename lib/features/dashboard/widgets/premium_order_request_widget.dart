@@ -30,6 +30,8 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
   int _secondsRemaining = 30;
   Timer? _timer;
   AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isAccepted = false;  // Guard: evita múltiples llamadas al aceptar
+  bool _isRejected = false;  // Guard: evita múltiples llamadas al rechazar/timeout
 
   @override
   void initState() {
@@ -55,7 +57,10 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
       } else {
         _timer?.cancel();
         _audioPlayer.stop();
-        widget.onReject();
+        if (!_isRejected && !_isAccepted) {
+          _isRejected = true;
+          widget.onReject();
+        }
       }
     });
   }
@@ -208,11 +213,12 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                         ),
                         child: Slider(
                           value: _sliderValue,
-                          onChanged: (value) {
+                            onChanged: (value) {
                             setState(() {
                               _sliderValue = value;
                             });
-                            if (value > 0.9) {
+                            if (value > 0.9 && !_isAccepted && !_isRejected) {
+                              _isAccepted = true;  // Bloquear futuros disparos
                               _timer?.cancel();
                               _audioPlayer.stop();
                               widget.onAccept();

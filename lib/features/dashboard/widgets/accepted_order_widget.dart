@@ -8,7 +8,9 @@ import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
-
+import 'package:sixam_mart_delivery/helper/route_helper.dart';
+import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
+import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
 class AcceptedOrderWidget extends StatefulWidget {
   final OrderModel orderModel;
   final String phase;
@@ -142,6 +144,45 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
       }
     } else {
       showCustomSnackBar('Phone number not found');
+    }
+  }
+
+  void _chatWithPerson() {
+    if (widget.phase == 'going_to_store') {
+      Get.toNamed(
+        RouteHelper.getChatRoute(
+          notificationBody: NotificationBodyModel(
+            orderId: widget.orderModel.id,
+            vendorId: widget.orderModel.storeId,
+          ),
+          user: User(
+            id: widget.orderModel.storeId,
+            fName: widget.orderModel.storeName,
+            imageFullUrl: widget.orderModel.storeLogoFullUrl,
+            phone: widget.orderModel.storePhone,
+          ),
+        ),
+      );
+    } else {
+      if (widget.orderModel.customer != null) {
+        Get.toNamed(
+          RouteHelper.getChatRoute(
+            notificationBody: NotificationBodyModel(
+              orderId: widget.orderModel.id,
+              customerId: widget.orderModel.customer!.id,
+            ),
+            user: User(
+              id: widget.orderModel.customer!.id,
+              fName: widget.orderModel.customer!.fName,
+              lName: widget.orderModel.customer!.lName,
+              imageFullUrl: widget.orderModel.customer!.imageFullUrl,
+              phone: widget.orderModel.customer!.phone,
+            ),
+          ),
+        );
+      } else {
+        showCustomSnackBar('Información del cliente no disponible');
+      }
     }
   }
 
@@ -379,6 +420,10 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                 IconButton(
                   onPressed: _showNavigationOptions,
                   icon: const Icon(Icons.navigation, color: Colors.blue),
+                ),
+                IconButton(
+                  onPressed: _chatWithPerson,
+                  icon: const Icon(Icons.message, color: Colors.orange),
                 ),
                 IconButton(
                   onPressed: _callPerson,

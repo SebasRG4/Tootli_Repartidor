@@ -9,9 +9,9 @@ import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/main.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
-import 'package:sixam_mart_delivery/common/widgets/custom_alert_dialog_widget.dart';
-import 'package:sixam_mart_delivery/features/dashboard/widgets/new_request_dialog_widget.dart';
+
 import 'package:sixam_mart_delivery/features/home/screens/home_screen.dart';
+import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
 import 'package:sixam_mart_delivery/features/mission/controllers/mission_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/screens/profile_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_request_screen.dart';
@@ -64,11 +64,33 @@ class DashboardScreenState extends State<DashboardScreen> {
       Get.find<MissionController>().getMissionList();
     });
 
+    // Registrar el listener para taps en notificaciones de pedidos nuevos
+    // (cuando el repartidor abre la app desde la notificación del lock screen)
+    OrderNotificationService.instance.onOrderRequestTapped = (int orderId) {
+      Get.find<OrderController>().getLatestOrders().then((_) {
+        final latestOrders = Get.find<OrderController>().latestOrderList;
+        if (latestOrders != null && latestOrders.isNotEmpty) {
+          final orderModel = latestOrders.firstWhere(
+            (o) => o.id == orderId,
+            orElse: () => latestOrders.first,
+          );
+          // Navegar al Home si el usuario está en otra tab
+          if (_pageIndex != 0) {
+            _setPage(0);
+          }
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _homeScreenKey.currentState?.showOrderRequest(orderModel);
+          });
+        }
+      });
+    };
+
     _stream = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       String? type = message.data['body_loc_key'] ?? message.data['type'];
       String? orderID =
           message.data['title_loc_key'] ?? message.data['order_id'];
-      bool isParcel = (message.data['order_type'] == 'parcel_order');
+
+
       if (type != 'assign' &&
           type != 'new_order' &&
           type != 'message' &&
@@ -87,15 +109,26 @@ class DashboardScreenState extends State<DashboardScreen> {
         Get.find<OrderController>().getOrderCount(
           Get.find<OrderController>().orderType,
         );
-        Get.find<OrderController>().getLatestOrders();
-        Get.dialog(
-          NewRequestDialogWidget(
-            isRequest: true,
-            onTap: () => _navigateRequestPage(),
-            orderId: int.parse(message.data['order_id'].toString()),
-            isParcel: isParcel,
-          ),
-        );
+        // Refrescar la lista de pedidos pendientes y luego mostrar el bottom sheet moderno
+        Get.find<OrderController>().getLatestOrders().then((_) {
+          final orderId = int.tryParse(message.data['order_id'].toString());
+          final latestOrders = Get.find<OrderController>().latestOrderList;
+          if (orderId != null && latestOrders != null && latestOrders.isNotEmpty) {
+            // Buscar el pedido específico por ID, o usar el primero de la lista
+            final orderModel = latestOrders.firstWhere(
+              (o) => o.id == orderId,
+              orElse: () => latestOrders.first,
+            );
+            // Navegar al Home si el usuario está en otra tab
+            if (_pageIndex != 0) {
+              _setPage(0);
+            }
+            // Disparar el bottom sheet moderno directamente en HomeScreen
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _homeScreenKey.currentState?.showOrderRequest(orderModel);
+            });
+          }
+        });
       } else if (type == 'assign' && orderID != null && orderID.isNotEmpty) {
         Get.find<OrderController>().getRunningOrders(
           Get.find<OrderController>().offset,
@@ -105,19 +138,11 @@ class DashboardScreenState extends State<DashboardScreen> {
           Get.find<OrderController>().orderType,
         );
         Get.find<OrderController>().getLatestOrders();
-        Get.dialog(
-          NewRequestDialogWidget(
-            isRequest: false,
-            orderId: int.parse(message.data['order_id'].toString()),
-            isParcel: isParcel,
-            onTap: () {
-              Get.offAllNamed(
-                RouteHelper.getOrderDetailsRoute(
-                  int.parse(orderID),
-                  fromNotification: true,
-                ),
-              );
-            },
+        // Para pedidos tipo 'assign' (asignados directamente), navegar a los detalles sin diálogo
+        Get.offAllNamed(
+          RouteHelper.getOrderDetailsRoute(
+            int.parse(orderID),
+            fromNotification: true,
           ),
         );
       } else if (type == 'block') {
@@ -131,27 +156,6 @@ class DashboardScreenState extends State<DashboardScreen> {
   Future<void> showDisbursementWarningMessage() async {
     if (!widget.fromOrderDetails) {
       disbursementHelper.enableDisbursementWarningMessage(true);
-    }
-  }
-
-  void _navigateRequestPage() {
-    if (Get.find<ProfileController>().profileModel != null &&
-        Get.find<ProfileController>().profileModel!.active == 1 &&
-        Get.find<OrderController>().currentOrderList != null &&
-        Get.find<OrderController>().currentOrderList!.isEmpty) {
-      _setPage(1);
-    } else {
-      if (Get.find<ProfileController>().profileModel == null ||
-          Get.find<ProfileController>().profileModel!.active == 0) {
-        Get.dialog(
-          CustomAlertDialogWidget(
-            description: 'you_are_offline_now'.tr,
-            onOkPressed: () => Get.back(),
-          ),
-        );
-      } else {
-        _setPage(1);
-      }
     }
   }
 
@@ -278,8 +282,8 @@ class DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ),
 
-                // Floating Buttons (Location and Bug)
-                if (hasSlider)
+                // Floating Buttons (Location and Bug) — se ocultan cuando hay pedido activo
+                if (hasSlider && !_isOrderActive)
                   Positioned(
                     bottom:
                         MediaQuery.of(context).size.height *

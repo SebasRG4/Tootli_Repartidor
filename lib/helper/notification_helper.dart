@@ -18,6 +18,7 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:get/get.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -54,7 +55,12 @@ class NotificationHelper {
                   fromNotification: true,
                 ),
               ),
-              NotificationType.order_request: () => null,
+              NotificationType.order_request: () {
+                final orderId = payload.orderId;
+                if (orderId != null) {
+                  OrderNotificationService.instance.notifyOrderRequest(orderId);
+                }
+              },
               NotificationType.block: () =>
                   Get.offAllNamed(RouteHelper.getSignInRoute()),
               NotificationType.unblock: () =>
@@ -173,7 +179,14 @@ class NotificationHelper {
                 fromNotification: true,
               ),
             ),
-            NotificationType.order_request: () => null,
+            NotificationType.order_request: () {
+                final orderId = int.tryParse(
+                  message.data['order_id']?.toString() ?? '',
+                );
+                if (orderId != null) {
+                  OrderNotificationService.instance.notifyOrderRequest(orderId);
+                }
+              },
             NotificationType.block: () =>
                 Get.offAllNamed(RouteHelper.getSignInRoute()),
             NotificationType.unblock: () =>
@@ -429,6 +442,7 @@ class NotificationHelper {
           orderId: int.parse(orderId),
           notificationType: NotificationType.order,
         );
+      case 'new_order':
       case 'order_request':
         return NotificationBodyModel(
           orderId: int.parse(orderId),

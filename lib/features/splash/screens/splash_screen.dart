@@ -5,6 +5,7 @@ import 'package:sixam_mart_delivery/features/dashboard/screens/dashboard_screen.
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
+import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
@@ -100,7 +101,16 @@ class SplashScreenState extends State<SplashScreen> {
 
     final Map<NotificationType, Function> notificationActions = {
       NotificationType.order: () => Get.toNamed(RouteHelper.getOrderDetailsRoute(notificationBody?.orderId, fromNotification: true)),
-      NotificationType.order_request: () => Get.toNamed(RouteHelper.getMainRoute('order-request')),
+      NotificationType.order_request: () async {
+        // App was terminated — navigate to Dashboard (Home) and trigger bottom sheet
+        await _handleDefaultRouting(); // goes to DashboardScreen
+        final orderId = notificationBody?.orderId;
+        if (orderId != null) {
+          // Give DashboardScreen time to register its callback
+          await Future.delayed(const Duration(milliseconds: 800));
+          OrderNotificationService.instance.notifyOrderRequest(orderId);
+        }
+      },
       NotificationType.block: () => Get.offAllNamed(RouteHelper.getSignInRoute()),
       NotificationType.unblock: () => Get.offAllNamed(RouteHelper.getSignInRoute()),
       NotificationType.otp: () => null,

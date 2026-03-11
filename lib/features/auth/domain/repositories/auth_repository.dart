@@ -73,13 +73,19 @@ class AuthRepository implements AuthRepositoryInterface {
       deviceToken = await _saveDeviceToken();
     }
     if (!GetPlatform.isWeb) {
-      FirebaseMessaging.instance.subscribeToTopic(AppConstants.topic);
-      FirebaseMessaging.instance.subscribeToTopic(
-        sharedPreferences.getString(AppConstants.zoneTopic)!,
-      );
-      FirebaseMessaging.instance.subscribeToTopic(
-        sharedPreferences.getString(AppConstants.vehicleWiseTopic)!,
-      );
+      try {
+        await FirebaseMessaging.instance.subscribeToTopic(AppConstants.topic);
+        final zoneTopic = sharedPreferences.getString(AppConstants.zoneTopic);
+        final vehicleTopic = sharedPreferences.getString(AppConstants.vehicleWiseTopic);
+        if (zoneTopic != null && zoneTopic.isNotEmpty) {
+          await FirebaseMessaging.instance.subscribeToTopic(zoneTopic);
+        }
+        if (vehicleTopic != null && vehicleTopic.isNotEmpty) {
+          await FirebaseMessaging.instance.subscribeToTopic(vehicleTopic);
+        }
+      } catch (e) {
+        debugPrint('FCM subscribeToTopic error (safe to ignore on simulator): $e');
+      }
     }
     return await apiClient.postData(AppConstants.tokenUri, {
       "_method": "put",
@@ -134,13 +140,19 @@ class AuthRepository implements AuthRepositoryInterface {
   @override
   Future<bool> clearSharedData() async {
     if (!GetPlatform.isWeb) {
-      await FirebaseMessaging.instance.unsubscribeFromTopic(AppConstants.topic);
-      FirebaseMessaging.instance.unsubscribeFromTopic(
-        sharedPreferences.getString(AppConstants.zoneTopic)!,
-      );
-      FirebaseMessaging.instance.unsubscribeFromTopic(
-        sharedPreferences.getString(AppConstants.vehicleWiseTopic)!,
-      );
+      try {
+        await FirebaseMessaging.instance.unsubscribeFromTopic(AppConstants.topic);
+        final zoneTopic = sharedPreferences.getString(AppConstants.zoneTopic);
+        final vehicleTopic = sharedPreferences.getString(AppConstants.vehicleWiseTopic);
+        if (zoneTopic != null && zoneTopic.isNotEmpty) {
+          await FirebaseMessaging.instance.unsubscribeFromTopic(zoneTopic);
+        }
+        if (vehicleTopic != null && vehicleTopic.isNotEmpty) {
+          await FirebaseMessaging.instance.unsubscribeFromTopic(vehicleTopic);
+        }
+      } catch (e) {
+        debugPrint('FCM unsubscribeFromTopic error (safe to ignore on simulator): $e');
+      }
       apiClient.postData(AppConstants.tokenUri, {
         "_method": "put",
         "token": getUserToken(),
@@ -202,7 +214,7 @@ class AuthRepository implements AuthRepositoryInterface {
   }
 
   @override
-  void setNotificationActive(bool isActive) {
+  Future<void> setNotificationActive(bool isActive) async {
     if (isActive) {
       updateToken();
     } else {
@@ -211,13 +223,19 @@ class AuthRepository implements AuthRepositoryInterface {
           "_method": "put",
           "token": getUserToken(),
         }, handleError: false);
-        FirebaseMessaging.instance.unsubscribeFromTopic(AppConstants.topic);
-        FirebaseMessaging.instance.unsubscribeFromTopic(
-          sharedPreferences.getString(AppConstants.zoneTopic)!,
-        );
-        FirebaseMessaging.instance.unsubscribeFromTopic(
-          sharedPreferences.getString(AppConstants.vehicleWiseTopic)!,
-        );
+        try {
+          await FirebaseMessaging.instance.unsubscribeFromTopic(AppConstants.topic);
+          final zoneTopic = sharedPreferences.getString(AppConstants.zoneTopic);
+          final vehicleTopic = sharedPreferences.getString(AppConstants.vehicleWiseTopic);
+          if (zoneTopic != null && zoneTopic.isNotEmpty) {
+            await FirebaseMessaging.instance.unsubscribeFromTopic(zoneTopic);
+          }
+          if (vehicleTopic != null && vehicleTopic.isNotEmpty) {
+            await FirebaseMessaging.instance.unsubscribeFromTopic(vehicleTopic);
+          }
+        } catch (e) {
+          debugPrint('FCM unsubscribeFromTopic error (safe to ignore on simulator): $e');
+        }
       }
     }
     sharedPreferences.setBool(AppConstants.notification, isActive);

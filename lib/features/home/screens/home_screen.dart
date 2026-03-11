@@ -27,7 +27,6 @@ import 'package:sixam_mart_delivery/features/address/controllers/address_control
 import 'package:sixam_mart_delivery/features/address/domain/models/zone_model.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
-import 'package:sixam_mart_delivery/features/order/widgets/order_requset_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/accepted_order_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'dart:math';
@@ -58,7 +57,6 @@ class HomeScreenState extends State<HomeScreen> {
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
   OrderModel? _activeOrderRequest;
-  int _previousOrderCount = 0;
   String _orderPhase = 'none'; // 'none', 'going_to_store', 'going_to_customer'
   double? _lastLat;
   double? _lastLng;
@@ -350,40 +348,6 @@ class HomeScreenState extends State<HomeScreen> {
 
       body: GetBuilder<OrderController>(
         builder: (orderController) {
-          // Check for new orders to show dialog
-          if (orderController.latestOrderList != null &&
-              orderController.latestOrderList!.length > _previousOrderCount) {
-            _previousOrderCount = orderController.latestOrderList!.length;
-            if (orderController.latestOrderList!.isNotEmpty) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (BuildContext context) {
-                    return Dialog(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          Dimensions.radiusDefault,
-                        ),
-                      ),
-                      insetPadding: const EdgeInsets.all(
-                        Dimensions.paddingSizeSmall,
-                      ),
-                      child: OrderRequestWidget(
-                        orderModel: orderController.latestOrderList![0],
-                        index: 0,
-                        onTap: () {
-                          Get.back(); // close dialog
-                        },
-                      ),
-                    );
-                  },
-                );
-              });
-            }
-          } else if (orderController.latestOrderList != null) {
-            _previousOrderCount = orderController.latestOrderList!.length;
-          }
 
           return GetBuilder<ProfileController>(
             builder: (profileController) {
@@ -715,15 +679,34 @@ class HomeScreenState extends State<HomeScreen> {
                       orderModel: _activeOrderRequest!,
                       distance: distance,
                       onAccept: () {
+                        // Guard: si ya se está procesando, no hacer nada
+                        if (_orderPhase != 'none') return;
                         setState(() {
-                          _orderPhase = 'going_to_store';
+                          _orderPhase = 'going_to_store'; // Bloquear inmediatamente
                           _startMovementTimer();
                         });
-                        Get.find<OrderController>().getOrderDetails(
+                        // Llamar al API de aceptación una sola vez
+                        Get.find<OrderController>().acceptOrder(
                           _activeOrderRequest!.id,
-                          _activeOrderRequest!.orderType == 'parcel',
-                        );
-                        setPolyline(_activeOrderRequest!);
+                          0,
+                          _activeOrderRequest!,
+                        ).then((isSuccess) {
+                          if (isSuccess) {
+                            Get.find<OrderController>().getOrderDetails(
+                              _activeOrderRequest!.id,
+                              _activeOrderRequest!.orderType == 'parcel',
+                            );
+                            setPolyline(_activeOrderRequest!);
+                          } else {
+                            // Si falla, revertir el estado
+                            setState(() {
+                              _orderPhase = 'none';
+                              _activeOrderRequest = null;
+                              _stopMovementTimer();
+                            });
+                            widget.onOrderActiveStatusChanged?.call(false);
+                          }
+                        });
                       },
                       onReject: _performCancellation,
                     );
@@ -827,11 +810,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   void _performCancellation() async {
     if (_activeOrderRequest != null && _activeOrderRequest!.id != 999) {
-      Get.find<OrderController>().updateOrderStatus(
-        _activeOrderRequest!,
-        AppConstants.canceled,
-        back: false,
-      );
+      Get.find<OrderController>().ignoreOrderApi(_activeOrderRequest!.id!);
     }
 
     setState(() {
@@ -939,6 +918,21 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Dibujar la ruta en el mapa
     setPolyline(mockOrder);
+  }
+
+  /// Llamado desde DashboardScreen cuando llega un FCM de pedido nuevo.
+  /// Muestra el bottom sheet moderno con datos reales del pedido.
+  void showOrderRequest(OrderModel order) {
+    // Si ya hay un pedido activo, ignorar el nuevo (el repartidor solo puede tomar uno a la vez)
+    if (_activeOrderRequest != null) return;
+
+    setState(() {
+      _activeOrderRequest = order;
+      _orderPhase = 'none';
+    });
+    widget.onOrderActiveStatusChanged?.call(true);
+    // Dibujar la ruta en el mapa: repartidor → tienda → cliente
+    setPolyline(order);
   }
 
   bool get isOrderActive => _activeOrderRequest != null;

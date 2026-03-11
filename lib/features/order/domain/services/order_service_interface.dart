@@ -18,6 +18,7 @@ abstract class OrderServiceInterface{
   Future<PaginatedOrderModel?> getCurrentOrders(int offset, {String orderStatus = 'all'});
   Future<List<OrderModel>?> getLatestOrders();
   Future<ResponseModel> updateOrderStatus(UpdateStatusBodyModel updateStatusBody, List<MultipartBody> proofAttachment);
+  Future<ResponseModel> ignoreOrderApi(int orderId);
   Future<List<OrderDetailsModel>?> getOrderDetails(int? orderID);
   Future<ResponseModel> acceptOrder(int? orderID);
   List<IgnoreModel> getIgnoreList();

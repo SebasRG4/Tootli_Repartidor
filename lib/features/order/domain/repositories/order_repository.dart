@@ -131,6 +131,16 @@ class OrderRepository implements OrderRepositoryInterface {
   }
 
   @override
+  Future<ResponseModel> ignoreOrderApi(int orderId) async {
+    Response response = await apiClient.postData(AppConstants.ignoreOrderUri, {"order_id": orderId});
+    if (response.statusCode == 200) {
+      return ResponseModel(true, response.body['message']);
+    } else {
+      return ResponseModel(false, response.statusText);
+    }
+  }
+
+  @override
   Future<List<OrderDetailsModel>?> getOrderDetails(int? orderID) async {
     List<OrderDetailsModel>? orderDetailsModel;
     Response response = await apiClient.getData(

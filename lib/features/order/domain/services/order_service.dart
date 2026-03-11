@@ -47,6 +47,11 @@ class OrderService implements OrderServiceInterface {
   }
 
   @override
+  Future<ResponseModel> ignoreOrderApi(int orderId) async {
+    return await orderRepositoryInterface.ignoreOrderApi(orderId);
+  }
+
+  @override
   Future<List<OrderDetailsModel>?> getOrderDetails(int? orderID) async {
     return await orderRepositoryInterface.getOrderDetails(orderID);
   }
