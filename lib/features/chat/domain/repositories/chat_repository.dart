@@ -35,7 +35,7 @@ class ChatRepository implements ChatRepositoryInterface {
   Future<MessageModel?> getMessages(int offset, int? userId, String userType, int? conversationID) async {
     MessageModel? messageModel;
     Response response = await apiClient.getData('${AppConstants.getMessageListUri}?${conversationID != null ?
-    'conversation_id' : userType == AppConstants.user ? 'user_id' : 'vendor_id'}=${conversationID ?? userId}&token=${_getUserToken()}&offset=$offset&limit=10');
+    'conversation_id' : userType == AppConstants.user ? 'user_id' : userType == AppConstants.admin ? 'admin_id' : 'vendor_id'}=${conversationID ?? userId}&token=${_getUserToken()}&offset=$offset&limit=10');
     if(response.statusCode == 200 && response.body['messages'] != {}) {
       messageModel = MessageModel.fromJson(response.body);
     }

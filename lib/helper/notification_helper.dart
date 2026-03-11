@@ -237,6 +237,10 @@ class NotificationHelper {
     String? orderId,
     NotificationType notificationType,
   ) async {
+    if (orderId != null) {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('latest_order_request_id', orderId);
+    }
     if (await FlutterForegroundTask.isRunningService) {
       return FlutterForegroundTask.restartService();
     } else {
@@ -574,17 +578,35 @@ class MyTaskHandler extends TaskHandler {
   }
 
   @override
-  void onNotificationButtonPressed(String id) {
+  void onNotificationButtonPressed(String id) async {
     customPrint('onNotificationButtonPressed: $id');
     if (id == '1') {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      final orderIdStr = prefs.getString('latest_order_request_id');
+      if (orderIdStr != null) {
+        final orderId = int.tryParse(orderIdStr);
+        if (orderId != null) {
+          OrderNotificationService.instance.notifyOrderRequest(orderId);
+        }
+        await prefs.remove('latest_order_request_id');
+      }
       FlutterForegroundTask.launchApp('/');
     }
     NotificationHelper.stopService();
   }
 
   @override
-  void onNotificationPressed() {
+  void onNotificationPressed() async {
     customPrint('onNotificationPressed');
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final orderIdStr = prefs.getString('latest_order_request_id');
+    if (orderIdStr != null) {
+      final orderId = int.tryParse(orderIdStr);
+      if (orderId != null) {
+        OrderNotificationService.instance.notifyOrderRequest(orderId);
+      }
+      await prefs.remove('latest_order_request_id');
+    }
     FlutterForegroundTask.launchApp('/');
     NotificationHelper.stopService();
   }

@@ -60,7 +60,23 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     showDisbursementWarningMessage();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Get.find<OrderController>().getLatestOrders();
+      Get.find<OrderController>().getLatestOrders().then((_) {
+        final latestOrders = Get.find<OrderController>().latestOrderList;
+        if (latestOrders != null && latestOrders.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _homeScreenKey.currentState?.showOrderRequest(latestOrders.first);
+          });
+        } else {
+          Get.find<OrderController>().getRunningOrders(1).then((_) {
+            final runningOrders = Get.find<OrderController>().currentOrderList;
+            if (runningOrders != null && runningOrders.isNotEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _homeScreenKey.currentState?.restoreActiveOrder(runningOrders.first);
+              });
+            }
+          });
+        }
+      });
       Get.find<MissionController>().getMissionList();
     });
 

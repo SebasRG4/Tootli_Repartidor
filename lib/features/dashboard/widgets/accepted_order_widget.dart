@@ -9,6 +9,7 @@ import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
+import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
 class AcceptedOrderWidget extends StatefulWidget {
@@ -128,11 +129,8 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     }
   }
 
-  void _callPerson() async {
-    String? phone = widget.phase == 'going_to_store'
-        ? widget.orderModel.storePhone
-        : widget.orderModel.deliveryAddress?.contactPersonNumber;
-
+  void _callStore() async {
+    String? phone = widget.orderModel.storePhone;
     if (phone != null && phone.isNotEmpty) {
       if (await canLaunchUrlString('tel:$phone')) {
         await launchUrlString(
@@ -147,42 +145,58 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     }
   }
 
-  void _chatWithPerson() {
-    if (widget.phase == 'going_to_store') {
+  void _callCustomer() async {
+    String? phone = widget.orderModel.deliveryAddress?.contactPersonNumber ?? widget.orderModel.customer?.phone;
+    if (phone != null && phone.isNotEmpty) {
+      if (await canLaunchUrlString('tel:$phone')) {
+        await launchUrlString(
+          'tel:$phone',
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        showCustomSnackBar('Could not launch dialer');
+      }
+    } else {
+      showCustomSnackBar('Phone number not found');
+    }
+  }
+
+  void _chatWithStore() {
+    Get.toNamed(
+      RouteHelper.getChatRoute(
+        notificationBody: NotificationBodyModel(
+          orderId: widget.orderModel.id,
+          vendorId: widget.orderModel.storeId,
+        ),
+        user: User(
+          id: widget.orderModel.storeId,
+          fName: widget.orderModel.storeName,
+          imageFullUrl: widget.orderModel.storeLogoFullUrl,
+          phone: widget.orderModel.storePhone,
+        ),
+      ),
+    );
+  }
+
+  void _chatWithCustomer() {
+    if (widget.orderModel.customer != null) {
       Get.toNamed(
         RouteHelper.getChatRoute(
           notificationBody: NotificationBodyModel(
             orderId: widget.orderModel.id,
-            vendorId: widget.orderModel.storeId,
+            customerId: widget.orderModel.customer!.id,
           ),
           user: User(
-            id: widget.orderModel.storeId,
-            fName: widget.orderModel.storeName,
-            imageFullUrl: widget.orderModel.storeLogoFullUrl,
-            phone: widget.orderModel.storePhone,
+            id: widget.orderModel.customer!.id,
+            fName: widget.orderModel.customer!.fName,
+            lName: widget.orderModel.customer!.lName,
+            imageFullUrl: widget.orderModel.customer!.imageFullUrl,
+            phone: widget.orderModel.customer!.phone,
           ),
         ),
       );
     } else {
-      if (widget.orderModel.customer != null) {
-        Get.toNamed(
-          RouteHelper.getChatRoute(
-            notificationBody: NotificationBodyModel(
-              orderId: widget.orderModel.id,
-              customerId: widget.orderModel.customer!.id,
-            ),
-            user: User(
-              id: widget.orderModel.customer!.id,
-              fName: widget.orderModel.customer!.fName,
-              lName: widget.orderModel.customer!.lName,
-              imageFullUrl: widget.orderModel.customer!.imageFullUrl,
-              phone: widget.orderModel.customer!.phone,
-            ),
-          ),
-        );
-      } else {
-        showCustomSnackBar('Información del cliente no disponible');
-      }
+      showCustomSnackBar('Información del cliente no disponible');
     }
   }
 
@@ -210,19 +224,24 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
             const SizedBox(height: 25),
             _buildSupportOption(
               'Soporte Tootli',
-              'Comunícate con nuestro equipo',
-              Icons.headset_mic,
+              'Comunícate con nuestro equipo por chat',
+              Icons.chat,
               Colors.blue,
               () {
-                String? phone = Get.find<SplashController>().configModel?.phone;
-                if (phone != null && phone.isNotEmpty) {
-                  launchUrlString(
-                    'tel:$phone',
-                    mode: LaunchMode.externalApplication,
-                  );
-                } else {
-                  showCustomSnackBar('Número de soporte no configurado');
-                }
+                Get.toNamed(
+                  RouteHelper.getChatRoute(
+                    notificationBody: NotificationBodyModel(
+                      type: AppConstants.admin,
+                      orderId: widget.orderModel.id,
+                    ),
+                    user: User(
+                       id: 0,
+                       fName: 'Soporte',
+                       lName: 'Tootli',
+                       imageFullUrl: '',
+                    ),
+                  ),
+                );
               },
             ),
             const SizedBox(height: 15),
@@ -363,16 +382,15 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                   color: Theme.of(context).primaryColor,
                 ),
               ),
-              const SizedBox(width: 10),
               InkWell(
                 onTap: _showSupportBottomSheet,
                 child: Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.emergency, color: Colors.red),
+                  child: const Icon(Icons.emergency, color: Colors.white),
                 ),
               ),
             ],
@@ -380,7 +398,55 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
 
           const SizedBox(height: 20),
 
-          // Store Info Card
+          if (widget.phase == 'going_to_store')
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+              decoration: BoxDecoration(
+                color: Theme.of(context).secondaryHeaderColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.orderModel.storeName ?? '',
+                          style: robotoMedium.copyWith(fontSize: 16),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          widget.orderModel.storeAddress ?? '',
+                          style: robotoRegular.copyWith(
+                            fontSize: 12,
+                            color: Theme.of(context).disabledColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _showNavigationOptions,
+                    icon: const Icon(Icons.navigation, color: Colors.blue),
+                  ),
+                  IconButton(
+                    onPressed: _chatWithStore,
+                    icon: const Icon(Icons.message, color: Colors.orange),
+                  ),
+                  IconButton(
+                    onPressed: _callStore,
+                    icon: const Icon(Icons.call, color: Colors.green),
+                  ),
+                ],
+              ),
+            ),
+
+          // Customer Info Card (Always Visible)
           Container(
             padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
             decoration: BoxDecoration(
@@ -394,19 +460,13 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        (widget.phase == 'going_to_store'
-                                ? widget.orderModel.storeName
-                                : widget.orderModel.deliveryAddress?.address) ??
-                            '',
+                        widget.orderModel.deliveryAddress?.address ?? 'Dirección de entrega',
                         style: robotoMedium.copyWith(fontSize: 16),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        (widget.phase == 'going_to_store'
-                                ? widget.orderModel.storeAddress
-                                : '${widget.orderModel.customer?.fName} ${widget.orderModel.customer?.lName}') ??
-                            '',
+                        '${widget.orderModel.customer?.fName ?? ''} ${widget.orderModel.customer?.lName ?? ''}',
                         style: robotoRegular.copyWith(
                           fontSize: 12,
                           color: Theme.of(context).disabledColor,
@@ -417,16 +477,17 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     ],
                   ),
                 ),
+                if (widget.phase != 'going_to_store')
+                  IconButton(
+                    onPressed: _showNavigationOptions,
+                    icon: const Icon(Icons.navigation, color: Colors.blue),
+                  ),
                 IconButton(
-                  onPressed: _showNavigationOptions,
-                  icon: const Icon(Icons.navigation, color: Colors.blue),
-                ),
-                IconButton(
-                  onPressed: _chatWithPerson,
+                  onPressed: _chatWithCustomer,
                   icon: const Icon(Icons.message, color: Colors.orange),
                 ),
                 IconButton(
-                  onPressed: _callPerson,
+                  onPressed: _callCustomer,
                   icon: const Icon(Icons.call, color: Colors.green),
                 ),
               ],

@@ -38,6 +38,9 @@ class ChatService implements ChatServiceInterface {
       messageModel = await getMessages(offset, notificationBody.customerId, AppConstants.user, conversationID);
     }else if(notificationBody.vendorId != null || notificationBody.type == AppConstants.vendor) {
       messageModel = await getMessages(offset, notificationBody.vendorId, AppConstants.vendor, conversationID);
+    }else if(notificationBody.type == AppConstants.admin) {
+      // Pasamos un null como userId ya que es la plataforma quien maneja la charla con admin general
+      messageModel = await getMessages(offset, null, AppConstants.admin, conversationID);
     }
     return messageModel;
   }
@@ -58,6 +61,8 @@ class ChatService implements ChatServiceInterface {
       messageModel = await sendMessage(message, chatImage, conversationId, notificationBody.customerId, AppConstants.customer);
     }else if(notificationBody != null && (notificationBody.vendorId != null || notificationBody.type == AppConstants.vendor)){
       messageModel = await sendMessage(message, chatImage, conversationId, notificationBody.vendorId, AppConstants.vendor);
+    }else if(notificationBody != null && notificationBody.type == AppConstants.admin) {
+      messageModel = await sendMessage(message, chatImage, conversationId, null, AppConstants.admin);
     }
     return messageModel;
   }

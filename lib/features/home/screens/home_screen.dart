@@ -7,8 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui' as ui;
 import 'dart:typed_data';
-import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/controllers/notification_controller.dart';
@@ -191,121 +189,6 @@ class HomeScreenState extends State<HomeScreen> {
     checkPermission();
   }
 
-  void _showSupportBottomSheet() {
-    Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              height: 4,
-              width: 40,
-              decoration: BoxDecoration(
-                color: Theme.of(context).disabledColor.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 15),
-            Text('Centro de Soporte', style: robotoBold.copyWith(fontSize: 18)),
-            const SizedBox(height: 25),
-            _buildSupportOption(
-              'Soporte Tootli',
-              'Comunícate con nuestro equipo',
-              Icons.headset_mic,
-              Colors.blue,
-              () {
-                String? phone = Get.find<SplashController>().configModel?.phone;
-                if (phone != null && phone.isNotEmpty) {
-                  launchUrlString(
-                    'tel:$phone',
-                    mode: LaunchMode.externalApplication,
-                  );
-                } else {
-                  showCustomSnackBar('Número de soporte no configurado');
-                }
-              },
-            ),
-            const SizedBox(height: 15),
-            _buildSupportOption(
-              'Emergencia (911)',
-              'Solo para casos de gravedad',
-              Icons.emergency_share,
-              Colors.red,
-              () => launchUrlString(
-                'tel:911',
-                mode: LaunchMode.externalApplication,
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSupportOption(
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    Function onTap,
-  ) {
-    return InkWell(
-      onTap: () {
-        Get.back();
-        onTap();
-      },
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: robotoBold.copyWith(fontSize: 16, color: color),
-                  ),
-                  Text(
-                    subtitle,
-                    style: robotoRegular.copyWith(
-                      fontSize: 12,
-                      color: Theme.of(context).disabledColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Theme.of(context).disabledColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _getPolygons(List<ZoneModel> zoneList) {
     _polygons.clear();
@@ -638,18 +521,6 @@ class HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(
-          bottom: 70,
-        ), // Avoid overlap with bottom info
-        child: FloatingActionButton(
-          onPressed: _showSupportBottomSheet,
-          backgroundColor: Colors.red,
-          child: const Icon(Icons.emergency, color: Colors.white),
-        ),
-      ),
-
       bottomSheet: _activeOrderRequest != null
           ? (_orderPhase == 'none'
                 ? () {
@@ -935,6 +806,22 @@ class HomeScreenState extends State<HomeScreen> {
     setPolyline(order);
   }
 
+  void restoreActiveOrder(OrderModel order) {
+    if (_activeOrderRequest != null) return;
+
+    setState(() {
+      _activeOrderRequest = order;
+      if (order.orderStatus == 'picked_up') {
+        _orderPhase = 'going_to_customer';
+      } else {
+        _orderPhase = 'going_to_store';
+      }
+      _startMovementTimer();
+    });
+    widget.onOrderActiveStatusChanged?.call(true);
+    setPolyline(order);
+  }
+
   bool get isOrderActive => _activeOrderRequest != null;
 
   void setPolyline(OrderModel order) async {
@@ -1131,6 +1018,14 @@ class HomeScreenState extends State<HomeScreen> {
     _lastLng = Get.find<ProfileController>().recordLocationBody?.longitude;
 
     _noMovementTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_orderPhase != 'going_to_store' &&
+          _orderPhase != 'going_to_customer') {
+        _stopMovementTimer();
+        return;
+      }
+
+      /*
+      // COMENTADO MIENTRAS TANTO PARA EVITAR INACTIVIDAD
       double? currentLat =
           Get.find<ProfileController>().recordLocationBody?.latitude;
       double? currentLng =
@@ -1161,7 +1056,7 @@ class HomeScreenState extends State<HomeScreen> {
             _governanceAudioPlayer.play(AssetSource('Dms_no_moving.mp3'));
           } else if (_noMovementCount >= 6) {
             // Llegamos a los 3 min (6 checks de 30s)
-            _performCancellation();
+            // _performCancellation(); // COMENTADO TEMPORALMENTE
             _showUnassignedDialog();
           }
         } else {
@@ -1173,6 +1068,7 @@ class HomeScreenState extends State<HomeScreen> {
         _lastLat = currentLat;
         _lastLng = currentLng;
       }
+      */
     });
   }
 

@@ -46,6 +46,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
     _isLoggedIn = Get.find<AuthController>().isLoggedIn();
     Get.find<ChatController>().getMessages(1, widget.notificationBody!, widget.user, widget.conversationId, firstLoad: true);
+    
+    if (widget.notificationBody?.type == AppConstants.admin && widget.notificationBody?.orderId != null) {
+      _inputMessageController.text = 'Soporte para el pedido #${widget.notificationBody!.orderId}: ';
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!Get.find<ChatController>().isSendButtonActive) {
+          Get.find<ChatController>().toggleSendButtonActivity();
+        }
+      });
+    }
   }
 
   @override

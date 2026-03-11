@@ -153,6 +153,7 @@ class AppConstants {
   static const String customer = 'customer';
   static const String deliveryMan = 'delivery_man';
   static const String vendor = 'vendor';
+  static const String admin = 'admin';
 
   static List<LanguageModel> languages = [
     LanguageModel(
