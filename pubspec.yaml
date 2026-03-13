@@ -53,11 +53,16 @@ dependencies:
   fluttertoast: ^9.0.0
   emoji_picker_flutter: ^4.4.0
   file_picker: ^10.3.10
+  pusher_channels_flutter: ^2.6.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.13
+  integration_test:
+    sdk: flutter
 
 flutter:
   uses-material-design: true

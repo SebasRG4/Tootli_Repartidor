@@ -49,8 +49,27 @@ Future<void> main() async {
       if (remoteMessage != null) {
         body = NotificationHelper.convertNotification(remoteMessage.data);
       }
+
+      // IMPORTANTE: Solicitar permisos antes de inicializar para asegurar que el token se genere correctamente.
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true, announcement: false, badge: true, carPlay: false,
+        criticalAlert: false, provisional: false, sound: true,
+      );
+
       await NotificationHelper.initialize(flutterLocalNotificationsPlugin);
       FirebaseMessaging.onBackgroundMessage(myBackgroundMessageHandler);
+
+      // Asegurar que el FCM token siempre se mantenga actualizado en backend.
+      // Si Firebase rota el token, lo guardamos y notificamos al servidor
+      // sin necesidad de que el repartidor cierre y vuelva a iniciar sesión.
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+        debugPrint('----Device Token REFRESHED----- $newToken');
+        if (Get.isRegistered<AuthController>() &&
+            Get.find<AuthController>().isLoggedIn()) {
+          // updateToken volverá a leer el token actual de FCM y lo mandará al backend.
+          await Get.find<AuthController>().updateToken();
+        }
+      });
     }
   } catch (_) {}
 

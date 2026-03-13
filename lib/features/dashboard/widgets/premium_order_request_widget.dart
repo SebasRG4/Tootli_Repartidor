@@ -37,12 +37,8 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
   void initState() {
     super.initState();
     _startTimer();
-    _playNotificationSound();
   }
 
-  void _playNotificationSound() {
-    _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
-  }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -50,10 +46,6 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
         setState(() {
           _secondsRemaining--;
         });
-        // Reproducir sonido cada 3 segundos
-        if (_secondsRemaining % 3 == 0 && _secondsRemaining > 0) {
-          _playNotificationSound();
-        }
       } else {
         _timer?.cancel();
         _audioPlayer.stop();
@@ -71,10 +63,10 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
     _audioPlayer.stop();
     _audioPlayer.dispose();
     super.dispose();
-  }
-
-  @override
+  }  @override
   Widget build(BuildContext context) {
+    final bool isLoading = widget.orderModel.storeName == null;
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
@@ -111,35 +103,42 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
             child: Column(
               children: [
                 // Total Earnings
-                Text(
-                  PriceConverterHelper.convertPrice(
-                    (widget.orderModel.originalDeliveryCharge ?? 0) +
-                        (widget.orderModel.dmTips ?? 0),
+                if (isLoading)
+                  const SizedBox(
+                    height: 60,
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else ...[
+                  Text(
+                    PriceConverterHelper.convertPrice(
+                      (widget.orderModel.originalDeliveryCharge ?? 0) +
+                          (widget.orderModel.dmTips ?? 0),
+                    ),
+                    style: robotoBold.copyWith(
+                      fontSize: 40,
+                      color: Theme.of(context).primaryColor,
+                    ),
                   ),
-                  style: robotoBold.copyWith(
-                    fontSize: 40,
-                    color: Theme.of(context).primaryColor,
+                  Text(
+                    '${'ganancia_neta'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.originalDeliveryCharge ?? 0)} + ${'propina'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.dmTips ?? 0)}',
+                    style: robotoRegular.copyWith(
+                      fontSize: 12,
+                      color: Colors.grey,
+                    ),
                   ),
-                ),
-                Text(
-                  '${'ganancia_neta'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.originalDeliveryCharge ?? 0)} + ${'propina'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.dmTips ?? 0)}',
-                  style: robotoRegular.copyWith(
-                    fontSize: 12,
-                    color: Colors.grey,
-                  ),
-                ),
+                ],
 
                 const SizedBox(height: 15),
 
                 // Distance and Store
                 Text(
-                  widget.distance != null
-                      ? '${widget.distance!.toStringAsFixed(2)} km'
-                      : '... km',
+                  isLoading
+                      ? '... km'
+                      : (widget.distance != null ? '${widget.distance!.toStringAsFixed(2)} km' : '... km'),
                   style: robotoBold.copyWith(fontSize: 30),
                 ),
                 Text(
-                  widget.orderModel.storeName ?? 'Tienda',
+                  isLoading ? 'Cargando tienda...'.tr : (widget.orderModel.storeName ?? 'Tienda'),
                   style: robotoMedium.copyWith(
                     fontSize: 18,
                     color: Colors.grey,
@@ -149,19 +148,22 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                 const SizedBox(height: 20),
 
                 // Payment info
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.payments, color: Colors.green[600], size: 24),
-                    const SizedBox(width: 10),
-                    Text(
-                      widget.orderModel.paymentMethod == 'cash_on_delivery'
-                          ? 'Pago en efectivo'.tr
-                          : 'Pago con tarjeta'.tr,
-                      style: robotoMedium.copyWith(fontSize: 16),
-                    ),
-                  ],
-                ),
+                if (!isLoading)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.payments, color: Colors.green[600], size: 24),
+                      const SizedBox(width: 10),
+                      Text(
+                        widget.orderModel.paymentMethod == 'cash_on_delivery'
+                            ? 'Pago en efectivo'.tr
+                            : 'Pago con tarjeta'.tr,
+                        style: robotoMedium.copyWith(fontSize: 16),
+                      ),
+                    ],
+                  )
+                else
+                  const SizedBox(height: 24),
 
                 const SizedBox(height: 30),
 
@@ -173,7 +175,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                       height: 65,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.green,
+                        color: isLoading ? Colors.grey : Colors.green,
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Center(
@@ -199,62 +201,61 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                         ),
                       ),
                     ),
-                    Positioned.fill(
-                      child: SliderTheme(
-                        data: SliderTheme.of(context).copyWith(
-                          trackHeight: 65,
-                          thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 30,
+                    if (!isLoading)
+                      Positioned.fill(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 65,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 30,
+                            ),
+                            overlayShape: SliderComponentShape.noOverlay,
+                            activeTrackColor: Colors.transparent,
+                            inactiveTrackColor: Colors.transparent,
+                            thumbColor: Colors.white.withValues(alpha: 0.2),
                           ),
-                          overlayShape: SliderComponentShape.noOverlay,
-                          activeTrackColor: Colors.transparent,
-                          inactiveTrackColor: Colors.transparent,
-                          thumbColor: Colors.white.withValues(alpha: 0.2),
-                        ),
-                        child: Slider(
-                          value: _sliderValue,
+                          child: Slider(
+                            value: _sliderValue,
                             onChanged: (value) {
-                            setState(() {
-                              _sliderValue = value;
-                            });
-                            if (value > 0.9 && !_isAccepted && !_isRejected) {
-                              _isAccepted = true;  // Bloquear futuros disparos
-                              _timer?.cancel();
-                              _audioPlayer.stop();
-                              widget.onAccept();
-                            }
-                          },
-                          onChangeEnd: (value) {
-                            if (value <= 0.9) {
                               setState(() {
-                                _sliderValue = 0.0;
+                                _sliderValue = value;
                               });
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    // Visual arrow icon for the slider
-                    Positioned(
-                      left:
-                          10 +
-                          (_sliderValue *
-                              (MediaQuery.of(context).size.width - 100)),
-                      child: IgnorePointer(
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Icons.double_arrow,
-                            color: Colors.white,
-                            size: 30,
+                              if (value > 0.9 && !_isAccepted && !_isRejected) {
+                                _isAccepted = true; // Bloquear futuros disparos
+                                _timer?.cancel();
+                                _audioPlayer.stop();
+                                widget.onAccept();
+                              }
+                            },
+                            onChangeEnd: (value) {
+                              if (value <= 0.9) {
+                                setState(() {
+                                  _sliderValue = 0.0;
+                                });
+                              }
+                            },
                           ),
                         ),
                       ),
-                    ),
+                    // Visual arrow icon for the slider (only if not loading)
+                    if (!isLoading)
+                      Positioned(
+                        left: 10 + (_sliderValue * (MediaQuery.of(context).size.width - 100)),
+                        child: IgnorePointer(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.double_arrow,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ],

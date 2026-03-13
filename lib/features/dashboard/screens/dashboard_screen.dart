@@ -2,16 +2,17 @@ import 'dart:async';
 import 'dart:io';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
+import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/disbursement/helper/disbursement_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
-import 'package:sixam_mart_delivery/main.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 
 import 'package:sixam_mart_delivery/features/home/screens/home_screen.dart';
 import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
+import 'package:sixam_mart_delivery/helper/pusher_service.dart';
 import 'package:sixam_mart_delivery/features/mission/controllers/mission_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/screens/profile_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_request_screen.dart';
@@ -37,12 +38,13 @@ class DashboardScreen extends StatefulWidget {
   DashboardScreenState createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen> {
+class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   PageController? _pageController;
   int _pageIndex = 0;
   late List<Widget> _screens;
   final _channel = const MethodChannel('com.sixamtech/app_retain');
-  late StreamSubscription _stream;
+  StreamSubscription<RemoteMessage>? _stream;
+  Timer? _latestOrdersPoller;
   DisbursementHelper disbursementHelper = DisbursementHelper();
   bool _canExit = false;
   bool _isBottomBarVisible = true;
@@ -50,6 +52,8 @@ class DashboardScreenState extends State<DashboardScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<HomeScreenState> _homeScreenKey =
       GlobalKey<HomeScreenState>();
+  /// IDs de pedidos ya enviados al HomeScreen para evitar duplicados
+  final Set<int> _shownOrderIds = {};
 
   @override
   void initState() {
@@ -57,17 +61,25 @@ class DashboardScreenState extends State<DashboardScreen> {
 
     _pageIndex = widget.pageIndex;
     _pageController = PageController(initialPage: widget.pageIndex);
+    WidgetsBinding.instance.addObserver(this);
+    NotificationHelper.setAppInForeground(true);
 
     showDisbursementWarningMessage();
+    _startLatestOrdersPolling();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Get.find<OrderController>().getLatestOrders().then((_) {
+        if (!mounted) return;
         final latestOrders = Get.find<OrderController>().latestOrderList;
         if (latestOrders != null && latestOrders.isNotEmpty) {
+          // Usar _dispatchOrderToHome en vez de showOrderRequest directo.
+          // Esto asegura que pase por la deduplicación de _shownOrderIds:
+          // si el FCM ya mostró este pedido, el initState no lo mostrará de nuevo.
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _homeScreenKey.currentState?.showOrderRequest(latestOrders.first);
+            _dispatchOrderToHome(latestOrders.first);
           });
         } else {
           Get.find<OrderController>().getRunningOrders(1).then((_) {
+            if (!mounted) return;
             final runningOrders = Get.find<OrderController>().currentOrderList;
             if (runningOrders != null && runningOrders.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -77,97 +89,146 @@ class DashboardScreenState extends State<DashboardScreen> {
           });
         }
       });
-      Get.find<MissionController>().getMissionList();
     });
+    Get.find<MissionController>().getMissionList();
 
-    // Registrar el listener para taps en notificaciones de pedidos nuevos
-    // (cuando el repartidor abre la app desde la notificación del lock screen)
+    // Registrar el listener para que el Dashboard reaccione a notificaciones
+    // centralizadas en NotificationHelper vía OrderNotificationService.
     OrderNotificationService.instance.onOrderRequestTapped = (int orderId) {
-      Get.find<OrderController>().getLatestOrders().then((_) {
-        final latestOrders = Get.find<OrderController>().latestOrderList;
-        if (latestOrders != null && latestOrders.isNotEmpty) {
-          final orderModel = latestOrders.firstWhere(
-            (o) => o.id == orderId,
-            orElse: () => latestOrders.first,
-          );
-          // Navegar al Home si el usuario está en otra tab
-          if (_pageIndex != 0) {
-            _setPage(0);
-          }
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            _homeScreenKey.currentState?.showOrderRequest(orderModel);
-          });
-        }
-      });
+      print("[Dashboard] \n┌────────────────────────────────────────┐");
+      print("[Dashboard] │  📩 CALLBACK FIRED for order $orderId   │");
+      print("[Dashboard] └────────────────────────────────────────┘");
+      print("[Dashboard] mounted=$mounted, _pageIndex=$_pageIndex");
+      if (!mounted) return;
+      if (_pageIndex != 0) _setPage(0);
+      _triggerShowOrder(orderId);
     };
 
-    _stream = FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      String? type = message.data['body_loc_key'] ?? message.data['type'];
-      String? orderID =
-          message.data['title_loc_key'] ?? message.data['order_id'];
-
-
-      if (type != 'assign' &&
-          type != 'new_order' &&
-          type != 'message' &&
-          type != 'order_request' &&
-          type != 'order_status') {
-        NotificationHelper.showNotification(
-          message,
-          flutterLocalNotificationsPlugin,
-        );
-      }
-      if (type == 'new_order' || type == 'order_request') {
-        Get.find<OrderController>().getRunningOrders(
-          Get.find<OrderController>().offset,
-          status: 'all',
-        );
-        Get.find<OrderController>().getOrderCount(
-          Get.find<OrderController>().orderType,
-        );
-        // Refrescar la lista de pedidos pendientes y luego mostrar el bottom sheet moderno
-        Get.find<OrderController>().getLatestOrders().then((_) {
-          final orderId = int.tryParse(message.data['order_id'].toString());
-          final latestOrders = Get.find<OrderController>().latestOrderList;
-          if (orderId != null && latestOrders != null && latestOrders.isNotEmpty) {
-            // Buscar el pedido específico por ID, o usar el primero de la lista
-            final orderModel = latestOrders.firstWhere(
-              (o) => o.id == orderId,
-              orElse: () => latestOrders.first,
-            );
-            // Navegar al Home si el usuario está en otra tab
-            if (_pageIndex != 0) {
-              _setPage(0);
-            }
-            // Disparar el bottom sheet moderno directamente en HomeScreen
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _homeScreenKey.currentState?.showOrderRequest(orderModel);
-            });
-          }
-        });
-      } else if (type == 'assign' && orderID != null && orderID.isNotEmpty) {
-        Get.find<OrderController>().getRunningOrders(
-          Get.find<OrderController>().offset,
-          status: 'all',
-        );
-        Get.find<OrderController>().getOrderCount(
-          Get.find<OrderController>().orderType,
-        );
-        Get.find<OrderController>().getLatestOrders();
-        // Para pedidos tipo 'assign' (asignados directamente), navegar a los detalles sin diálogo
-        Get.offAllNamed(
-          RouteHelper.getOrderDetailsRoute(
-            int.parse(orderID),
-            fromNotification: true,
-          ),
-        );
-      } else if (type == 'block') {
-        Get.find<AuthController>().clearSharedData();
-        Get.find<ProfileController>().stopLocationRecord();
-        Get.offAllNamed(RouteHelper.getSignInRoute());
+    // 🚀 Start Real-Time WebSocket Connection
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final profileModel = Get.find<ProfileController>().profileModel;
+      if (profileModel != null && profileModel.id != null) {
+        PusherService.instance.initPusher(profileModel.id!);
       }
     });
   }
+
+  /// Polling defensivo para no depender 100% de FCM.
+  /// Si el push no llega (app reiniciándose, red, OEM, etc.), la app aún mostrará
+  /// el bottom sheet al detectar pedidos en `latest-orders`.
+  void _startLatestOrdersPolling() {
+    _latestOrdersPoller?.cancel();
+    _latestOrdersPoller = Timer.periodic(const Duration(seconds: 15), (_) async {
+      if (!mounted) return;
+      // Solo cuando el usuario está en Home y no hay pedido activo
+      if (_pageIndex != 0 || _isOrderActive) return;
+
+      await Get.find<OrderController>().getLatestOrders();
+      if (!mounted) return;
+      final latestOrders = Get.find<OrderController>().latestOrderList;
+      if (latestOrders != null && latestOrders.isNotEmpty) {
+        _dispatchOrderToHome(latestOrders.first);
+      }
+    });
+  }
+
+  /// Busca el [OrderModel] y lo muestra en HomeScreen con la menor latencia posible.
+  /// Implementa una estrategia de "Respuesta Instantánea" abriendo el UI inmediatamente.
+  void _triggerShowOrder(int orderId) {
+    print("[Dashboard] _triggerShowOrder($orderId) called");
+    print("[Dashboard] _shownOrderIds = $_shownOrderIds");
+    // ── Paso 0: Deduplicación INMEDIATA (antes de cualquier async) ──────────
+    if (_shownOrderIds.contains(orderId)) {
+      print("[Dashboard] ⛔ orderId=$orderId BLOCKED by _shownOrderIds dedup");
+      return;
+    }
+    _shownOrderIds.add(orderId);
+    print("[Dashboard] ✅ orderId=$orderId passed dedup check");
+
+    // ── Paso 1: Respuesta Instantánea (Shell Loading) ──────────────────────
+    debugPrint("[FCM] orderId=$orderId disparando UI instantánea...");
+    
+    // Buscar en caché primero para evitar el shell si ya los tenemos
+    final cachedOrder = Get.find<OrderController>()
+        .latestOrderList
+        ?.firstWhereOrNull((o) => o.id == orderId);
+
+    if (cachedOrder != null) {
+      debugPrint("[FCM] orderId=$orderId encontrado en caché.");
+      _dispatchOrderToHome(cachedOrder);
+      _refreshCounters();
+    } else {
+      // Mostrar shell inmediato con un modelo parcial (solo ID)
+      // HomeScreen y PremiumOrderRequestWidget manejarán el estado de carga
+      final dummyOrder = OrderModel(id: orderId);
+      _dispatchOrderToHome(dummyOrder);
+
+      // ── Paso 2: Fetch de datos reales en segundo plano ────────────────────
+      debugPrint("[FCM] orderId=$orderId consultando latest-orders en segundo plano...");
+      Get.find<OrderController>().getLatestOrders().then((_) {
+        if (!mounted) return;
+        final order = Get.find<OrderController>()
+            .latestOrderList
+            ?.firstWhereOrNull((o) => o.id == orderId);
+
+        if (order != null) {
+          debugPrint("[FCM] orderId=$orderId datos obtenidos de latest-orders. Actualizando UI...");
+          _dispatchOrderToHome(order);
+          _refreshCounters();
+        } else {
+          // Fallback a fetch directo si no está en latest-orders (asignado)
+          Get.find<OrderController>().fetchOrderForNotification(orderId).then((fetched) {
+            if (!mounted) return;
+            if (fetched != null) {
+              debugPrint("[FCM] orderId=$orderId datos obtenidos por fetch directo. Actualizando UI...");
+              _dispatchOrderToHome(fetched);
+            }
+            _refreshCounters();
+          });
+        }
+      });
+    }
+  }
+
+
+  /// Refresca contadores y lista de corridas en paralelo, sin bloquear el bottom sheet.
+  void _refreshCounters() {
+    Get.find<OrderController>().getRunningOrders(
+      Get.find<OrderController>().offset,
+      status: 'all',
+    );
+    Get.find<OrderController>().getOrderCount(
+      Get.find<OrderController>().orderType,
+    );
+  }
+
+
+
+
+  /// Envía el [order] al HomeScreen asegurando que el key y el state existen.
+  /// Implementa deduplicación estricta por ID y manejo de race conditions.
+  void _dispatchOrderToHome(OrderModel order) {
+    if (!mounted) return;
+    
+    final id = order.id;
+    if (id == null) return;
+
+    final homeState = _homeScreenKey.currentState;
+    
+    print("[Dashboard] _dispatchOrderToHome($id) - homeState is ${homeState != null ? 'NOT null' : 'NULL'}");
+    
+    if (homeState == null) {
+      print("[Dashboard] ⚠️ HomeScreenState is null, retrying next frame for order $id");
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _dispatchOrderToHome(order);
+      });
+      return;
+    }
+    
+    print("[Dashboard] ✅ DISPATCHING order $id to HomeScreen.showOrderRequest()");
+    homeState.showOrderRequest(order);
+  }
+
 
   Future<void> showDisbursementWarningMessage() async {
     if (!widget.fromOrderDetails) {
@@ -177,9 +238,21 @@ class DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    NotificationHelper.setAppInForeground(false);
+    _stream?.cancel();
+    _latestOrdersPoller?.cancel();
+    PusherService.instance.disconnect();
     super.dispose();
+  }
 
-    _stream.cancel();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      NotificationHelper.setAppInForeground(true);
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      NotificationHelper.setAppInForeground(false);
+    }
   }
 
   @override
@@ -549,6 +622,7 @@ class DashboardScreenState extends State<DashboardScreen> {
               Get.back();
               Get.find<AuthController>().clearSharedData();
               Get.find<ProfileController>().stopLocationRecord();
+              PusherService.instance.disconnect();
               Get.offAllNamed(RouteHelper.getSignInRoute());
             },
           ),

@@ -12,9 +12,12 @@ import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
+import 'package:geolocator/geolocator.dart';
+
 class AcceptedOrderWidget extends StatefulWidget {
   final OrderModel orderModel;
   final String phase;
+  final Function onHandover;
   final Function onPickedUp;
   final Function onDelivered;
   final String? estimatedArrivalTime;
@@ -22,6 +25,7 @@ class AcceptedOrderWidget extends StatefulWidget {
     super.key,
     required this.orderModel,
     required this.phase,
+    required this.onHandover,
     required this.onPickedUp,
     required this.onDelivered,
     this.estimatedArrivalTime,
@@ -353,7 +357,9 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                   Text(
                     widget.phase == 'going_to_store'
                         ? 'En camino al restaurante'
-                        : 'En camino al cliente',
+                        : widget.phase == 'at_store'
+                            ? 'Preparando entrega'
+                            : 'En camino al cliente',
                     style: robotoRegular.copyWith(
                       color: Theme.of(context).primaryColor,
                       fontSize: 14,
@@ -376,7 +382,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  widget.phase == 'going_to_store'
+                  (widget.phase == 'going_to_store' || widget.phase == 'at_store')
                       ? Icons.restaurant
                       : Icons.person_pin_circle,
                   color: Theme.of(context).primaryColor,
@@ -398,7 +404,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
 
           const SizedBox(height: 20),
 
-          if (widget.phase == 'going_to_store')
+          if (widget.phase == 'going_to_store' || widget.phase == 'at_store')
             Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
@@ -477,7 +483,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     ],
                   ),
                 ),
-                if (widget.phase != 'going_to_store')
+                if (widget.phase != 'going_to_store' && widget.phase != 'at_store')
                   IconButton(
                     onPressed: _showNavigationOptions,
                     icon: const Icon(Icons.navigation, color: Colors.blue),
@@ -494,7 +500,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
             ),
           ),
 
-          if (widget.phase == 'going_to_store')
+          if (widget.phase == 'going_to_store' || widget.phase == 'at_store')
             GetBuilder<OrderController>(
               builder: (orderController) {
                 return orderController.orderDetailsModel != null &&
@@ -576,10 +582,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     Row(
                       children: [
                         InkWell(
-                          onTap: () => orderController.pickPrescriptionImage(
-                            isRemove: false,
-                            isCamera: true,
-                          ),
+                          onTap: () => orderController.pickCameraDirectly(),
                           child: Container(
                             height: 60,
                             width: 60,
@@ -714,7 +717,9 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                   child: Text(
                     widget.phase == 'going_to_store'
                         ? 'Pedido recogido'.tr
-                        : 'Entregar pedido'.tr,
+                        : widget.phase == 'at_store'
+                            ? 'Empezar entrega'.tr
+                            : 'Entregar pedido'.tr,
                     style: robotoBold.copyWith(
                       color: Colors.white,
                       fontSize: 18,
@@ -742,9 +747,23 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                       });
                       if (value > 0.9) {
                         if (widget.phase == 'going_to_store') {
+                          _checkProximityAndProceed(
+                            targetLat: double.tryParse(widget.orderModel.storeLat ?? '') ?? 0,
+                            targetLng: double.tryParse(widget.orderModel.storeLng ?? '') ?? 0,
+                            maxDistance: 100,
+                            onSuccess: () => widget.onHandover(),
+                            errorMessage: 'Debes estar a menos de 100m del restaurante para recoger el pedido.',
+                          );
+                        } else if (widget.phase == 'at_store') {
                           widget.onPickedUp();
                         } else {
-                          widget.onDelivered();
+                          _checkProximityAndProceed(
+                            targetLat: double.tryParse(widget.orderModel.deliveryAddress?.latitude ?? '') ?? 0,
+                            targetLng: double.tryParse(widget.orderModel.deliveryAddress?.longitude ?? '') ?? 0,
+                            maxDistance: 500,
+                            onSuccess: () => widget.onDelivered(),
+                            errorMessage: 'Debes estar a menos de 500m del cliente para entregar el pedido.',
+                          );
                         }
                         setState(() {
                           _sliderValue = 0.0;
@@ -786,5 +805,39 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
         ],
       ),
     );
+  }
+  Future<void> _checkProximityAndProceed({
+    required double targetLat,
+    required double targetLng,
+    required double maxDistance,
+    required Function() onSuccess,
+    required String errorMessage,
+  }) async {
+    try {
+      Position currentPosition = await Geolocator.getCurrentPosition();
+
+      if (targetLat == 0 || targetLng == 0) {
+        onSuccess();
+        return;
+      }
+
+      double distance = Geolocator.distanceBetween(
+        currentPosition.latitude,
+        currentPosition.longitude,
+        targetLat,
+        targetLng,
+      );
+
+      if (distance <= maxDistance) {
+        onSuccess();
+      } else {
+        showCustomSnackBar(
+          '$errorMessage Estás a ${distance.toInt()}m.',
+          isError: true,
+        );
+      }
+    } catch (e) {
+      onSuccess();
+    }
   }
 }

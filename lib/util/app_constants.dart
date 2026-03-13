@@ -134,6 +134,7 @@ class AppConstants {
   static const String localizationKey = 'X-localization';
   static const String langIntro = 'language_intro';
   static const String notificationIdList = 'notification_id_list';
+  static const String isForeground = 'is_foreground';
 
   /// Status
   static const String pending = 'pending';

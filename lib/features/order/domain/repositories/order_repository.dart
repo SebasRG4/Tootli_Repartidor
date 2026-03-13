@@ -12,6 +12,7 @@ import 'package:sixam_mart_delivery/features/order/domain/models/parcel_cancella
 import 'package:sixam_mart_delivery/features/order/domain/models/update_status_body_model.dart';
 import 'package:sixam_mart_delivery/features/order/domain/repositories/order_repository_interface.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/order_count_model.dart';
 
@@ -148,10 +149,17 @@ class OrderRepository implements OrderRepositoryInterface {
     );
     if (response.statusCode == 200) {
       orderDetailsModel = [];
-      response.body.forEach(
-        (orderDetails) =>
-            orderDetailsModel!.add(OrderDetailsModel.fromJson(orderDetails)),
-      );
+      response.body.forEach((orderDetails) {
+        try {
+          orderDetailsModel!.add(OrderDetailsModel.fromJson(orderDetails));
+        } catch (e, stacktrace) {
+          debugPrint('Error parsing OrderDetails: $e');
+          debugPrint('Stacktrace: $stacktrace');
+          debugPrint('JSON data: $orderDetails');
+        }
+      });
+    } else {
+      debugPrint('Failed to get order details: ${response.statusCode} - ${response.statusText}');
     }
     return orderDetailsModel;
   }

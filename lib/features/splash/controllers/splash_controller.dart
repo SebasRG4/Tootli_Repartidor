@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:sixam_mart_delivery/common/models/config_model.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/features/splash/domain/services/splash_service_interface.dart';
@@ -56,4 +57,9 @@ class SplashController extends GetxController implements GetxService {
     _firstTimeConnectionCheck = isChecked;
   }
 
+  /// Solo para uso en tests — inyecta un [ConfigModel] sin llamar a la API.
+  @visibleForTesting
+  void injectConfigForTest(ConfigModel config) {
+    _configModel = config;
+  }
 }

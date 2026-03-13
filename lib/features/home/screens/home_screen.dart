@@ -62,6 +62,8 @@ class HomeScreenState extends State<HomeScreen> {
   String? _estimatedArrivalTime;
   Timer? _noMovementTimer;
   final AudioPlayer _governanceAudioPlayer = AudioPlayer();
+  /// Último orderId enviado a showOrderRequest para evitar mostrar el mismo pedido dos veces
+  int? _lastShownOrderId;
 
   @override
   void initState() {
@@ -586,11 +588,34 @@ class HomeScreenState extends State<HomeScreen> {
                     orderModel: _activeOrderRequest!,
                     phase: _orderPhase,
                     estimatedArrivalTime: _estimatedArrivalTime,
-                    onPickedUp: () {
-                      setState(() {
-                        _orderPhase = 'going_to_customer';
-                      });
-                      setPolyline(_activeOrderRequest!);
+                    onHandover: () async {
+                      bool success = await Get.find<OrderController>()
+                          .updateOrderStatus(_activeOrderRequest!, 'handover');
+                      if (success) {
+                        setState(() {
+                          _orderPhase = 'at_store';
+                        });
+                      } else {
+                        showCustomSnackBar(
+                          'Error al actualizar el estado del pedido a recogido (handover)',
+                          isError: true,
+                        );
+                      }
+                    },
+                    onPickedUp: () async {
+                      bool success = await Get.find<OrderController>()
+                          .updateOrderStatus(_activeOrderRequest!, 'picked_up');
+                      if (success) {
+                        setState(() {
+                          _orderPhase = 'going_to_customer';
+                        });
+                        setPolyline(_activeOrderRequest!);
+                      } else {
+                        showCustomSnackBar(
+                          'Error al actualizar el estado del pedido a en camino',
+                          isError: true,
+                        );
+                      }
                     },
                     onDelivered: () async {
                       bool success = await Get.find<OrderController>()
@@ -603,8 +628,12 @@ class HomeScreenState extends State<HomeScreen> {
                         setState(() {
                           _activeOrderRequest = null;
                           _orderPhase = 'none';
+                          _polylines.clear();
+                          _markers.clear();
+                          _polygons.clear();
                           _stopMovementTimer();
                         });
+                        widget.onOrderActiveStatusChanged?.call(false);
                       }
                     },
                   ))
@@ -793,18 +822,64 @@ class HomeScreenState extends State<HomeScreen> {
 
   /// Llamado desde DashboardScreen cuando llega un FCM de pedido nuevo.
   /// Muestra el bottom sheet moderno con datos reales del pedido.
+  /// Soporta actualizaciones (ej. de dummy model a modelo real con datos de red).
   void showOrderRequest(OrderModel order) {
-    // Si ya hay un pedido activo, ignorar el nuevo (el repartidor solo puede tomar uno a la vez)
-    if (_activeOrderRequest != null) return;
+    print("\n┌──────────────────────────────────────────────┐");
+    print("│  🏠 HomeScreen.showOrderRequest(${order.id})      │");
+    print("└──────────────────────────────────────────────┘");
+    print("[HomeScreen] mounted=$mounted");
+    print("[HomeScreen] _activeOrderRequest=${_activeOrderRequest?.id}");
+    print("[HomeScreen] _lastShownOrderId=$_lastShownOrderId");
+    print("[HomeScreen] _orderPhase=$_orderPhase");
+    print("[HomeScreen] order.storeLat=${order.storeLat}, order.storeName=${order.storeName}");
+
+    if (!mounted) {
+      print("[HomeScreen] ⛔ NOT MOUNTED - returning");
+      return;
+    }
+
+    // Si ya tenemos un pedido activo con DIFERENTE ID, ignorar el nuevo
+    if (_activeOrderRequest != null && _activeOrderRequest!.id != order.id) {
+       print("[HomeScreen] ⛔ IGNORED - active order already ${_activeOrderRequest!.id}");
+       return;
+    }
+
+    bool isUpdate = _activeOrderRequest != null && _activeOrderRequest!.id == order.id;
+
+    // Deduplicación para pedidos nuevos (no updates)
+    if (!isUpdate && order.id != null && order.id == _lastShownOrderId) {
+      print("[HomeScreen] ⛔ IGNORED - duplicate orderId ${order.id}");
+      return;
+    }
+    _lastShownOrderId = order.id;
+
+    print("[HomeScreen] ✅ ${isUpdate ? 'UPDATING' : 'SHOWING'} bottom sheet for order ${order.id}");
+
+    // Reproducir alerta sonora solo si es un pedido nuevo (no en update)
+    if (!isUpdate) {
+      try {
+        _governanceAudioPlayer.stop().then((_) {
+          _governanceAudioPlayer.play(AssetSource('alert_new_delivery.mp3'));
+        });
+      } catch (e) {
+        print("[HomeScreen] Error playing audio: $e");
+      }
+    }
 
     setState(() {
       _activeOrderRequest = order;
-      _orderPhase = 'none';
+      if (!isUpdate) _orderPhase = 'none';
     });
-    widget.onOrderActiveStatusChanged?.call(true);
-    // Dibujar la ruta en el mapa: repartidor → tienda → cliente
-    setPolyline(order);
+    print("[HomeScreen] ✅ setState called - _activeOrderRequest is now ${_activeOrderRequest?.id}");
+
+    if (!isUpdate) widget.onOrderActiveStatusChanged?.call(true);
+
+    // Dibujar la ruta solo si tenemos coordenadas (el dummy model no las tiene)
+    if (order.storeLat != null && order.storeLat != '0') {
+      setPolyline(order);
+    }
   }
+
 
   void restoreActiveOrder(OrderModel order) {
     if (_activeOrderRequest != null) return;
@@ -828,34 +903,46 @@ class HomeScreenState extends State<HomeScreen> {
     _polylines.clear();
     bool parcel = order.orderType == 'parcel';
 
+    // ── Diagnóstico de coordenadas ──────────────────────────────
+    debugPrint('[Polyline] orderType=${order.orderType} parcel=$parcel');
+    debugPrint('[Polyline] storeLat=${order.storeLat} storeLng=${order.storeLng}');
+    debugPrint('[Polyline] deliveryAddress.lat=${order.deliveryAddress?.latitude} deliveryAddress.lng=${order.deliveryAddress?.longitude}');
+    debugPrint('[Polyline] dmLocation: lat=${Get.find<ProfileController>().recordLocationBody?.latitude} lng=${Get.find<ProfileController>().recordLocationBody?.longitude}');
+
     LatLng dmLocation = LatLng(
       Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
       Get.find<ProfileController>().recordLocationBody?.longitude ?? 0,
     );
 
-    LatLng storeLocation = LatLng(
-      double.parse(
-        parcel ? order.deliveryAddress?.latitude ?? '0' : order.storeLat ?? '0',
-      ),
-      double.parse(
-        parcel
-            ? order.deliveryAddress?.longitude ?? '0'
-            : order.storeLng ?? '0',
-      ),
-    );
+    final double storeLat = double.tryParse(
+          parcel ? order.deliveryAddress?.latitude ?? '0' : order.storeLat ?? '0',
+        ) ?? 0;
+    final double storeLng = double.tryParse(
+          parcel ? order.deliveryAddress?.longitude ?? '0' : order.storeLng ?? '0',
+        ) ?? 0;
+    final double destLat = double.tryParse(
+          parcel ? order.receiverDetails?.latitude ?? '0' : order.deliveryAddress?.latitude ?? '0',
+        ) ?? 0;
+    final double destLng = double.tryParse(
+          parcel ? order.receiverDetails?.longitude ?? '0' : order.deliveryAddress?.longitude ?? '0',
+        ) ?? 0;
 
-    LatLng destinationLocation = LatLng(
-      double.parse(
-        parcel
-            ? order.receiverDetails?.latitude ?? '0'
-            : order.deliveryAddress?.latitude ?? '0',
-      ),
-      double.parse(
-        parcel
-            ? order.receiverDetails?.longitude ?? '0'
-            : order.deliveryAddress?.longitude ?? '0',
-      ),
-    );
+    debugPrint('[Polyline] storeLocation=($storeLat, $storeLng) destLocation=($destLat, $destLng)');
+
+    // Seguridad: si las coordenadas son (0,0), significa que el OrderModel no trajo
+    // los datos de ubicación. En ese caso, refrescar el pedido completo y reintentar.
+    if (storeLat == 0 && storeLng == 0) {
+      debugPrint('[Polyline] ⚠️ storeLat/storeLng son 0 — recargando pedido completo...');
+      final refreshed = await Get.find<OrderController>().fetchOrderForNotification(order.id!);
+      if (refreshed != null && mounted) {
+        debugPrint('[Polyline] Pedido recargado, storeLat=${refreshed.storeLat}');
+        setPolyline(refreshed);
+      }
+      return;
+    }
+
+    LatLng storeLocation = LatLng(storeLat, storeLng);
+    LatLng destinationLocation = LatLng(destLat, destLng);
 
     // Obtener puntos de ruta reales por carretera
     List<LatLng> segment1Points = await _getRoutePolyline(
@@ -895,6 +982,8 @@ class HomeScreenState extends State<HomeScreen> {
         activePoints[i + 1].longitude,
       );
     }
+    // Guard: el widget puede haberse desmontado durante la espera async
+    if (!mounted) return;
     setState(() {
       int minutes = (totalDistance / 333).ceil();
       if (minutes == 0 && totalDistance > 0) minutes = 1;

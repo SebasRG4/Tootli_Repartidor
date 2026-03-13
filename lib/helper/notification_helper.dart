@@ -11,6 +11,7 @@ import 'package:sixam_mart_delivery/features/chat/controllers/chat_controller.da
 import 'package:sixam_mart_delivery/features/dashboard/screens/dashboard_screen.dart';
 import 'package:sixam_mart_delivery/features/notification/controllers/notification_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
+import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/helper/custom_print_helper.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
@@ -90,12 +91,28 @@ class NotificationHelper {
     );
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (kDebugMode) {
-        print("onMessage message type:${message.data['type']}");
-        print("onMessage message:${message.data}");
-      }
+      print("\n╔══════════════════════════════════════════════╗");
+      print("║  🔔 FCM onMessage RECEIVED                   ║");
+      print("╚══════════════════════════════════════════════╝");
+      print("[FCM-DEBUG] Raw data: ${message.data}");
+      print("[FCM-DEBUG] data['type']: ${message.data['type']}");
+      print("[FCM-DEBUG] data['order_id']: ${message.data['order_id']}");
+      print("[FCM-DEBUG] notification title: ${message.notification?.title}");
+      print("[FCM-DEBUG] notification body: ${message.notification?.body}");
 
-      if (message.data['type'] == 'message' &&
+      // Normalizar tipo y orderId para soportar distintas claves desde backend
+      final String rawType = (message.data['type'] ??
+              message.data['body_loc_key'] ??
+              message.data['notification_type'] ??
+              '')
+          .toString();
+      String? type = rawType.isNotEmpty ? rawType : null;
+
+      final int? notifOrderId = _parseOrderId(message.data);
+      final String? orderID =
+          message.data['order_id']?.toString() ?? message.data['title_loc_key']?.toString();
+
+      if (type == 'message' &&
           Get.currentRoute.startsWith(RouteHelper.chatScreen)) {
         if (Get.find<AuthController>().isLoggedIn()) {
           Get.find<ChatController>().getConversationList(1);
@@ -117,50 +134,55 @@ class NotificationHelper {
               int.parse(message.data['conversation_id'].toString()),
             );
           } else {
-            NotificationHelper.showNotification(
-              message,
-              flutterLocalNotificationsPlugin,
-            );
+            NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
           }
         }
-      } else if (message.data['type'] == 'message' &&
+      } else if (type == 'message' &&
           Get.currentRoute.startsWith(RouteHelper.conversationListScreen)) {
         if (Get.find<AuthController>().isLoggedIn()) {
           Get.find<ChatController>().getConversationList(1);
         }
-        NotificationHelper.showNotification(
-          message,
-          flutterLocalNotificationsPlugin,
-        );
-      } else if (message.data['type'] == 'otp') {
-        NotificationHelper.showNotification(
-          message,
-          flutterLocalNotificationsPlugin,
-        );
-      } else if (message.data['type'] == 'deliveryman_referral') {
-        NotificationHelper.showNotification(
-          message,
-          flutterLocalNotificationsPlugin,
-        );
-      } else {
-        String? type = message.data['type'];
-
-        if (type != 'assign' &&
-            type != 'new_order' &&
-            type != 'order_request') {
-          NotificationHelper.showNotification(
-            message,
-            flutterLocalNotificationsPlugin,
+        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+      } else if (type == 'otp' || type == 'deliveryman_referral') {
+        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+      } else if (type == 'new_order' || type == 'order_request' || type == 'order_status') {
+        print("[FCM-DEBUG] ✅ MATCHED order type: '$type'");
+        print("[FCM-DEBUG] notifOrderId = $notifOrderId");
+        print("[FCM-DEBUG] OrderNotificationService callback registered: ${OrderNotificationService.instance.hasCallback}");
+        if (notifOrderId != null) {
+          print("[FCM-DEBUG] 🚀 CALLING OrderNotificationService.notifyOrderRequest($notifOrderId)");
+          OrderNotificationService.instance.notifyOrderRequest(notifOrderId);
+          print("[FCM-DEBUG] ✅ notifyOrderRequest CALLED successfully");
+        } else {
+          print(
+            "[FCM-DEBUG] ⚠️ new_order/order_request recibido SIN orderId válido. "
+            "Payload: ${message.data}",
           );
-          Get.find<OrderController>().getRunningOrders(1, status: 'all');
-          Get.find<OrderController>().getOrderCount(
-            Get.find<OrderController>().orderType,
-          );
-          Get.find<OrderController>().getLatestOrders();
-          Get.find<NotificationController>().getNotificationList();
         }
+      } else if (type == 'assign' && orderID != null && orderID.isNotEmpty) {
+        Get.find<OrderController>().getRunningOrders(1, status: 'all');
+        Get.find<OrderController>().getOrderCount(Get.find<OrderController>().orderType);
+        Get.find<OrderController>().getLatestOrders();
+        final assignId = int.tryParse(orderID);
+        if (assignId != null) {
+          Get.offAllNamed(RouteHelper.getOrderDetailsRoute(assignId, fromNotification: true));
+        }
+      } else if (type == 'block') {
+        Get.find<AuthController>().clearSharedData();
+        Get.find<ProfileController>().stopLocationRecord();
+        Get.offAllNamed(RouteHelper.getSignInRoute());
+      } else if (type == 'unassign') {
+        Get.to(const DashboardScreen(pageIndex: 1));
+      } else {
+        // Para cualquier otro tipo, mostrar notificación estándar
+        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        Get.find<OrderController>().getRunningOrders(1, status: 'all');
+        Get.find<OrderController>().getOrderCount(Get.find<OrderController>().orderType);
+        Get.find<OrderController>().getLatestOrders();
+        Get.find<NotificationController>().getNotificationList();
       }
     });
+
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       if (kDebugMode) {
@@ -180,11 +202,12 @@ class NotificationHelper {
               ),
             ),
             NotificationType.order_request: () {
-                final orderId = int.tryParse(
-                  message.data['order_id']?.toString() ?? '',
-                );
+                final orderId = _parseOrderId(message.data);
                 if (orderId != null) {
+                  debugPrint("[NotificationHelper] [onMessageOpenedApp] Notificando pedido $orderId a OrderNotificationService");
                   OrderNotificationService.instance.notifyOrderRequest(orderId);
+                } else {
+                  debugPrint("[NotificationHelper] [onMessageOpenedApp] order_request SIN ID válido: ${message.data}");
                 }
               },
             NotificationType.block: () =>
@@ -429,8 +452,8 @@ class NotificationHelper {
   }
 
   static NotificationBodyModel? convertNotification(Map<String, dynamic> data) {
-    final type = data['type'];
-    final orderId = data['order_id'];
+    final type = data['type'] ?? data['notification_type'];
+    final int? orderId = _parseOrderId(data);
 
     switch (type) {
       case 'cash_collect':
@@ -442,14 +465,22 @@ class NotificationHelper {
           notificationType: NotificationType.unassign,
         );
       case 'order_status':
+        if (orderId == null) {
+          debugPrint('[NotificationHelper] order_status sin orderId válido, ignorando.');
+          return null;
+        }
         return NotificationBodyModel(
-          orderId: int.parse(orderId),
+          orderId: orderId,
           notificationType: NotificationType.order,
         );
       case 'new_order':
       case 'order_request':
+        if (orderId == null) {
+          debugPrint('[NotificationHelper] new_order/order_request sin orderId válido, ignorando.');
+          return null;
+        }
         return NotificationBodyModel(
-          orderId: int.parse(orderId),
+          orderId: orderId,
           notificationType: NotificationType.order_request,
         );
       case 'block':
@@ -477,6 +508,32 @@ class NotificationHelper {
     }
   }
 
+  /// Intenta extraer el orderId desde diferentes claves comunes del payload FCM.
+  /// Esto hace el sistema más robusto ante cambios menores en el backend.
+  static int? _parseOrderId(Map<String, dynamic> data) {
+    const candidates = <String>[
+      'order_id',
+      'orderId',
+      'id',
+      'order',
+      'orderID',
+      'order_request_id',
+      'booking_id',
+      'title_loc_key',
+    ];
+
+    for (final key in candidates) {
+      final value = data[key];
+      if (value != null) {
+        final parsed = int.tryParse(value.toString());
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  }
+
   static NotificationBodyModel _handleMessageNotification(
     Map<String, dynamic> data,
   ) {
@@ -493,6 +550,12 @@ class NotificationHelper {
           : AppConstants.vendor,
     );
   }
+
+  static void setAppInForeground(bool isForeground) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(AppConstants.isForeground, isForeground);
+    debugPrint("[NotificationHelper] app_in_foreground set to: $isForeground");
+  }
 }
 
 /// Background FCM message handler
@@ -500,6 +563,14 @@ class NotificationHelper {
 Future<void> myBackgroundMessageHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   customPrint("onBackground: ${message.data}");
+
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  bool isForeground = prefs.getBool(AppConstants.isForeground) ?? false;
+
+  if (isForeground) {
+    debugPrint("[FCM] App en primer plano. Ignorando servicio de background para evitar doble sonido.");
+    return;
+  }
 
   final notificationBody = NotificationHelper.convertNotification(message.data);
 

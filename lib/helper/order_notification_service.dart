@@ -11,27 +11,49 @@ class OrderNotificationService {
 
   /// orderId pendiente cuando el callback aún no estaba registrado
   int? _pendingOrderId;
+  
+  /// Lista temporal para deduplicar notificaciones concurrentes (WS + FCM)
+  final List<int> _processedOrderIds = [];
 
   void Function(int orderId)? _onOrderRequestTapped;
 
+  /// Whether the DashboardScreen has registered its callback
+  bool get hasCallback => _onOrderRequestTapped != null;
+
   /// DashboardScreen llama esto en initState para registrar el listener.
   set onOrderRequestTapped(void Function(int orderId)? callback) {
+    print("[OrderNotifService] 🔧 onOrderRequestTapped SET (callback is ${callback != null ? 'NOT null' : 'null'})");
     _onOrderRequestTapped = callback;
-    // Si llegó una notificación antes de que el callback estuviera listo, procesarla ahora
     if (callback != null && _pendingOrderId != null) {
       final id = _pendingOrderId!;
       _pendingOrderId = null;
+      print("[OrderNotifService] 📦 Dispatching PENDING order $id to newly registered callback");
       Future.microtask(() => callback(id));
     }
   }
 
-  /// Llamado desde NotificationHelper cuando el repartidor toca una notificación
-  /// de tipo [order_request] o [new_order].
+  /// Llamado desde NotificationHelper o PusherService cuando el repartidor
+  /// tiene una notificación de tipo [order_request] o [new_order].
   void notifyOrderRequest(int orderId) {
+    // 🛡️ Deduplicación Híbrida: Si este orderId llegó en los últimos minutos
+    // por Websocket o FCM, lo ignoramos para no repetir el Bottom Sheet ni el sonido.
+    if (_processedOrderIds.contains(orderId)) {
+      print("[OrderNotifService] 🚫 DUPLICATE orderId $orderId ignored (Híbrido FCM/WS).");
+      return;
+    }
+    
+    _processedOrderIds.add(orderId);
+    if (_processedOrderIds.length > 50) {
+      _processedOrderIds.removeAt(0); // keep memory light
+    }
+
+    print("[OrderNotifService] 📨 notifyOrderRequest($orderId) called");
+    print("[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}");
     if (_onOrderRequestTapped != null) {
+      print("[OrderNotifService] ✅ Calling _onOrderRequestTapped($orderId)");
       _onOrderRequestTapped!(orderId);
     } else {
-      // Guardar para cuando DashboardScreen se inicialice y registre el callback
+      print("[OrderNotifService] ⚠️ No callback! Saving $orderId as pending");
       _pendingOrderId = orderId;
     }
   }

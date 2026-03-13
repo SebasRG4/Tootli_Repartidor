@@ -1,4 +1,4 @@
-package com.sixamtech.sixam_mart_delivery_app
+package com.Tootli.repartidor
 
 import io.flutter.embedding.android.FlutterActivity
 

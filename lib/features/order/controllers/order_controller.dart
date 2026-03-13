@@ -134,6 +134,20 @@ class OrderController extends GetxController implements GetxService {
     }
   }
 
+  /// Abre la cámara directamente para tomar la foto de prueba de entrega.
+  /// Evita cualquier selector de galería/cámara.
+  Future<void> pickCameraDirectly() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? xFile = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 50,
+    );
+    if (xFile != null) {
+      _pickedPrescriptions.add(xFile);
+      update();
+    }
+  }
+
   void initLoading() {
     _isLoading = false;
     update();
@@ -166,6 +180,16 @@ class OrderController extends GetxController implements GetxService {
       await Get.find<OrderController>().getRunningOrders(offset);
     }
     update();
+  }
+
+  /// Versión segura de getOrderWithId sin efectos secundarios.
+  /// Úsala cuando sólo necesites obtener el modelo para mostrarlo (p.ej. notificaciones).
+  Future<OrderModel?> fetchOrderForNotification(int orderId) async {
+    Response response = await orderServiceInterface.getOrderWithId(orderId);
+    if (response.statusCode == 200) {
+      return OrderModel.fromJson(response.body);
+    }
+    return null;
   }
 
   Future<void> getCompletedOrders(
@@ -303,8 +327,9 @@ class OrderController extends GetxController implements GetxService {
       multiParts,
     );
     Get.back(result: responseModel.isSuccess);
-    if (responseModel.isSuccess) {
-      if (back) {
+      if (responseModel.isSuccess) {
+        _pickedPrescriptions = []; // Limpiar fotos después de éxito
+        if (back) {
         Get.back();
       }
       if (gotoDashboard) {
@@ -382,13 +407,16 @@ class OrderController extends GetxController implements GetxService {
     ResponseModel responseModel = await orderServiceInterface.acceptOrder(
       orderID,
     );
-    Get.back();
+    // NOTA: No llamamos Get.back() aquí porque el flujo actual usa un bottom sheet
+    // embebido en el Scaffold (no una ruta propia). Llamarlo cerraría la pantalla equivocada.
     if (responseModel.isSuccess) {
       if (_latestOrderList != null &&
           _latestOrderList!.isNotEmpty &&
           index < _latestOrderList!.length) {
         _latestOrderList!.removeAt(index);
       }
+      // Inicializar la lista si es null para evitar crash
+      _currentOrderList ??= [];
       _currentOrderList!.add(orderModel);
     } else {
       showCustomSnackBar(responseModel.message, isError: true);
