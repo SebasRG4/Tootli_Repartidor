@@ -131,16 +131,23 @@ class AuthService implements AuthServiceInterface {
   }
 
   @override
-  Future<XFile?> pickImageFromGallery() async{
-    XFile? pickImage = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if(pickImage != null) {
-      pickImage.length().then((value) {
-        if (value > 2000000) {
-          showCustomSnackBar('please_upload_lower_size_file'.tr);
-        } else {
-          return pickImage;
-        }
-      });
+  Future<XFile?> pickImageFromGallery() async {
+    return pickImageFromSource(ImageSource.gallery);
+  }
+
+  @override
+  Future<XFile?> pickImageFromSource(ImageSource source) async {
+    final XFile? pickImage = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 88,
+    );
+    if (pickImage == null) return null;
+    final int length = await pickImage.length();
+    if (length > 2000000) {
+      showCustomSnackBar('please_upload_lower_size_file'.tr);
+      return null;
     }
     return pickImage;
   }

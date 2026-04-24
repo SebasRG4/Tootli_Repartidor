@@ -2,12 +2,13 @@ import 'dart:async';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/delivery_man_body_model.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_result.dart';
+import 'package:sixam_mart_delivery/features/auth/widgets/identity_image_source_sheet_widget.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/services/auth_service_interface.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 
@@ -274,13 +275,50 @@ class AuthController extends GetxController implements GetxService {
       if (isLogo) {
         _pickedImage = await authServiceInterface.pickDeliveryProfileSelfie();
       } else {
-        XFile? pickedIdentities = await authServiceInterface.pickImageFromGallery();
+        final XFile? pickedIdentities = await authServiceInterface.pickImageFromSource(ImageSource.gallery);
         if(pickedIdentities != null) {
           _pickedIdentities.add(pickedIdentities);
         }
       }
       update();
     }
+  }
+
+  /// Muestra galería o cámara para añadir o sustituir una foto de identidad.
+  void openIdentityImageSourceSheet({int? replaceIndex}) {
+    if (replaceIndex == null && _pickedIdentities.length >= 6) {
+      showCustomSnackBar('maximum_image_limit_is_6'.tr);
+      return;
+    }
+    Get.bottomSheet(
+      IdentityImageSourceSheetWidget(
+        onGallery: () {
+          if (Get.isBottomSheetOpen ?? false) Get.back();
+          _pickIdentityFromSource(ImageSource.gallery, replaceIndex);
+        },
+        onCamera: GetPlatform.isWeb
+            ? null
+            : () {
+                if (Get.isBottomSheetOpen ?? false) Get.back();
+                _pickIdentityFromSource(ImageSource.camera, replaceIndex);
+              },
+      ),
+      isScrollControlled: true,
+    );
+  }
+
+  Future<void> _pickIdentityFromSource(ImageSource source, int? replaceIndex) async {
+    final XFile? file = await authServiceInterface.pickImageFromSource(source);
+    if (file == null) return;
+    if (replaceIndex != null) {
+      if (replaceIndex >= 0 && replaceIndex < _pickedIdentities.length) {
+        _pickedIdentities[replaceIndex] = file;
+      }
+    } else {
+      if (_pickedIdentities.length >= 6) return;
+      _pickedIdentities.add(file);
+    }
+    update();
   }
 
   void removeIdentityImage(int index) {

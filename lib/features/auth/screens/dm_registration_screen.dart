@@ -617,7 +617,7 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                                     return InkWell(
                                       onTap: () {
                                         if((authController.pickedIdentities.length) < 6) {
-                                          authController.pickDmImageForRegistration(false, false);
+                                          authController.openIdentityImageSourceSheet();
                                         }else {
                                           showCustomSnackBar('maximum_image_limit_is_6'.tr);
                                         }
@@ -663,24 +663,34 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                                       width: 180,
                                       child: Stack(children: [
 
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                                          child: GetPlatform.isWeb ? Image.network(
-                                            file!.path, height: 130, width: 180, fit: BoxFit.cover,
-                                          ) : Image.file(
-                                            File(file!.path), height: 130, width: 180, fit: BoxFit.cover,
+                                        Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => authController.openIdentityImageSourceSheet(replaceIndex: index),
+                                            borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                                              child: GetPlatform.isWeb ? Image.network(
+                                                file!.path, height: 130, width: 180, fit: BoxFit.cover,
+                                              ) : Image.file(
+                                                File(file!.path), height: 130, width: 180, fit: BoxFit.cover,
+                                              ),
+                                            ),
                                           ),
                                         ),
 
                                         Positioned(
                                           right: 0, top: 0,
-                                          child: InkWell(
-                                            onTap: () {
-                                              authController.removeIdentityImage(index);
-                                            },
-                                            child: const Padding(
-                                              padding: EdgeInsets.all(Dimensions.paddingSizeSmall),
-                                              child: Icon(Icons.delete_forever, color: Colors.red),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              onTap: () {
+                                                authController.removeIdentityImage(index);
+                                              },
+                                              child: const Padding(
+                                                padding: EdgeInsets.all(Dimensions.paddingSizeSmall),
+                                                child: Icon(Icons.delete_forever, color: Colors.red),
+                                              ),
                                             ),
                                           ),
                                         ),

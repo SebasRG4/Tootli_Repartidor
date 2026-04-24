@@ -31,6 +31,9 @@ abstract class AuthServiceInterface {
   List<int?> vehicleIds (List<VehicleModel>? vehicles);
   Future<XFile?> pickImageFromGallery();
 
+  /// Identidad u otras imágenes desde galería o cámara (máx. ~2 MB).
+  Future<XFile?> pickImageFromSource(ImageSource source);
+
   /// Selfie con cámara frontal + fondo Tootli (solo móvil).
   Future<XFile?> pickDeliveryProfileSelfie();
 }
