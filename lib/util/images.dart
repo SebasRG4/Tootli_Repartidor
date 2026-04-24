@@ -17,6 +17,9 @@ class Images {
   static const String warning = 'assets/image/warning.png';
   static const String list = 'assets/image/list.png';
   static const String placeholder = 'assets/image/placeholder.jpg';
+  /// Fondo Tootli para foto de perfil (selfie recortada con ML Kit).
+  static const String tootliProfileSelfieBg =
+      'assets/image/tootli_profile_selfie_bg.png';
   static const String money = 'assets/image/money.png';
   static const String payMoney = 'assets/image/pay_money.png';
   static const String profileBg = 'assets/image/profile_bg.png';

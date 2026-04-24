@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'dart:io';
-import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/disbursement/helper/disbursement_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
-import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
-import 'package:sixam_mart_delivery/util/styles.dart';
 
 import 'package:sixam_mart_delivery/features/home/screens/home_screen.dart';
 import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
@@ -17,13 +14,13 @@ import 'package:sixam_mart_delivery/features/mission/controllers/mission_control
 import 'package:sixam_mart_delivery/features/profile/screens/profile_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_request_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_screen.dart';
+import 'package:sixam_mart_delivery/features/dashboard/widgets/dashboard_drawer_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/online_panel_widget.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/offline_panel_widget.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:sixam_mart_delivery/util/images.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int pageIndex;
@@ -250,6 +247,24 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       NotificationHelper.setAppInForeground(true);
+      
+      // Reconectar inmediatamente el WebSocket de Soketi si se durmió por iOS/Android
+      PusherService.instance.disconnect();
+      final profileModel = Get.find<ProfileController>().profileModel;
+      if (profileModel != null && profileModel.id != null) {
+        PusherService.instance.initPusher(profileModel.id!);
+      }
+
+      // 🛡️ Mecanismo de seguridad (Fallback): Si onMessageOpenedApp de FCM falla al 
+      // tocar el banner (común en iOS), rescatamos los pedidos asignados consultando la red.
+      Get.find<OrderController>().getLatestOrders().then((_) {
+        if (!mounted || _pageIndex != 0 || _isOrderActive) return;
+        final latestOrders = Get.find<OrderController>().latestOrderList;
+        if (latestOrders != null && latestOrders.isNotEmpty) {
+          _dispatchOrderToHome(latestOrders.first);
+        }
+      });
+
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       NotificationHelper.setAppInForeground(false);
     }
@@ -326,7 +341,14 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
           return Scaffold(
             key: _scaffoldKey,
-            drawer: _buildDrawer(profileController),
+            drawer: DashboardDrawerWidget(
+              profileController: profileController,
+              pageIndex: _pageIndex,
+              onSelectPage: (int index) {
+                Get.back();
+                _setPage(index);
+              },
+            ),
             body: Stack(
               children: [
                 PageView.builder(
@@ -440,224 +462,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           );
         },
       ),
-    );
-  }
-
-  Widget _buildDrawer(ProfileController profileController) {
-    return Drawer(
-      backgroundColor: Theme.of(context).cardColor,
-      child: Column(
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: BoxDecoration(color: Theme.of(context).primaryColor),
-            accountName: Text(
-              profileController.profileModel?.fName ?? '',
-              style: robotoBold.copyWith(
-                fontSize: Dimensions.fontSizeLarge,
-                color: Colors.white,
-              ),
-            ),
-            accountEmail: Text(
-              profileController.profileModel?.email ?? '',
-              style: robotoRegular.copyWith(color: Colors.white),
-            ),
-            currentAccountPicture: ClipOval(
-              child: profileController.profileModel?.imageFullUrl != null
-                  ? Image.network(
-                      profileController.profileModel!.imageFullUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          Image.asset(Images.placeholder),
-                    )
-                  : Image.asset(Images.placeholder),
-            ),
-          ),
-
-          // Performance Metrics Section
-          Container(
-            margin: const EdgeInsets.symmetric(
-              horizontal: Dimensions.paddingSizeDefault,
-            ),
-            padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-              border: Border.all(
-                color: Theme.of(context).primaryColor.withOpacity(0.1),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Métricas de Desempeño',
-                  style: robotoBold.copyWith(
-                    fontSize: Dimensions.fontSizeSmall,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                ),
-                const SizedBox(height: Dimensions.paddingSizeSmall),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildMetricItem(
-                      'Rating',
-                      '${profileController.profileModel?.avgRating ?? 0}',
-                      Icons.star,
-                      Colors.orange,
-                    ),
-                    _buildMetricItem(
-                      'Hoy',
-                      '${profileController.profileModel?.todaysOrderCount ?? 0}',
-                      Icons.today,
-                      Colors.blue,
-                    ),
-                    _buildMetricItem(
-                      'Semana',
-                      '${profileController.profileModel?.thisWeekOrderCount ?? 0}',
-                      Icons.calendar_view_week,
-                      Colors.green,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.home,
-              color: _pageIndex == 0 ? Theme.of(context).primaryColor : null,
-            ),
-            title: Text(
-              'home'.tr,
-              style: robotoMedium.copyWith(
-                color: _pageIndex == 0 ? Theme.of(context).primaryColor : null,
-              ),
-            ),
-            selected: _pageIndex == 0,
-            onTap: () {
-              Get.back();
-              _setPage(0);
-            },
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.list_alt,
-              color: _pageIndex == 1 ? Theme.of(context).primaryColor : null,
-            ),
-            title: Text(
-              'request'.tr,
-              style: robotoMedium.copyWith(
-                color: _pageIndex == 1 ? Theme.of(context).primaryColor : null,
-              ),
-            ),
-            selected: _pageIndex == 1,
-            onTap: () {
-              Get.back();
-              _setPage(1);
-            },
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.shopping_bag,
-              color: _pageIndex == 2 ? Theme.of(context).primaryColor : null,
-            ),
-            title: Text(
-              'orders'.tr,
-              style: robotoMedium.copyWith(
-                color: _pageIndex == 2 ? Theme.of(context).primaryColor : null,
-              ),
-            ),
-            selected: _pageIndex == 2,
-            onTap: () {
-              Get.back();
-              _setPage(2);
-            },
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.person,
-              color: _pageIndex == 3 ? Theme.of(context).primaryColor : null,
-            ),
-            title: Text(
-              'profile'.tr,
-              style: robotoMedium.copyWith(
-                color: _pageIndex == 3 ? Theme.of(context).primaryColor : null,
-              ),
-            ),
-            selected: _pageIndex == 3,
-            onTap: () {
-              Get.back();
-              _setPage(3);
-            },
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.military_tech,
-              color: Get.currentRoute == RouteHelper.mission
-                  ? Theme.of(context).primaryColor
-                  : null,
-            ),
-            title: Text(
-              'driver_missions'.tr,
-              style: robotoMedium.copyWith(
-                color: Get.currentRoute == RouteHelper.mission
-                    ? Theme.of(context).primaryColor
-                    : null,
-              ),
-            ),
-            onTap: () {
-              Get.back();
-              Get.toNamed(RouteHelper.getMissionRoute());
-            },
-          ),
-          const Spacer(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: Text(
-              'logout'.tr,
-              style: robotoMedium.copyWith(color: Colors.red),
-            ),
-            onTap: () {
-              Get.back();
-              Get.find<AuthController>().clearSharedData();
-              Get.find<ProfileController>().stopLocationRecord();
-              PusherService.instance.disconnect();
-              Get.offAllNamed(RouteHelper.getSignInRoute());
-            },
-          ),
-          SizedBox(
-            height:
-                MediaQuery.of(context).padding.bottom +
-                Dimensions.paddingSizeDefault,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricItem(
-    String label,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 20),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge),
-        ),
-        Text(
-          label,
-          style: robotoRegular.copyWith(
-            fontSize: 10,
-            color: Theme.of(context).disabledColor,
-          ),
-        ),
-      ],
     );
   }
 

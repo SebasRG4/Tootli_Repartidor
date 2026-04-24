@@ -22,6 +22,8 @@ import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_text_field_widget.dart';
 import 'package:sixam_mart_delivery/features/auth/widgets/pass_view_widget.dart';
+import 'package:sixam_mart_delivery/api/api_client.dart';
+import 'package:sixam_mart_delivery/util/app_constants.dart';
 
 class DmRegistrationScreen extends StatefulWidget {
   const DmRegistrationScreen({super.key});
@@ -31,6 +33,8 @@ class DmRegistrationScreen extends StatefulWidget {
 }
 
 class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
+
+  bool _registrationRevisionMode = false;
 
   final TextEditingController _fNameController = TextEditingController();
   final TextEditingController _lNameController = TextEditingController();
@@ -54,11 +58,82 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
   @override
   void initState() {
     super.initState();
+    final dynamic args = Get.arguments;
+    _registrationRevisionMode = args is Map && args['registrationRevision'] == true;
+
     _countryDialCode = CountryCode.fromCountryCode(Get.find<SplashController>().configModel!.country!).dialCode;
     Get.find<AuthController>().resetDmRegistrationData();
-    Get.find<AddressController>().resetSelectedDeliveryZone();
+    if (!_registrationRevisionMode) {
+      Get.find<AddressController>().resetSelectedDeliveryZone();
+    }
     Get.find<AddressController>().getZoneList();
     Get.find<AuthController>().getVehicleList();
+    if (_registrationRevisionMode) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadRegistrationRevisionPrefill());
+    }
+  }
+
+  Future<void> _loadRegistrationRevisionPrefill() async {
+    final AuthController auth = Get.find<AuthController>();
+    final ApiClient api = Get.find<ApiClient>();
+    await auth.getVehicleList();
+    await Get.find<AddressController>().getZoneList();
+    final response = await api.getData('${AppConstants.profileUri}${auth.getUserToken()}');
+    if (!mounted) {
+      return;
+    }
+    if (response.statusCode != 200 || response.body is! Map) {
+      showCustomSnackBar('registration_revision_submit_failed'.tr);
+      return;
+    }
+    final Map<String, dynamic> m = Map<String, dynamic>.from(response.body as Map);
+    final bool canDeliver = m['can_deliver'] == true || m['can_deliver'] == 1 || '${m['can_deliver']}' == '1';
+    final bool canDriveTaxi = m['can_drive_taxi'] == true || m['can_drive_taxi'] == 1 || '${m['can_drive_taxi']}' == '1';
+    final Map<String, String> extras = <String, String>{
+      'can_deliver': canDeliver ? '1' : '0',
+      'can_drive_taxi': canDriveTaxi ? '1' : '0',
+    };
+    if (canDriveTaxi) {
+      final String? tln = m['taxi_license_number']?.toString();
+      final String? tle = m['taxi_license_expiry']?.toString();
+      if (tln != null && tln.isNotEmpty) {
+        extras['taxi_license_number'] = tln;
+      }
+      if (tle != null && tle.isNotEmpty) {
+        extras['taxi_license_expiry'] = tle;
+      }
+    }
+    auth.setRevisionSubmitExtras(extras);
+
+    _fNameController.text = m['f_name']?.toString() ?? '';
+    _lNameController.text = m['l_name']?.toString() ?? '';
+    _emailController.text = m['email']?.toString() ?? '';
+    final String fullPhone = m['phone']?.toString() ?? '';
+    String dial = auth.getUserCountryDialCode();
+    if (dial.isEmpty) {
+      dial = CountryCode.fromCountryCode(Get.find<SplashController>().configModel!.country!).dialCode ?? '';
+    }
+    if (fullPhone.startsWith(dial)) {
+      _phoneController.text = fullPhone.substring(dial.length).trim();
+      _countryDialCode = dial;
+    } else {
+      _phoneController.text = fullPhone;
+    }
+
+    final String earning = '${m['earning'] ?? ''}';
+    if (earning == '1') {
+      auth.setSelectedDmType('freelancer');
+    } else if (earning.isNotEmpty) {
+      auth.setSelectedDmType('salary_based');
+    }
+    Get.find<AddressController>().setSelectedDeliveryZone(zoneId: m['zone_id']?.toString());
+    auth.setSelectedVehicleType(vehicleId: m['vehicle_id']?.toString());
+    auth.setSelectedIdentityType(m['identity_type']?.toString());
+    _identityNumberController.text = m['identity_number']?.toString() ?? '';
+
+    setState(() {});
+    auth.update();
+    Get.find<AddressController>().update();
   }
 
   @override
@@ -77,7 +152,7 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            'delivery_man_registration'.tr,
+            _registrationRevisionMode ? 'registration_revision_title'.tr : 'delivery_man_registration'.tr,
             style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, fontWeight: FontWeight.w600, color: Theme.of(context).textTheme.bodyLarge!.color),
           ),
           centerTitle: true,
@@ -133,6 +208,22 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                   Visibility(
                     visible: authController.dmStatus == 0.4,
                     child: Column( crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+                      if (_registrationRevisionMode && (authController.registrationRevisionMessage ?? '').trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: Dimensions.paddingSizeDefault),
+                          child: CustomCard(
+                            padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text('registration_revision_banner'.tr, style: robotoBold),
+                              const SizedBox(height: Dimensions.paddingSizeSmall),
+                              Text(
+                                authController.registrationRevisionMessage!.trim(),
+                                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeDefault),
+                              ),
+                            ]),
+                          ),
+                        ),
 
                       Text('basic_information'.tr, style: robotoBold),
                       const SizedBox(height: Dimensions.paddingSizeSmall),
@@ -203,7 +294,7 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                           CustomTextFieldWidget(
                             labelText: 'password'.tr,
                             hintText: 'eight_characters'.tr,
-                            isRequired: true,
+                            isRequired: !_registrationRevisionMode,
                             controller: _passwordController,
                             focusNode: _passwordNode,
                             nextFocus: _confirmPasswordNode,
@@ -229,13 +320,22 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                           CustomTextFieldWidget(
                             labelText: 'confirm_password'.tr,
                             hintText: 're_enter_your_password'.tr,
-                            isRequired: true,
+                            isRequired: !_registrationRevisionMode,
                             controller: _confirmPasswordController,
                             focusNode: _confirmPasswordNode,
                             inputAction: TextInputAction.done,
                             inputType: TextInputType.visiblePassword,
                             isPassword: true,
                           ),
+
+                          if (_registrationRevisionMode)
+                            Padding(
+                              padding: const EdgeInsets.only(top: Dimensions.paddingSizeSmall),
+                              child: Text(
+                                'leave_password_unchanged_hint'.tr,
+                                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor),
+                              ),
+                            ),
                         ]),
                       ),
                       const SizedBox(height: Dimensions.paddingSizeLarge),
@@ -250,15 +350,19 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                                 text: 'profile_picture'.tr,
                                 style: robotoBold.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color),
                               ),
-                              TextSpan(
-                                text: '*',
-                                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red),
-                              ),
+                              if (!_registrationRevisionMode)
+                                TextSpan(
+                                  text: '*',
+                                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red),
+                                ),
                             ]),
                           ),
                           const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
-                          Text('image_format_and_ratio_for_profile'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor)),
+                          Text(
+                            _registrationRevisionMode ? 'optional_new_profile_photo'.tr : 'image_format_and_ratio_for_profile'.tr,
+                            style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor),
+                          ),
                           const SizedBox(height: Dimensions.paddingSizeLarge),
 
                           Align(alignment: Alignment.center, child: Stack(children: [
@@ -478,15 +582,19 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                                 text: 'identity_image'.tr,
                                 style: robotoBold.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color),
                               ),
-                              TextSpan(
-                                text: '*',
-                                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red),
-                              ),
+                              if (!_registrationRevisionMode)
+                                TextSpan(
+                                  text: '*',
+                                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red),
+                                ),
                             ]),
                           ),
                           const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
-                          Text('image_format_and_ratio_for_profile'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor)),
+                          Text(
+                            _registrationRevisionMode ? 'optional_new_identity_images'.tr : 'image_format_and_ratio_for_profile'.tr,
+                            style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor),
+                          ),
                           const SizedBox(height: Dimensions.paddingSizeLarge),
 
                           Center(
@@ -629,6 +737,22 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                       showCustomSnackBar('enter_delivery_man_phone_number'.tr);
                     }else if(!phoneValid.isValid) {
                       showCustomSnackBar('enter_a_valid_phone_number'.tr);
+                    }else if(_registrationRevisionMode) {
+                      if (password.isNotEmpty) {
+                        if(!authController.spatialCheck || !authController.lowercaseCheck || !authController.uppercaseCheck || !authController.numberCheck || !authController.lengthCheck) {
+                          showCustomSnackBar('provide_valid_password'.tr);
+                        }else if(password != confirmPass) {
+                          showCustomSnackBar('password_does_not_matched'.tr);
+                        }else {
+                          authController.dmStatusChange(0.8);
+                        }
+                      } else {
+                        if (confirmPass.isNotEmpty) {
+                          showCustomSnackBar('password_does_not_matched'.tr);
+                        }else {
+                          authController.dmStatusChange(0.8);
+                        }
+                      }
                     }else if(password.isEmpty) {
                       showCustomSnackBar('enter_password_for_delivery_man'.tr);
                     }else if(!authController.spatialCheck || !authController.lowercaseCheck || !authController.uppercaseCheck || !authController.numberCheck || !authController.lengthCheck) {
@@ -651,15 +775,22 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                       showCustomSnackBar('select_identity_type'.tr);
                     }else if(identityNumber.isEmpty) {
                       showCustomSnackBar('enter_delivery_man_identity_number'.tr);
-                    }else if(authController.pickedIdentities.isEmpty) {
+                    }else if(authController.pickedIdentities.isEmpty && !_registrationRevisionMode) {
                       showCustomSnackBar('please_upload_identity_image'.tr);
                     }else {
-                      authController.registerDeliveryMan(DeliveryManBodyModel(
-                        fName: fName, lName: lName, password: password, phone: numberWithCountryCode, email: email,
+                      final DeliveryManBodyModel body = DeliveryManBodyModel(
+                        fName: fName, lName: lName,
+                        password: _registrationRevisionMode && password.isEmpty ? null : password,
+                        phone: numberWithCountryCode, email: email,
                         identityNumber: identityNumber, identityType: authController.selectedIdentityType,
                         earning: authController.selectedDmTypeId, zoneId: addressController.selectedDeliveryZoneId,
                         vehicleId: authController.selectedVehicleId, referCode: _referTextController.text,
-                      ));
+                      );
+                      if (_registrationRevisionMode) {
+                        authController.submitRegistrationRevision(body);
+                      } else {
+                        authController.registerDeliveryMan(body);
+                      }
                     }
                   }
                 },

@@ -299,5 +299,15 @@ Future<Map<String, Map<String, String>>> init() async {
     languages['${languageModel.languageCode}_${languageModel.countryCode}'] =
         json;
   }
+  // GetX también resuelve por código de idioma; duplicar evita fallos si el locale
+  // no coincide exactamente con es_MX.
+  final primary = AppConstants.languages[0];
+  final fullKey = '${primary.languageCode}_${primary.countryCode}';
+  if (primary.languageCode != null &&
+      languages.containsKey(fullKey) &&
+      !languages.containsKey(primary.languageCode)) {
+    languages[primary.languageCode!] =
+        Map<String, String>.from(languages[fullKey]!);
+  }
   return languages;
 }

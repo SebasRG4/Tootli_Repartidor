@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:audioplayers/audioplayers.dart';
+
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
@@ -47,11 +47,8 @@ class _NewRequestDialogWidgetState extends State<NewRequestDialogWidget> {
   }
 
   void _startAlarm() {
-    AudioPlayer audio = AudioPlayer();
-    audio.play(AssetSource('alert_new_delivery.mp3'));
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      audio.play(AssetSource('alert_new_delivery.mp3'));
-    });
+    // Audio is now handled centrally by OrderNotificationService 
+    // to prevent overlap.
   }
 
   @override

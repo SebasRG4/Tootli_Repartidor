@@ -59,7 +59,12 @@ class NotificationHelper {
               NotificationType.order_request: () {
                 final orderId = payload.orderId;
                 if (orderId != null) {
-                  OrderNotificationService.instance.notifyOrderRequest(orderId);
+                  // Agregamos un ligero delay para dar tiempo a que DashboardScreen cambie de listener 
+                  // cuando regresamos a la app desde el tap en la notificación
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    debugPrint("[NotificationHelper] [getInitialMessage] Notificando pedido $orderId a OrderNotificationService tras iniciar");
+                    OrderNotificationService.instance.notifyOrderRequest(orderId);
+                  });
                 }
               },
               NotificationType.block: () =>
@@ -145,6 +150,15 @@ class NotificationHelper {
         NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
       } else if (type == 'otp' || type == 'deliveryman_referral') {
         NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+      } else if (type == 'dm_registration_revision' ||
+          type == 'dm_registration_approved' ||
+          type == 'dm_registration_denied') {
+        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        if (Get.isRegistered<NotificationController>()) {
+          try {
+            Get.find<NotificationController>().getNotificationList();
+          } catch (_) {}
+        }
       } else if (type == 'new_order' || type == 'order_request' || type == 'order_status') {
         print("[FCM-DEBUG] ✅ MATCHED order type: '$type'");
         print("[FCM-DEBUG] notifOrderId = $notifOrderId");
@@ -204,8 +218,11 @@ class NotificationHelper {
             NotificationType.order_request: () {
                 final orderId = _parseOrderId(message.data);
                 if (orderId != null) {
-                  debugPrint("[NotificationHelper] [onMessageOpenedApp] Notificando pedido $orderId a OrderNotificationService");
-                  OrderNotificationService.instance.notifyOrderRequest(orderId);
+                  // Delay extra en iOS/Background tap para asegurar que Home esté montado y registrado el callback
+                  Future.delayed(const Duration(milliseconds: 500), () {
+                    debugPrint("[NotificationHelper] [onMessageOpenedApp] Notificando pedido $orderId a OrderNotificationService");
+                    OrderNotificationService.instance.notifyOrderRequest(orderId);
+                  });
                 } else {
                   debugPrint("[NotificationHelper] [onMessageOpenedApp] order_request SIN ID válido: ${message.data}");
                 }
@@ -498,6 +515,12 @@ class NotificationHelper {
           notificationType: NotificationType.withdraw,
         );
       case 'deliveryman_referral':
+        return NotificationBodyModel(
+          notificationType: NotificationType.general,
+        );
+      case 'dm_registration_revision':
+      case 'dm_registration_approved':
+      case 'dm_registration_denied':
         return NotificationBodyModel(
           notificationType: NotificationType.general,
         );

@@ -35,6 +35,23 @@ class AuthRepository implements AuthRepositoryInterface {
   }
 
   @override
+  Future<bool> submitRegistrationRevision(
+    DeliveryManBodyModel deliveryManBody,
+    List<MultipartBody> multiParts,
+    Map<String, String> revisionExtras,
+  ) async {
+    final Map<String, String> fields = deliveryManBody.toRevisionSubmitMap(getUserToken());
+    fields.addAll(revisionExtras);
+    final Response response = await apiClient.postMultipartData(
+      AppConstants.dmSubmitRegistrationRevisionUri,
+      fields,
+      multiParts,
+      handleError: false,
+    );
+    return response.statusCode == 200;
+  }
+
+  @override
   Future<List<VehicleModel>?> getList() async {
     List<VehicleModel>? vehicles;
     Response response = await apiClient.getData(AppConstants.vehiclesUri);
@@ -116,7 +133,7 @@ class AuthRepository implements AuthRepositoryInterface {
     apiClient.token = token;
     apiClient.updateHeader(
       token,
-      sharedPreferences.getString(AppConstants.languageCode),
+      AppConstants.languages[0].languageCode!,
     );
     sharedPreferences.setString(AppConstants.zoneTopic, zoneTopic);
     sharedPreferences.setString(

@@ -60,6 +60,25 @@ class _MyEarningScreenState extends State<MyEarningScreen> {
     _getFilteredEarnings();
   }
 
+  /// Pestañas con texto largo (p. ej. "Punto de Lealtad") usan ellipsis; al pulsar
+  /// mostramos el rótulo completo sin depender del ancho del chip.
+  static const int _minTabTitleLengthForFullLabelHint = 15;
+
+  void _showFullTabTitleIfLong(BuildContext context, String title) {
+    if (title.length < _minTabTitleLengthForFullLabelHint) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) return;
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(title, textAlign: TextAlign.center),
+        duration: const Duration(milliseconds: 1800),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      ),
+    );
+  }
+
   void _getFilteredEarnings({bool fromFilter = false}) {
     if (_selectedTabIndex == 0) {
       // Order
@@ -196,17 +215,19 @@ class _MyEarningScreenState extends State<MyEarningScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-                  child: SizedBox(
-                    height: 120,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(children: [
-                        _earningCard(context: context, image: Images.totalEarning, price: totalEarning, title: 'total_earning'.tr),
-                        _earningCard(context: context, image: Images.deliveryFeeEarned, price: myAccountController.earningReportModel?.totalDeliveryCharge??0, title: 'delivery_fee_earned'.tr),
-                        _earningCard(context: context, image: Images.deliveryTipsEarned, price: myAccountController.earningReportModel?.totalDmTips??0, title: 'delivery_tips_earned'.tr),
-                        _earningCard(context: context, image: Images.refferalIcon, price: myAccountController.earningReportModel?.totalReferal??0, title: 'referral'.tr),
-                        _earningCard(context: context, image: Images.loyaltyPoint2, price: myAccountController.earningReportModel?.totalLoyaltyPointEarning??0, title: 'loyalty_point'.tr),
-                      ]),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _earningCard(context: context, image: Images.totalEarning, price: totalEarning, title: 'total_earning'.tr),
+                          _earningCard(context: context, image: Images.deliveryFeeEarned, price: myAccountController.earningReportModel?.totalDeliveryCharge??0, title: 'delivery_fee_earned'.tr),
+                          _earningCard(context: context, image: Images.deliveryTipsEarned, price: myAccountController.earningReportModel?.totalDmTips??0, title: 'delivery_tips_earned'.tr),
+                          _earningCard(context: context, image: Images.refferalIcon, price: myAccountController.earningReportModel?.totalReferal??0, title: 'referral'.tr),
+                          _earningCard(context: context, image: Images.loyaltyPoint2, price: myAccountController.earningReportModel?.totalLoyaltyPointEarning??0, title: 'loyalty_point'.tr),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -234,23 +255,34 @@ class _MyEarningScreenState extends State<MyEarningScreen> {
                   child: Container(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault),
-                    child: Row(children: [
-                      _buildTab(
-                        context: context,
-                        title: 'order'.tr,
-                        index: 0,
-                      ),
-                      _buildTab(
-                        context: context,
-                        title: 'referral'.tr,
-                        index: 1,
-                      ),
-                      _buildTab(
-                        context: context,
-                        title: 'loyalty_point'.tr,
-                        index: 2,
-                      ),
-                    ]),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _buildTab(
+                            context: context,
+                            title: 'order'.tr,
+                            index: 0,
+                            isLast: false,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildTab(
+                            context: context,
+                            title: 'referral'.tr,
+                            index: 1,
+                            isLast: false,
+                          ),
+                        ),
+                        Expanded(
+                          child: _buildTab(
+                            context: context,
+                            title: 'loyalty_point'.tr,
+                            index: 2,
+                            isLast: true,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -282,27 +314,45 @@ class _MyEarningScreenState extends State<MyEarningScreen> {
     });
   }
 
-  Widget _buildTab({required BuildContext context, required String title, required int index}) {
-    return InkWell(
-      onTap: () {
-        if(index != _selectedTabIndex) {
-          _onTabChanged(index);
-        }
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
-          color: _selectedTabIndex == index ? Theme.of(context).primaryColor : null,
-          border: Border.all(color: _selectedTabIndex == index ? Theme.of(context).primaryColor : Theme.of(context).disabledColor),
-        ),
-        margin: const EdgeInsets.only(top: Dimensions.paddingSizeExtraSmall, bottom: Dimensions.paddingSizeExtraSmall, right: Dimensions.paddingSizeSmall),
-        padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault),
-        alignment: Alignment.center,
-        child: Text(
-          title,
-          style: robotoMedium.copyWith(
-            color: _selectedTabIndex == index ? Theme.of(context).cardColor : Theme.of(context).textTheme.bodyLarge!.color!.withValues(alpha: 0.6),
-            fontSize: Dimensions.fontSizeLarge,
+  Widget _buildTab({
+    required BuildContext context,
+    required String title,
+    required int index,
+    required bool isLast,
+  }) {
+    return Semantics(
+      label: title,
+      button: true,
+      selected: _selectedTabIndex == index,
+      child: InkWell(
+        onTap: () {
+          if (index != _selectedTabIndex) {
+            _onTabChanged(index);
+          }
+          _showFullTabTitleIfLong(context, title);
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Dimensions.radiusExtraLarge),
+            color: _selectedTabIndex == index ? Theme.of(context).primaryColor : null,
+            border: Border.all(color: _selectedTabIndex == index ? Theme.of(context).primaryColor : Theme.of(context).disabledColor),
+          ),
+          margin: EdgeInsets.only(
+            top: Dimensions.paddingSizeExtraSmall,
+            bottom: Dimensions.paddingSizeExtraSmall,
+            right: isLast ? 0 : Dimensions.paddingSizeSmall,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall),
+          alignment: Alignment.center,
+          child: Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: robotoMedium.copyWith(
+              color: _selectedTabIndex == index ? Theme.of(context).cardColor : Theme.of(context).textTheme.bodyLarge!.color!.withValues(alpha: 0.6),
+              fontSize: Dimensions.fontSizeLarge,
+            ),
           ),
         ),
       ),
@@ -319,18 +369,27 @@ class _MyEarningScreenState extends State<MyEarningScreen> {
         borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
         border: Border.all(color: Theme.of(context).disabledColor.withValues(alpha: 0.3), width: 1),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Image.asset(image, height: 30, width: 30),
-        const SizedBox(height: Dimensions.paddingSizeDefault),
-
-        Text(
-          PriceConverterHelper.convertPrice(price),
-          style: robotoBold.copyWith(fontSize: Dimensions.fontSizeExtraLarge),
-        ),
-        const SizedBox(height: Dimensions.paddingSizeExtraSmall - 2),
-
-        Text(title, style: robotoMedium.copyWith(color: Theme.of(context).hintColor)),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(image, height: 30, width: 30),
+          const SizedBox(height: Dimensions.paddingSizeDefault),
+          Text(
+            PriceConverterHelper.convertPrice(price),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: robotoBold.copyWith(fontSize: Dimensions.fontSizeExtraLarge),
+          ),
+          const SizedBox(height: Dimensions.paddingSizeExtraSmall - 2),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: robotoMedium.copyWith(color: Theme.of(context).hintColor),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -20,8 +20,16 @@ abstract class AuthServiceInterface {
   void setNotificationActive(bool isActive);
   Future<bool> clearUserNumberAndPassword();
   Future<bool> registerDeliveryMan(DeliveryManBodyModel deliveryManBody, List<MultipartBody> multiParts);
+  Future<bool> submitRegistrationRevision(
+    DeliveryManBodyModel deliveryManBody,
+    List<MultipartBody> multiParts,
+    Map<String, String> revisionExtras,
+  );
   Future<List<VehicleModel>?> getVehicleList();
   List<MultipartBody> prepareMultiPartsBody(XFile? pickedImage, List<XFile> pickedIdentities);
   List<int?> vehicleIds (List<VehicleModel>? vehicles);
   Future<XFile?> pickImageFromGallery();
+
+  /// Selfie con cámara frontal + fondo Tootli (solo móvil).
+  Future<XFile?> pickDeliveryProfileSelfie();
 }

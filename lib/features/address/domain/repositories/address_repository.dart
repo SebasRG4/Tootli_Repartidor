@@ -42,7 +42,7 @@ class AddressRepository implements AddressRepositoryInterface {
   Future<bool> saveUserAddress(String address, List<int>? zoneIDs) async {
     apiClient.updateHeader(
       sharedPreferences.getString(AppConstants.token),
-      sharedPreferences.getString(AppConstants.languageCode),
+      AppConstants.languages[0].languageCode!,
     );
     return await sharedPreferences.setString(AppConstants.userAddress, address);
   }

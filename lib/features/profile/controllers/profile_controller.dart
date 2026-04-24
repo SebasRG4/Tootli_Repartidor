@@ -11,6 +11,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/domain/services/profile_service_interface.dart';
+import 'package:sixam_mart_delivery/helper/profile_selfie_composer.dart';
 
 class ProfileController extends GetxController implements GetxService {
   final ProfileServiceInterface profileServiceInterface;
@@ -70,7 +71,7 @@ class ProfileController extends GetxController implements GetxService {
   }
 
   void pickImage() async {
-    _pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
+    _pickedFile = await ProfileSelfieComposer.pickComposedProfileSelfie();
     update();
   }
 

@@ -166,6 +166,13 @@ class _SignInScreenState extends State<SignInScreen> {
           } else {
             authController.clearUserNumberAndPassword();
           }
+          if (authController.registrationRevisionRequired) {
+            Get.offAllNamed(
+              RouteHelper.getDeliverymanRegistrationRoute(),
+              arguments: const {'registrationRevision': true},
+            );
+            return;
+          }
           await Get.find<ProfileController>().getProfile();
           Get.offAllNamed(RouteHelper.getInitialRoute());
         }else {

@@ -210,6 +210,17 @@ class ChatController extends GetxController implements GetxService {
     }
     update();
   }
+
+  Future<void> pickCameraImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.camera, imageQuality: 30);
+    if (image != null) {
+      _chatImage ??= [];
+      _chatImage!.add(image);
+      _isSendButtonActive = true;
+    }
+    update();
+  }
   void removeImage(int index){
     chatImage!.removeAt(index);
     update();

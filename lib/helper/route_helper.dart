@@ -24,7 +24,6 @@ import 'package:sixam_mart_delivery/features/forgot_password/screens/forget_pass
 import 'package:sixam_mart_delivery/features/forgot_password/screens/new_pass_screen.dart';
 import 'package:sixam_mart_delivery/features/forgot_password/screens/verification_screen.dart';
 import 'package:sixam_mart_delivery/features/html/screens/html_viewer_screen.dart';
-import 'package:sixam_mart_delivery/features/language/screens/language_screen.dart';
 import 'package:sixam_mart_delivery/features/notification/screens/notification_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_details_screen.dart';
 import 'package:sixam_mart_delivery/features/profile/screens/update_profile_screen.dart';
@@ -51,7 +50,6 @@ class RouteHelper {
   static const String runningOrder = '/running-order';
   static const String terms = '/terms-and-condition';
   static const String privacy = '/privacy-policy';
-  static const String language = '/language';
   static const String update = '/update';
   static const String chatScreen = '/chat-screen';
   static const String conversationListScreen = '/conversation-list-screen';
@@ -109,7 +107,6 @@ class RouteHelper {
   static String getRunningOrderRoute() => runningOrder;
   static String getTermsRoute() => terms;
   static String getPrivacyRoute() => privacy;
-  static String getLanguageRoute() => language;
   static String getUpdateRoute(bool isUpdate) =>
       '$update?update=${isUpdate.toString()}';
   static String getChatRoute({
@@ -250,7 +247,6 @@ class RouteHelper {
       name: privacy,
       page: () => const HtmlViewerScreen(isPrivacyPolicy: true),
     ),
-    GetPage(name: language, page: () => const ChooseLanguageScreen()),
     GetPage(
       name: update,
       page: () => UpdateScreen(isUpdate: Get.parameters['update'] == 'true'),

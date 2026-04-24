@@ -91,7 +91,13 @@ class ProfileModel {
     email = json['email'];
     identityNumber = json['identity_number'];
     identityType = json['identity_type'];
-    identityImageFullUrl = json['identity_image_full_url'].cast<String>();
+    if (json['identity_image_full_url'] != null) {
+      identityImageFullUrl = List<String>.from(
+        (json['identity_image_full_url'] as List).map((e) => e.toString()),
+      );
+    } else {
+      identityImageFullUrl = [];
+    }
     imageFullUrl = json['image_full_url'];
     fcmToken = json['fcm_token'];
     zoneId = json['zone_id'];

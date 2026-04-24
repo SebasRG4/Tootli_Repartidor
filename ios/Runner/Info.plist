@@ -24,6 +24,8 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>La app usa la cámara para tomar tu selfie de perfil repartidor con el fondo Tootli.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs access to location to manage coverage of restaurant and also show the customer and restaurant distance.</string>
 	<key>NSMicrophoneUsageDescription</key>

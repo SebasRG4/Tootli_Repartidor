@@ -18,4 +18,9 @@ abstract class AuthRepositoryInterface implements RepositoryInterface {
   void setNotificationActive(bool isActive);
   Future<bool> clearUserNumberAndPassword();
   Future<dynamic> registerDeliveryMan(DeliveryManBodyModel deliveryManBody, List<MultipartBody> multiParts);
+  Future<bool> submitRegistrationRevision(
+    DeliveryManBodyModel deliveryManBody,
+    List<MultipartBody> multiParts,
+    Map<String, String> revisionExtras,
+  );
 }

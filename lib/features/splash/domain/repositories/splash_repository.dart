@@ -18,7 +18,7 @@ class SplashRepository implements SplashRepositoryInterface {
   @override
   Future<bool> initSharedData() {
     if(!sharedPreferences.containsKey(AppConstants.theme)) {
-      return sharedPreferences.setBool(AppConstants.theme, false);
+      return sharedPreferences.setBool(AppConstants.theme, true);
     }
     if(!sharedPreferences.containsKey(AppConstants.countryCode)) {
       return sharedPreferences.setString(AppConstants.countryCode, AppConstants.languages[0].countryCode!);

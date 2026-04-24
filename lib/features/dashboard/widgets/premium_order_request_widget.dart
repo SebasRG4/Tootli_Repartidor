@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
+import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
 
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
 
@@ -36,9 +37,14 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
   @override
   void initState() {
     super.initState();
+    _playAlertSound();
     _startTimer();
   }
 
+  void _playAlertSound() async {
+    // Sound is now handled centrally by OrderNotificationService 
+    // to prevent overlap.
+  }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -51,6 +57,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
         _audioPlayer.stop();
         if (!_isRejected && !_isAccepted) {
           _isRejected = true;
+          OrderNotificationService.instance.stopAudio();
           widget.onReject();
         }
       }
@@ -223,6 +230,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                               if (value > 0.9 && !_isAccepted && !_isRejected) {
                                 _isAccepted = true; // Bloquear futuros disparos
                                 _timer?.cancel();
+                                OrderNotificationService.instance.stopAudio();
                                 _audioPlayer.stop();
                                 widget.onAccept();
                               }

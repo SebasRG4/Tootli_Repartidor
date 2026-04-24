@@ -56,4 +56,27 @@ class DeliveryManBodyModel {
     }
     return data;
   }
+
+  /// Reenvío de solicitud (token + campos; contraseña solo si se cambia).
+  Map<String, String> toRevisionSubmitMap(String token) {
+    final Map<String, String> data = <String, String>{
+      'token': token,
+      'f_name': fName ?? '',
+      'l_name': lName ?? '',
+      'phone': phone ?? '',
+      'email': email ?? '',
+      'identity_type': identityType ?? '',
+      'identity_number': identityNumber ?? '',
+      'earning': earning ?? '',
+      'zone_id': zoneId ?? '',
+      'vehicle_id': vehicleId ?? '',
+    };
+    if (password != null && password!.isNotEmpty) {
+      data['password'] = password!;
+    }
+    if (referCode != null && referCode!.isNotEmpty) {
+      data['referral_code'] = referCode!;
+    }
+    return data;
+  }
 }

@@ -37,6 +37,7 @@ class AcceptedOrderWidget extends StatefulWidget {
 
 class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
   double _sliderValue = 0.0;
+  bool _isCheckingProximity = false;
 
   void _showNavigationOptions() {
     Get.bottomSheet(
@@ -456,8 +457,15 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
           Container(
             padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
             decoration: BoxDecoration(
-              color: Theme.of(context).secondaryHeaderColor.withOpacity(0.1),
+              color: Theme.of(context).primaryColor,
               borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 5,
+                  spreadRadius: 1,
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -466,16 +474,19 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.orderModel.deliveryAddress?.address ?? 'Dirección de entrega',
-                        style: robotoMedium.copyWith(fontSize: 16),
+                        '${widget.orderModel.customer?.fName ?? ''} ${widget.orderModel.customer?.lName ?? ''}',
+                        style: robotoBold.copyWith(
+                          fontSize: 18,
+                          color: Colors.white,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '${widget.orderModel.customer?.fName ?? ''} ${widget.orderModel.customer?.lName ?? ''}',
-                        style: robotoRegular.copyWith(
-                          fontSize: 12,
-                          color: Theme.of(context).disabledColor,
+                        widget.orderModel.deliveryAddress?.address ?? 'Dirección de entrega',
+                        style: robotoMedium.copyWith(
+                          fontSize: 14,
+                          color: Colors.white70,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -486,15 +497,15 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                 if (widget.phase != 'going_to_store' && widget.phase != 'at_store')
                   IconButton(
                     onPressed: _showNavigationOptions,
-                    icon: const Icon(Icons.navigation, color: Colors.blue),
+                    icon: const Icon(Icons.navigation, color: Colors.white),
                   ),
                 IconButton(
                   onPressed: _chatWithCustomer,
-                  icon: const Icon(Icons.message, color: Colors.orange),
+                  icon: const Icon(Icons.message, color: Colors.white),
                 ),
                 IconButton(
                   onPressed: _callCustomer,
-                  icon: const Icon(Icons.call, color: Colors.green),
+                  icon: const Icon(Icons.call, color: Colors.white),
                 ),
               ],
             ),
@@ -718,7 +729,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     widget.phase == 'going_to_store'
                         ? 'Pedido recogido'.tr
                         : widget.phase == 'at_store'
-                            ? 'Empezar entrega'.tr
+                            ? 'on_the_way'.tr
                             : 'Entregar pedido'.tr,
                     style: robotoBold.copyWith(
                       color: Colors.white,
@@ -813,6 +824,9 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     required Function() onSuccess,
     required String errorMessage,
   }) async {
+    if (_isCheckingProximity) return;
+    _isCheckingProximity = true;
+
     try {
       Position currentPosition = await Geolocator.getCurrentPosition();
 
@@ -838,6 +852,14 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
       }
     } catch (e) {
       onSuccess();
+    } finally {
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _isCheckingProximity = false;
+          });
+        }
+      });
     }
   }
 }

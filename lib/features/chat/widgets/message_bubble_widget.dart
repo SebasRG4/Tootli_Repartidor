@@ -66,7 +66,7 @@ class MessageBubbleWidget extends StatelessWidget {
               if(message.message != null)  Flexible(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).disabledColor.withValues(alpha: 0.2),
+                    color: const Color(0xFFDCF8C6), // Light green for receiver
                     borderRadius: isReply && (isSameUserWithNextMessage || isSameUserWithPreviousMessage) ? BorderRadius.only(
                       topLeft: Radius.circular(isSameUserWithNextMessage && isLTR && chatTime ==""? Dimensions.radiusSmall : Dimensions.radiusExtraLarge + 5),
                       bottomLeft: Radius.circular( isSameUserWithPreviousMessage && isLTR && previousMessageHasChatTime == "" ? Dimensions.radiusSmall : Dimensions.radiusExtraLarge + 5),
@@ -76,7 +76,7 @@ class MessageBubbleWidget extends StatelessWidget {
                     ) : BorderRadius.circular(Dimensions.radiusExtraLarge + 5),
                   ),
                   padding: EdgeInsets.all(message.message != null ? Dimensions.paddingSizeDefault : 0),
-                  child: Text(message.message ?? ''),
+                  child: Text(message.message ?? '', style: robotoRegular.copyWith(color: Colors.black87)),
                 ),
               ),
               message.filesFullUrl == null ? SizedBox(height:  8.0) : SizedBox.shrink(),
@@ -134,7 +134,7 @@ class MessageBubbleWidget extends StatelessWidget {
                 child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.end, children: [
                   (message.message != null && message.message!.isNotEmpty) ?  Container(
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor,
+                      color: const Color(0xFFE3F2FD), // Light blue for sender
                       borderRadius: !isReply && (isSameUserWithNextMessage || isSameUserWithPreviousMessage) ? BorderRadius.only(
                         topRight: Radius.circular(isSameUserWithNextMessage && isLTR && chatTime ==""? Dimensions.radiusSmall : Dimensions.radiusExtraLarge + 5),
                         bottomRight: Radius.circular( isSameUserWithPreviousMessage && isLTR && previousMessageHasChatTime == "" ? Dimensions.radiusSmall : Dimensions.radiusExtraLarge + 5),
@@ -143,7 +143,19 @@ class MessageBubbleWidget extends StatelessWidget {
                       ) : BorderRadius.circular(Dimensions.radiusExtraLarge + 5),
                     ),
                     padding: EdgeInsets.all(message.message != null ? Dimensions.paddingSizeDefault : 0),
-                    child: Text(message.message??'', style: robotoRegular.copyWith(color: Theme.of(context).cardColor)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Flexible(child: Text(message.message??'', style: robotoRegular.copyWith(color: Colors.black87))),
+                        const SizedBox(width: 5),
+                        Icon(
+                          message.isSeen == 1 ? Icons.done_all : Icons.check,
+                          size: 16,
+                          color: message.isSeen == 1 ? Colors.blue : Colors.blueGrey,
+                        ),
+                      ],
+                    ),
                   ) : const SizedBox(),
 
                   message.filesFullUrl != null ? Directionality(

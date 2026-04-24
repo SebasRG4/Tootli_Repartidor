@@ -6,6 +6,7 @@ import 'package:sixam_mart_delivery/features/auth/domain/models/delivery_man_bod
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/repositories/auth_repository_interface.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/services/auth_service_interface.dart';
+import 'package:sixam_mart_delivery/helper/profile_selfie_composer.dart';
 
 class AuthService implements AuthServiceInterface {
   final AuthRepositoryInterface authRepositoryInterface;
@@ -19,6 +20,19 @@ class AuthService implements AuthServiceInterface {
   @override
   Future<bool> registerDeliveryMan(DeliveryManBodyModel deliveryManBody, List<MultipartBody> multiParts) async {
     return await authRepositoryInterface.registerDeliveryMan(deliveryManBody, multiParts);
+  }
+
+  @override
+  Future<bool> submitRegistrationRevision(
+    DeliveryManBodyModel deliveryManBody,
+    List<MultipartBody> multiParts,
+    Map<String, String> revisionExtras,
+  ) async {
+    return await authRepositoryInterface.submitRegistrationRevision(
+      deliveryManBody,
+      multiParts,
+      revisionExtras,
+    );
   }
 
   @override
@@ -108,6 +122,11 @@ class AuthService implements AuthServiceInterface {
       vehicleIds.add(vehicle.id);
     }
     return vehicleIds;
+  }
+
+  @override
+  Future<XFile?> pickDeliveryProfileSelfie() {
+    return ProfileSelfieComposer.pickComposedProfileSelfie();
   }
 
   @override

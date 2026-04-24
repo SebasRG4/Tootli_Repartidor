@@ -7,6 +7,7 @@ import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/services/auth_service_interface.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 
 class AuthController extends GetxController implements GetxService {
   final AuthServiceInterface authServiceInterface;
@@ -80,12 +81,46 @@ class AuthController extends GetxController implements GetxService {
   bool _notificationLoading = false;
   bool get notificationLoading => _notificationLoading;
 
+  bool _registrationRevisionRequired = false;
+  bool get registrationRevisionRequired => _registrationRevisionRequired;
+
+  String? _registrationRevisionMessage;
+  String? get registrationRevisionMessage => _registrationRevisionMessage;
+
+  final Map<String, String> _revisionSubmitExtras = <String, String>{};
+  Map<String, String> get revisionSubmitExtras => Map<String, String>.unmodifiable(_revisionSubmitExtras);
+
+  void _applyLoginRegistrationRevisionFlags(Response response) {
+    final dynamic body = response.body;
+    if (body is Map && body['registration_revision_required'] == true) {
+      _registrationRevisionRequired = true;
+      _registrationRevisionMessage = body['registration_revision_message']?.toString();
+    } else {
+      _registrationRevisionRequired = false;
+      _registrationRevisionMessage = null;
+    }
+  }
+
+  void setRevisionSubmitExtras(Map<String, String> extras) {
+    _revisionSubmitExtras
+      ..clear()
+      ..addAll(extras);
+    update();
+  }
+
+  void clearRevisionRegistrationFlow() {
+    _registrationRevisionRequired = false;
+    _registrationRevisionMessage = null;
+    _revisionSubmitExtras.clear();
+  }
+
   Future<ResponseModel> login(String phone, String password) async {
     _isLoading = true;
     update();
     Response response = await authServiceInterface.login(phone, password);
     ResponseModel responseModel;
     if (response.statusCode == 200) {
+      _applyLoginRegistrationRevisionFlags(response);
       authServiceInterface.saveUserToken(response.body['token'], response.body['zone_topic'], response.body['topic']);
       await authServiceInterface.updateToken();
       responseModel = ResponseModel(true, 'successful');
@@ -104,6 +139,27 @@ class AuthController extends GetxController implements GetxService {
     bool isSuccess = await authServiceInterface.registerDeliveryMan(deliveryManBody, multiParts);
     if (isSuccess) {
       Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
+    }
+    _isLoading = false;
+    update();
+  }
+
+  Future<void> submitRegistrationRevision(DeliveryManBodyModel deliveryManBody) async {
+    _isLoading = true;
+    update();
+    final List<MultipartBody> multiParts = authServiceInterface.prepareMultiPartsBody(_pickedImage, _pickedIdentities);
+    final bool isSuccess = await authServiceInterface.submitRegistrationRevision(
+      deliveryManBody,
+      multiParts,
+      _revisionSubmitExtras,
+    );
+    if (isSuccess) {
+      clearRevisionRegistrationFlow();
+      await clearSharedData();
+      Get.offAllNamed(RouteHelper.getSignInRoute());
+      showCustomSnackBar('registration_revision_submitted'.tr, isError: false);
+    } else {
+      showCustomSnackBar('registration_revision_submit_failed'.tr, isError: true);
     }
     _isLoading = false;
     update();
@@ -209,7 +265,7 @@ class AuthController extends GetxController implements GetxService {
       _pickedIdentities = [];
     }else {
       if (isLogo) {
-        _pickedImage = await authServiceInterface.pickImageFromGallery();
+        _pickedImage = await authServiceInterface.pickDeliveryProfileSelfie();
       } else {
         XFile? pickedIdentities = await authServiceInterface.pickImageFromGallery();
         if(pickedIdentities != null) {

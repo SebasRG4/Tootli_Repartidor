@@ -29,10 +29,10 @@ Future<void> main() async {
   if (GetPlatform.isAndroid) {
     await Firebase.initializeApp(
       options: const FirebaseOptions(
-        apiKey: "AIzaSyCc3OCd5I2xSlnftZ4bFAbuCzMhgQHLivA",
-        appId: "1:491987943015:android:fe79b69339834d5c8f1ec2",
-        messagingSenderId: "491987943015",
-        projectId: "stackmart-500c7",
+        apiKey: "AIzaSyA-o6RpcHXEHwHyKECCTDjKL0trpZEMqhw",
+        appId: "1:475625875675:android:f834bb6f2e87e95e8cc4fe",
+        messagingSenderId: "475625875675",
+        projectId: "tootli-74a7c",
       ),
     );
   } else {
@@ -126,7 +126,7 @@ class MyApp extends StatelessWidget {
                         translations: Messages(languages: languages),
                         fallbackLocale: Locale(
                           AppConstants.languages[0].languageCode!,
-                          AppConstants.languages[0].countryCode,
+                          AppConstants.languages[0].countryCode ?? 'MX',
                         ),
                         initialRoute: RouteHelper.getSplashRoute(body),
                         getPages: RouteHelper.routes,

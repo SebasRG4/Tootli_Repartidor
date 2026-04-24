@@ -40,31 +40,84 @@ class CustomButtonWidget extends StatelessWidget {
       child: TextButton(
         onPressed: isLoading ? null : onPressed as void Function()?,
         style: flatButtonStyle,
-        child: isLoading ? Center(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const SizedBox(
-            height: 15, width: 15,
-            child: CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              strokeWidth: 2,
-            ),
-          ),
-          const SizedBox(width: Dimensions.paddingSizeSmall),
-
-          Text('loading'.tr, style: robotoMedium.copyWith(color: Colors.white)),
-        ]),
-        ) : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          icon != null ? Padding(
-            padding: const EdgeInsets.only(right: Dimensions.paddingSizeExtraSmall),
-            child: Icon(icon, color: transparent ? Theme.of(context).primaryColor : Theme.of(context).cardColor),
-          ) : const SizedBox(),
-          Text(buttonText, textAlign: TextAlign.center, style: isBold ? robotoBold.copyWith(
-            color: onPressed == null ? (disabledFontColor ?? Theme.of(context).textTheme.bodyLarge!.color) : fontColor ?? (transparent ? Theme.of(context).primaryColor : Colors.white),
-            fontSize: fontSize ?? Dimensions.fontSizeLarge,
-          ) : robotoRegular.copyWith(
-            color: onPressed == null ? (disabledFontColor ?? Theme.of(context).textTheme.bodyLarge!.color) : fontColor ?? (transparent ? Theme.of(context).primaryColor : Colors.white),
-            fontSize: fontSize ?? Dimensions.fontSizeLarge,
-          )),
-        ]),
+        child: isLoading
+            ? Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      height: 15,
+                      width: 15,
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        strokeWidth: 2,
+                      ),
+                    ),
+                    const SizedBox(width: Dimensions.paddingSizeSmall),
+                    Flexible(
+                      child: Text(
+                        'loading'.tr,
+                        textAlign: TextAlign.center,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: robotoMedium.copyWith(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (icon != null)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        right: Dimensions.paddingSizeExtraSmall,
+                      ),
+                      child: Icon(
+                        icon,
+                        color: transparent
+                            ? Theme.of(context).primaryColor
+                            : Theme.of(context).cardColor,
+                      ),
+                    ),
+                  Flexible(
+                    child: Text(
+                      buttonText,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: isBold
+                          ? robotoBold.copyWith(
+                              color: onPressed == null
+                                  ? (disabledFontColor ??
+                                      Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge!
+                                          .color)
+                                  : fontColor ??
+                                      (transparent
+                                          ? Theme.of(context).primaryColor
+                                          : Colors.white),
+                              fontSize: fontSize ?? Dimensions.fontSizeLarge,
+                            )
+                          : robotoRegular.copyWith(
+                              color: onPressed == null
+                                  ? (disabledFontColor ??
+                                      Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge!
+                                          .color)
+                                  : fontColor ??
+                                      (transparent
+                                          ? Theme.of(context).primaryColor
+                                          : Colors.white),
+                              fontSize: fontSize ?? Dimensions.fontSizeLarge,
+                            ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     )));
   }

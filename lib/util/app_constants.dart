@@ -8,8 +8,11 @@ class AppConstants {
   ///Flutter sdk 3.41.1
   static const String fontFamily = 'Roboto';
 
-  static const String baseUrl = 'http://15.235.73.88';
-  static const String mapKey = 'AIzaSyA9Ed3wGMFVZqgFpJFqOu2UeWMQshC5ozE';
+  static const String baseUrl = 'https://tootli.mx';
+  static const String mapKey = 'AIzaSyA-o6RpcHXEHwHyKECCTDjKL0trpZEMqhw';
+
+  /// Ruta por carretera (Mapbox vía backend; sin token en el cliente).
+  static const String drivingRouteUri = '/api/v1/delivery-man/driving-route';
 
   static const String configUri = '/api/v1/config';
   static const String forgetPasswordUri =
@@ -46,6 +49,8 @@ class AppConstants {
   static const String driverRemoveUri =
       '/api/v1/delivery-man/remove-account?token=';
   static const String dmRegisterUri = '/api/v1/auth/delivery-man/store';
+  static const String dmSubmitRegistrationRevisionUri =
+      '/api/v1/delivery-man/submit-registration-revision';
   static const String zoneListUri = '/api/v1/zone/list';
   static const String zoneUri = '/api/v1/config/get-zone-id';
   static const String currentOrderUri = '/api/v1/delivery-man/order?token=';
@@ -156,30 +161,13 @@ class AppConstants {
   static const String vendor = 'vendor';
   static const String admin = 'admin';
 
+  /// Único idioma de la app: español (México).
   static List<LanguageModel> languages = [
     LanguageModel(
-      imageUrl: Images.english,
-      languageName: 'English',
-      countryCode: 'US',
-      languageCode: 'en',
-    ),
-    LanguageModel(
-      imageUrl: Images.arabic,
-      languageName: 'Arabic',
-      countryCode: 'SA',
-      languageCode: 'ar',
-    ),
-    LanguageModel(
       imageUrl: Images.spanish,
-      languageName: 'Spanish',
-      countryCode: 'ES',
+      languageName: 'Español',
+      countryCode: 'MX',
       languageCode: 'es',
-    ),
-    LanguageModel(
-      imageUrl: Images.bangla,
-      languageName: 'Bengali',
-      countryCode: 'BN',
-      languageCode: 'bn',
     ),
   ];
   static const String darkStyle =

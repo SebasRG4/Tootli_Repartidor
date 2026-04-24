@@ -13,13 +13,14 @@ import 'package:sixam_mart_delivery/features/notification/controllers/notificati
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
+import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/features/home/widgets/earning_widget.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:sixam_mart_delivery/helper/mapbox_directions_helper.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/premium_order_request_widget.dart';
 import 'package:sixam_mart_delivery/features/address/controllers/address_controller.dart';
 import 'package:sixam_mart_delivery/features/address/domain/models/zone_model.dart';
@@ -488,6 +489,7 @@ class HomeScreenState extends State<HomeScreen> {
                           left: 0,
                           right: 0,
                           child: permissionWarning(
+                            context: context,
                             isBatteryPermission: false,
                             onTap: requestNotificationPermission,
                             closeOnTap: () {
@@ -504,6 +506,7 @@ class HomeScreenState extends State<HomeScreen> {
                           left: 0,
                           right: 0,
                           child: permissionWarning(
+                            context: context,
                             isBatteryPermission: true,
                             onTap: requestBatteryOptimization,
                             closeOnTap: () {
@@ -709,6 +712,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _performCancellation() async {
+    OrderNotificationService.instance.stopAudio();
     if (_activeOrderRequest != null && _activeOrderRequest!.id != 999) {
       Get.find<OrderController>().ignoreOrderApi(_activeOrderRequest!.id!);
     }
@@ -754,37 +758,8 @@ class HomeScreenState extends State<HomeScreen> {
   Future<List<LatLng>> _getRoutePolyline(
     LatLng origin,
     LatLng destination,
-  ) async {
-    List<LatLng> polylineCoordinates = [];
-    PolylinePoints polylinePoints = PolylinePoints();
-
-    try {
-      PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-        googleApiKey: AppConstants.mapKey,
-        request: PolylineRequest(
-          origin: PointLatLng(origin.latitude, origin.longitude),
-          destination: PointLatLng(destination.latitude, destination.longitude),
-          mode: TravelMode.driving,
-        ),
-      );
-
-      if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
-        debugPrint("GOOGLE MAPS ERROR: ${result.errorMessage}");
-      }
-
-      if (result.points.isNotEmpty) {
-        for (var point in result.points) {
-          polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-        }
-      } else {
-        debugPrint(
-          "GOOGLE MAPS ERROR: No points found in result. Status: ${result.status}",
-        );
-      }
-    } catch (e) {
-      debugPrint("Error fetching polyline: $e");
-    }
-    return polylineCoordinates;
+  ) {
+    return MapboxDirectionsHelper.getDrivingRoute(origin, destination);
   }
 
   void simulateOrderRequest() {
@@ -858,11 +833,9 @@ class HomeScreenState extends State<HomeScreen> {
     // Reproducir alerta sonora solo si es un pedido nuevo (no en update)
     if (!isUpdate) {
       try {
-        _governanceAudioPlayer.stop().then((_) {
-          _governanceAudioPlayer.play(AssetSource('alert_new_delivery.mp3'));
-        });
+        _governanceAudioPlayer.stop(); // Solo detener previas si las hay
       } catch (e) {
-        print("[HomeScreen] Error playing audio: $e");
+        print("[HomeScreen] Error stopping audio: $e");
       }
     }
 
@@ -893,6 +866,12 @@ class HomeScreenState extends State<HomeScreen> {
       }
       _startMovementTimer();
     });
+    
+    Get.find<OrderController>().getOrderDetails(
+      order.id,
+      order.orderType == 'parcel',
+    );
+
     widget.onOrderActiveStatusChanged?.call(true);
     setPolyline(order);
   }
@@ -944,20 +923,9 @@ class HomeScreenState extends State<HomeScreen> {
     LatLng storeLocation = LatLng(storeLat, storeLng);
     LatLng destinationLocation = LatLng(destLat, destLng);
 
-    // Obtener puntos de ruta reales por carretera
-    List<LatLng> segment1Points = await _getRoutePolyline(
-      dmLocation,
-      storeLocation,
-    );
-    List<LatLng> segment2Points = await _getRoutePolyline(
-      storeLocation,
-      destinationLocation,
-    );
-
-    // Fallback a línea recta si falla la API
-    if (segment1Points.isEmpty) segment1Points = [dmLocation, storeLocation];
-    if (segment2Points.isEmpty)
-      segment2Points = [storeLocation, destinationLocation];
+    // Dibujamos marcadores y líneas rectas inmediatamente para evitar demoras visuales
+    List<LatLng> segment1Points = [dmLocation, storeLocation];
+    List<LatLng> segment2Points = [storeLocation, destinationLocation];
 
     Uint8List storeMarker = await _convertAssetToUnit8List(
       Images.store,
@@ -968,35 +936,99 @@ class HomeScreenState extends State<HomeScreen> {
       width: 40,
     );
 
-    // Calcular distancia total del tramo relevante
-    double totalDistance = 0;
-    List<LatLng> activePoints = _orderPhase == 'going_to_customer'
-        ? segment2Points
-        : segment1Points;
-
-    for (int i = 0; i < activePoints.length - 1; i++) {
-      totalDistance += _calculateDistance(
-        activePoints[i].latitude,
-        activePoints[i].longitude,
-        activePoints[i + 1].latitude,
-        activePoints[i + 1].longitude,
-      );
-    }
-    // Guard: el widget puede haberse desmontado durante la espera async
+    // Guard: el widget puede haberse desmontado
     if (!mounted) return;
-    setState(() {
-      int minutes = (totalDistance / 333).ceil();
-      if (minutes == 0 && totalDistance > 0) minutes = 1;
 
-      if (totalDistance > 0) {
-        DateTime arrivalTime = DateTime.now().add(Duration(minutes: minutes));
-        _estimatedArrivalTime = DateFormat('HH:mm').format(arrivalTime);
-      } else {
-        _estimatedArrivalTime = null;
+    // Pintar rápido línea recta o marcadores para evitar que el Bottom Sheet se trabe
+    setState(() {
+      _drawLinesAndMarkersOnMap(
+        dmLocation,
+        storeLocation,
+        destinationLocation,
+        segment1Points,
+        segment2Points,
+        storeMarker,
+        destinationMarker,
+        0, // Sin distancia real aún
+      );
+    });
+
+    // Ajustar cámara inicial rápidamente
+    _fitCamera(dmLocation, storeLocation, destinationLocation);
+
+    // Ajustar cámara inicial rápidamente
+    _fitCamera(dmLocation, storeLocation, destinationLocation);
+
+    // Sustituir línea recta por ruta real (Mapbox Directions, modo driving) en paralelo
+    Future.wait([
+      _getRoutePolyline(dmLocation, storeLocation),
+      _getRoutePolyline(storeLocation, destinationLocation),
+    ]).then((results) {
+      List<LatLng> seg1 = results[0];
+      List<LatLng> seg2 = results[1];
+
+      if (seg1.isNotEmpty) segment1Points = seg1;
+      if (seg2.isNotEmpty) segment2Points = seg2;
+
+      if (!mounted) return;
+
+      // Recalcular distancia real
+      double totalDistance = 0;
+      List<LatLng> activePoints = _orderPhase == 'going_to_customer'
+          ? segment2Points
+          : segment1Points;
+
+      for (int i = 0; i < activePoints.length - 1; i++) {
+        totalDistance += _calculateDistance(
+          activePoints[i].latitude,
+          activePoints[i].longitude,
+          activePoints[i + 1].latitude,
+          activePoints[i + 1].longitude,
+        );
       }
 
-      _markers.clear();
-      // En la fase de ir a la tienda, mostramos el marcador de la tienda
+      setState(() {
+        _drawLinesAndMarkersOnMap(
+          dmLocation,
+          storeLocation,
+          destinationLocation,
+          segment1Points,
+          segment2Points,
+          storeMarker,
+          destinationMarker,
+          totalDistance,
+        );
+      });
+    }).catchError((e) {
+      debugPrint("[HomeScreen] Error parallelizing polylines: $e");
+    });
+  }
+
+  void _drawLinesAndMarkersOnMap(
+    LatLng dmLocation,
+    LatLng storeLocation,
+    LatLng destinationLocation,
+    List<LatLng> segment1Points,
+    List<LatLng> segment2Points,
+    Uint8List storeMarker,
+    Uint8List destinationMarker,
+    double totalDistance,
+  ) {
+    int minutes = (totalDistance / 333).ceil();
+    if (minutes == 0 && totalDistance > 0) minutes = 1;
+
+    if (totalDistance > 0) {
+      DateTime arrivalTime = DateTime.parse(
+        DateTime.now().add(Duration(minutes: minutes)).toString(),
+      );
+      _estimatedArrivalTime = DateFormat('HH:mm').format(arrivalTime);
+    } else {
+      _estimatedArrivalTime = null;
+    }
+
+    _markers.clear();
+    _polylines.clear();
+    // En la fase de ir a la tienda, mostramos el marcador de la tienda
       if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
         _markers.add(
           Marker(
@@ -1061,9 +1093,9 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         );
       }
-    });
+  }
 
-    // Ajustar cámara para mostrar solo el segmento relevante
+  void _fitCamera(LatLng dmLocation, LatLng storeLocation, LatLng destinationLocation) {
     List<LatLng> pointsToFit = [];
     if (_orderPhase == 'going_to_store') {
       pointsToFit = [dmLocation, storeLocation];
@@ -1338,6 +1370,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Widget permissionWarning({
+    required BuildContext context,
     required bool isBatteryPermission,
     required Function() onTap,
     required Function() closeOnTap,

@@ -1,3 +1,5 @@
+import 'package:audioplayers/audioplayers.dart';
+
 /// Servicio singleton que permite que NotificationHelper (sin contexto)
 /// comunique un tap en notificación de pedido al DashboardScreen activo.
 ///
@@ -8,6 +10,8 @@
 class OrderNotificationService {
   OrderNotificationService._();
   static final OrderNotificationService instance = OrderNotificationService._();
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   /// orderId pendiente cuando el callback aún no estaba registrado
   int? _pendingOrderId;
@@ -48,6 +52,17 @@ class OrderNotificationService {
     }
 
     print("[OrderNotifService] 📨 notifyOrderRequest($orderId) called");
+    
+    // 🔊 Forzar reproducción de audio cada vez que un pedido superó el deduplicador
+    //    y va a mostrarse en la pantalla del usuario.
+    try {
+      _audioPlayer.stop().then((_) {
+        _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
+      });
+    } catch (e) {
+      print("[OrderNotifService] ⚠️ Could not play audio: $e");
+    }
+
     print("[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}");
     if (_onOrderRequestTapped != null) {
       print("[OrderNotifService] ✅ Calling _onOrderRequestTapped($orderId)");
@@ -55,6 +70,15 @@ class OrderNotificationService {
     } else {
       print("[OrderNotifService] ⚠️ No callback! Saving $orderId as pending");
       _pendingOrderId = orderId;
+    }
+  }
+
+  /// Detener el sonido de notificación (llamado al aceptar o rechazar un pedido)
+  void stopAudio() {
+    try {
+      _audioPlayer.stop();
+    } catch (e) {
+      print("[OrderNotifService] ⚠️ Could not stop audio: $e");
     }
   }
 }

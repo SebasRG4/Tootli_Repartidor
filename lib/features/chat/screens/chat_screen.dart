@@ -1,11 +1,14 @@
 import 'dart:io';
-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-import 'package:flutter/foundation.dart' as foundation;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:get/get.dart';
+import 'package:sixam_mart_delivery/helper/pusher_service.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/chat/controllers/chat_controller.dart';
+import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
 import 'package:sixam_mart_delivery/helper/responsive_helper.dart';
@@ -18,10 +21,6 @@ import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/paginated_list_view_widget.dart';
 import 'package:sixam_mart_delivery/features/chat/widgets/message_bubble_widget.dart';
-
-import '../../../common/widgets/custom_asset_image_widget.dart';
-import '../../order/controllers/order_controller.dart';
-import '../../order/domain/models/order_model.dart';
 
 class ChatScreen extends StatefulWidget {
   final NotificationBodyModel? notificationBody;
@@ -39,6 +38,41 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _inputMessageController = TextEditingController();
   late bool _isLoggedIn;
   final FocusNode _inputMessageFocus = FocusNode();
+  StreamSubscription<dynamic>? _chatSubscription;
+  
+  void _sendMessage(ChatController chatController) {
+    if(chatController.isSendButtonActive) {
+      int totalAttachments = (chatController.chatImage?.length ?? 0) +
+          (chatController.objFile?.length ?? 0) +
+          (chatController.pickedVideoFile != null ? 1 : 0);
+
+      if(totalAttachments > 3){
+        showCustomSnackBar('you_do_not_send_more_then_3_photos'.tr);
+      }else{
+        chatController.sendMessage(
+          message: _inputMessageController.text, notificationBody: widget.notificationBody, conversationId: widget.conversationId,
+        ).then((success) {
+          _inputMessageController.clear();
+          if(success){
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  0.0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              }
+            });
+            Future.delayed(const Duration(seconds: 2),() {
+              chatController.getMessages(1, widget.notificationBody!, widget.user, widget.conversationId);
+            });
+          }
+        });
+      }
+    }else{
+      showCustomSnackBar('write_somethings'.tr);
+    }
+  }
 
   @override
   void initState() {
@@ -55,6 +89,37 @@ class _ChatScreenState extends State<ChatScreen> {
         }
       });
     }
+
+    _chatSubscription = PusherService.instance.chatStreamController.stream.listen((data) {
+      if (!mounted) return;
+      // Solo refrescar si el mensaje es de esta conversación
+      try {
+        final message = data is Map ? data['message'] : null;
+        final convId = message is Map ? message['conversation_id'] : null;
+        final senderId = message is Map ? message['sender_id'] : null;
+        final int? receivedConvId = convId is int ? convId : (convId != null ? int.tryParse(convId.toString()) : null);
+        final int? receivedSenderId = senderId is int ? senderId : (senderId != null ? int.tryParse(senderId.toString()) : null);
+        final int? myId = Get.find<ProfileController>().profileModel?.id;
+
+        if (widget.conversationId == null || receivedConvId == widget.conversationId) {
+          if (receivedSenderId != null && myId != null && receivedSenderId != myId) {
+            AudioPlayer().play(AssetSource('imessenge_recive.mp3'));
+          }
+          Get.find<ChatController>().getMessages(1, widget.notificationBody!, widget.user, widget.conversationId);
+        }
+      } catch (_) {
+        Get.find<ChatController>().getMessages(1, widget.notificationBody!, widget.user, widget.conversationId);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _chatSubscription?.cancel();
+    _scrollController.dispose();
+    _inputMessageController.dispose();
+    _inputMessageFocus.dispose();
+    super.dispose();
   }
 
   @override
@@ -118,9 +183,12 @@ class _ChatScreenState extends State<ChatScreen> {
             elevation: 2,
           ),
 
-          body: _isLoggedIn ? SafeArea(
-            child: Center(
-              child: SizedBox(
+          body: _isLoggedIn ? GestureDetector(
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            behavior: HitTestBehavior.translucent,
+            child: SafeArea(
+              child: Center(
+                child: SizedBox(
                 width: MediaQuery.of(context).size.width,
                 child: Column(children: [
 
@@ -333,16 +401,6 @@ class _ChatScreenState extends State<ChatScreen> {
                               ),
                               child: Row(children: [
                                 const SizedBox(width: Dimensions.paddingSizeDefault),
-                                //Emoji
-                                InkWell(
-                                  onTap: () {
-                                    _inputMessageFocus.unfocus();
-                                    chatController.toggleEmojiPicker();
-                                  },
-                                  child: Icon(Icons.emoji_emotions_outlined, color: Theme.of(context).hintColor, size: 30),
-                                ),
-
-                                const SizedBox(width: Dimensions.paddingSizeDefault),
                                 // text editing button
                                 Expanded(
                                   child: TextField(
@@ -350,7 +408,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                     controller: _inputMessageController,
                                     textCapitalization: TextCapitalization.sentences,
                                     style: robotoRegular,
-                                    keyboardType: TextInputType.multiline,
+                                    textInputAction: TextInputAction.send,
                                     maxLines: null,
                                     decoration: InputDecoration(
                                       border: InputBorder.none,
@@ -358,11 +416,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       hintStyle: robotoRegular.copyWith(color: Theme.of(context).hintColor, fontSize: Dimensions.fontSizeLarge),
                                     ),
                                     onSubmitted: (String newText) {
-                                      if(newText.trim().isNotEmpty && !Get.find<ChatController>().isSendButtonActive) {
-                                        Get.find<ChatController>().toggleSendButtonActivity();
-                                      }else if(newText.isEmpty && Get.find<ChatController>().isSendButtonActive) {
-                                        Get.find<ChatController>().toggleSendButtonActivity();
-                                      }
+                                      _sendMessage(chatController);
                                     },
                                     onChanged: (String newText) {
                                       if(newText.trim().isNotEmpty && !Get.find<ChatController>().isSendButtonActive) {
@@ -377,49 +431,19 @@ class _ChatScreenState extends State<ChatScreen> {
                                 //pick image button
                                 InkWell(
                                   onTap: () async {
-                                    Get.find<ChatController>().pickImage(false);
+                                    PermissionStatus status = await Permission.camera.request();
+                                    if (status.isGranted) {
+                                      chatController.pickCameraImage();
+                                    } else if (status.isPermanentlyDenied) {
+                                      openAppSettings();
+                                    } else {
+                                      showCustomSnackBar('camera_permission_denied'.tr);
+                                    }
                                   },
-                                  child: Image.asset(Images.image, width: 25, height: 25, color: Theme.of(context).hintColor),
+                                  child: Icon(Icons.camera_alt_outlined, color: Theme.of(context).hintColor, size: 25),
                                 ),
 
-                                MenuAnchor(
-                                  builder: (BuildContext context, MenuController controller, Widget? child) {
-                                    return InkWell(
-                                      onTap: () async {
-                                        FocusManager.instance.primaryFocus?.unfocus();
-                                        _inputMessageFocus.unfocus();
-
-                                        if (controller.isOpen) {
-                                          controller.close();
-                                        } else {
-                                          controller.open();
-                                        }
-                                      },
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault, vertical: Dimensions.paddingSizeSmall),
-                                        child: CustomAssetImageWidget(image: Images.fileIcon, width: 25, height: 25, color: Theme.of(context).hintColor),
-                                      ),
-                                    );
-                                  },
-                                  menuChildren: List<MenuItemButton>.generate(2, (int index) => MenuItemButton(
-                                    onPressed: () {
-                                      if(index == 0) {
-                                        Get.find<ChatController>().pickFile(false);
-                                      } else {
-                                        Get.find<ChatController>().pickVideoFile(false);
-                                      }
-                                    },
-                                    child: Row(
-                                      children: [
-                                        Icon(index == 0 ? Icons.file_copy_outlined : Icons.video_collection_outlined, size: 18, color: Theme.of(context).primaryColor),
-                                        const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                                        Text(index == 0 ? 'pick_files'.tr : 'pick_video'.tr, style: robotoMedium),
-                                      ],
-                                    ),
-                                  ),
-                                  ),
-                                ),
+                                const SizedBox(width: Dimensions.paddingSizeDefault),
 
                               ]),
                             ),
@@ -433,40 +457,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                           child: GetBuilder<ChatController>(builder: (chatController) {
                             return !chatController.isLoading ? InkWell(
-                              onTap: () async {
-                                if(chatController.isSendButtonActive) {
-                                  int totalAttachments = (chatController.chatImage?.length ?? 0) +
-                                      (chatController.objFile?.length ?? 0) +
-                                      (chatController.pickedVideoFile != null ? 1 : 0);
-
-                                  if(totalAttachments > 3){
-                                    showCustomSnackBar('you_do_not_send_more_then_3_photos'.tr);
-                                  }else{
-                                    chatController.sendMessage(
-                                      message: _inputMessageController.text, notificationBody: widget.notificationBody, conversationId: widget.conversationId,
-                                    ).then((success) {
-                                      _inputMessageController.clear();
-                                      if(success){
-                                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                                          if (_scrollController.hasClients) {
-                                            _scrollController.animateTo(
-                                              0.0,
-                                              duration: const Duration(milliseconds: 300),
-                                              curve: Curves.easeOut,
-                                            );
-                                          }
-                                        });
-                                        Future.delayed(const Duration(seconds: 2),() {
-                                          chatController.getMessages(1, widget.notificationBody!, widget.user, widget.conversationId);
-                                        });
-                                      }
-                                    });
-                                  }
-
-                                }else{
-                                  showCustomSnackBar('write_somethings'.tr);
-                                }
-                              },
+                              onTap: () => _sendMessage(chatController),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeDefault),
                                 child: Image.asset(
@@ -479,34 +470,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                       ]),
 
-                      if (chatController.isEmojiPickerVisible)
-                        SizedBox(
-                          height: 250,
-                          child: EmojiPicker(
-                            onEmojiSelected: (category, emoji) {
-                              if (!chatController.isSendButtonActive) {
-                                chatController.toggleSendButtonActivity();
-                              }
-                            },
-                            textEditingController: _inputMessageController,
-                            config: Config(
-                              checkPlatformCompatibility: true,
-                              emojiViewConfig: EmojiViewConfig(
-                                emojiSizeMax: 28 * (foundation.defaultTargetPlatform == TargetPlatform.iOS ?  1.20 :  1.0),
-                              ),
-                              skinToneConfig: const SkinToneConfig(),
-                              categoryViewConfig: const CategoryViewConfig(),
-                              bottomActionBarConfig: const BottomActionBarConfig(),
-                              searchViewConfig: const SearchViewConfig(),
-                            ),
-                          ),
-                        ),
                     ]),
                   ) : const SizedBox(),
                 ]),
               ),
             ),
-          ) : const Center(child: Text('Not Login')),
+          )) : const Center(child: Text('Not Login')),
         ),
       );
     }

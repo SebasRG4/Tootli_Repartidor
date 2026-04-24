@@ -1,16 +1,26 @@
 import 'package:sixam_mart_delivery/features/language/domain/models/language_model.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/features/language/domain/services/language_service_interface.dart';
 
-class LocalizationController extends GetxController implements GetxService {
+class LocalizationController extends GetxController
+    with WidgetsBindingObserver
+    implements GetxService {
   final LanguageServiceInterface languageServiceInterface;
   LocalizationController({required this.languageServiceInterface}){
     loadCurrentLanguage();
   }
 
-  Locale _locale = Locale(AppConstants.languages[0].languageCode!, AppConstants.languages[0].countryCode);
+  /// Locale fijo de la app (solo español). GetX puede poner [Get.deviceLocale] en
+  /// [GetMaterialController.didChangeLocales]; reaplicamos después de su callback.
+  static Locale fixedAppLocale() {
+    final m = AppConstants.languages[0];
+    return Locale(m.languageCode!, m.countryCode ?? 'MX');
+  }
+
+  Locale _locale = fixedAppLocale();
   Locale get locale => _locale;
 
   bool _isLtr = true;
@@ -21,6 +31,39 @@ class LocalizationController extends GetxController implements GetxService {
 
   List<LanguageModel> _languages = [];
   List<LanguageModel> get languages => _languages;
+
+  void _syncGetLocaleAfterGetMaterialCallbacks() {
+    final target = fixedAppLocale();
+    void apply() {
+      if (Get.locale?.languageCode != target.languageCode ||
+          Get.locale?.countryCode != target.countryCode) {
+        Get.updateLocale(target);
+      }
+    }
+
+    // Get.asap en GetMaterialController usa Future.delayed(Duration.zero).
+    // Ejecutamos después para no quedar en inglés del dispositivo.
+    Future<void>.delayed(Duration.zero, () {
+      SchedulerBinding.instance.addPostFrameCallback((_) => apply());
+    });
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.onClose();
+  }
+
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    _syncGetLocaleAfterGetMaterialCallbacks();
+  }
 
   void setLanguage(Locale locale, {bool fromBottomSheet = false}) {
     Get.updateLocale(locale);
@@ -40,6 +83,7 @@ class LocalizationController extends GetxController implements GetxService {
     _languages = [];
     _languages.addAll(AppConstants.languages);
     update();
+    _syncGetLocaleAfterGetMaterialCallbacks();
   }
 
   void saveCacheLanguage(Locale? locale) {

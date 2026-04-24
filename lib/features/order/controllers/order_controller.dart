@@ -392,6 +392,8 @@ class OrderController extends GetxController implements GetxService {
       if (orderDetailsModel != null) {
         _orderDetailsModel = [];
         _orderDetailsModel!.addAll(orderDetailsModel);
+      } else {
+        _orderDetailsModel = [];
       }
       update();
     }

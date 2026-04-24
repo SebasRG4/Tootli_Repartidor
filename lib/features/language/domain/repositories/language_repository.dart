@@ -16,8 +16,10 @@ class LanguageRepository implements LanguageRepositoryInterface {
 
   @override
   Locale getLocaleFromSharedPref() {
-    return Locale(sharedPreferences.getString(AppConstants.languageCode) ?? AppConstants.languages[0].languageCode!,
-        sharedPreferences.getString(AppConstants.countryCode) ?? AppConstants.languages[0].countryCode);
+    return Locale(
+      AppConstants.languages[0].languageCode!,
+      AppConstants.languages[0].countryCode!,
+    );
   }
 
   @override
@@ -34,8 +36,10 @@ class LanguageRepository implements LanguageRepositoryInterface {
 
   @override
   Locale getCacheLocaleFromSharedPref() {
-    return Locale(sharedPreferences.getString(AppConstants.cacheLanguageCode) ?? AppConstants.languages[0].languageCode!,
-        sharedPreferences.getString(AppConstants.cacheCountryCode) ?? AppConstants.languages[0].countryCode);
+    return Locale(
+      AppConstants.languages[0].languageCode!,
+      AppConstants.languages[0].countryCode!,
+    );
   }
 
   @override

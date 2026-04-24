@@ -8,7 +8,7 @@ class ThemeController extends GetxController implements GetxService {
     _loadCurrentTheme();
   }
 
-  bool _darkTheme = false;
+  bool _darkTheme = true;
   bool get darkTheme => _darkTheme;
 
   void toggleTheme() {
@@ -18,7 +18,7 @@ class ThemeController extends GetxController implements GetxService {
   }
 
   void _loadCurrentTheme() async {
-    _darkTheme = sharedPreferences.getBool(AppConstants.theme) ?? false;
+    _darkTheme = sharedPreferences.getBool(AppConstants.theme) ?? true;
     update();
   }
 }
