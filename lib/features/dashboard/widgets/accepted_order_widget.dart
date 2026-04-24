@@ -14,6 +14,11 @@ import 'package:sixam_mart_delivery/features/notification/domain/models/notifica
 import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
 import 'package:geolocator/geolocator.dart';
 
+/// QA: `true` omite la validación de proximidad (100 m tienda / 500 m cliente).
+/// El API `update-order-status` no comprueba distancia; esto es solo cliente.
+/// Poner en `false` antes de producción.
+const bool kDisableDeliveryProximityCheckForQa = true;
+
 class AcceptedOrderWidget extends StatefulWidget {
   final OrderModel orderModel;
   final String phase;
@@ -828,6 +833,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     _isCheckingProximity = true;
 
     try {
+      if (kDisableDeliveryProximityCheckForQa) {
+        onSuccess();
+        return;
+      }
+
       Position currentPosition = await Geolocator.getCurrentPosition();
 
       if (targetLat == 0 || targetLng == 0) {

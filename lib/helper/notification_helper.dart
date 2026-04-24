@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:audio_session/audio_session.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -663,15 +664,32 @@ void startCallback() {
 /// Foreground Service Task Handler
 class MyTaskHandler extends TaskHandler {
   AudioPlayer? _localPlayer;
+  bool _alertAudioSessionReady = false;
 
-  void _playAudio() {
-    _localPlayer?.play(AssetSource('alert_new_delivery.mp3'));
+  Future<void> _ensureAlertAudioSession() async {
+    if (_alertAudioSessionReady) return;
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      await session.setActive(true);
+      _alertAudioSessionReady = true;
+    } catch (_) {}
+  }
+
+  Future<void> _playAudio() async {
+    final AudioPlayer? p = _localPlayer;
+    if (p == null) return;
+    try {
+      await _ensureAlertAudioSession();
+      await p.stop();
+      await p.play(AssetSource('alert_new_delivery.mp3'));
+    } catch (_) {}
   }
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     _localPlayer = AudioPlayer();
-    _playAudio();
+    await _playAudio();
   }
 
   @override
