@@ -104,6 +104,10 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
       }
     }
     auth.setRevisionSubmitExtras(extras);
+    auth.setRegistrationRevisionDisplay(
+      revisionRequired: m['registration_revision_required'] == true,
+      message: m['registration_revision_message']?.toString(),
+    );
 
     _fNameController.text = m['f_name']?.toString() ?? '';
     _lNameController.text = m['l_name']?.toString() ?? '';
@@ -145,7 +149,11 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
           Get.find<AuthController>().dmStatusChange(0.4);
         }else{
           Future.delayed(const Duration(milliseconds: 0), () {
-            Get.offAllNamed(RouteHelper.getSignInRoute());
+            if (_registrationRevisionMode) {
+              Get.offAllNamed(RouteHelper.getInitialRoute());
+            } else {
+              Get.offAllNamed(RouteHelper.getSignInRoute());
+            }
           });
         }
       },
@@ -163,7 +171,11 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
               if(Get.find<AuthController>().dmStatus != 0.4){
                 Get.find<AuthController>().dmStatusChange(0.4);
               }else{
-                Get.back();
+                if (_registrationRevisionMode) {
+                  Get.offAllNamed(RouteHelper.getInitialRoute());
+                } else {
+                  Get.back();
+                }
               }
             },
           ),

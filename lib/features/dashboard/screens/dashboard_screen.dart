@@ -64,11 +64,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     NotificationHelper.setAppInForeground(true);
 
     showDisbursementWarningMessage();
-    if (!Get.find<ProfileController>().isPendingRegistrationBrowse) {
+    if (!Get.find<ProfileController>().isPendingRegistrationDashboard) {
       _startLatestOrdersPolling();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (Get.find<ProfileController>().isPendingRegistrationBrowse) return;
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
       Get.find<OrderController>().getLatestOrders().then((_) {
         if (!mounted) return;
         final latestOrders = Get.find<OrderController>().latestOrderList;
@@ -92,14 +92,14 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         }
       });
     });
-    if (!Get.find<ProfileController>().isPendingRegistrationBrowse) {
+    if (!Get.find<ProfileController>().isPendingRegistrationDashboard) {
       Get.find<MissionController>().getMissionList();
     }
 
     // Registrar el listener para que el Dashboard reaccione a notificaciones
     // centralizadas en NotificationHelper vía OrderNotificationService.
     OrderNotificationService.instance.onOrderRequestTapped = (int orderId) {
-      if (Get.find<ProfileController>().isPendingRegistrationBrowse) return;
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
       print("[Dashboard] \n┌────────────────────────────────────────┐");
       print("[Dashboard] │  📩 CALLBACK FIRED for order $orderId   │");
       print("[Dashboard] └────────────────────────────────────────┘");
@@ -111,7 +111,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     // 🚀 Start Real-Time WebSocket Connection
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (Get.find<ProfileController>().isPendingRegistrationBrowse) return;
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
       final profileModel = Get.find<ProfileController>().profileModel;
       if (profileModel != null && profileModel.id != null) {
         PusherService.instance.initPusher(profileModel.id!);
@@ -126,7 +126,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     _latestOrdersPoller?.cancel();
     _latestOrdersPoller = Timer.periodic(const Duration(seconds: 15), (_) async {
       if (!mounted) return;
-      if (Get.find<ProfileController>().isPendingRegistrationBrowse) return;
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
       // Solo cuando el usuario está en Home y no hay pedido activo
       if (_pageIndex != 0 || _isOrderActive) return;
 
@@ -267,7 +267,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
       // 🛡️ Mecanismo de seguridad (Fallback): Si onMessageOpenedApp de FCM falla al 
       // tocar el banner (común en iOS), rescatamos los pedidos asignados consultando la red.
-      if (Get.find<ProfileController>().isPendingRegistrationBrowse) return;
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
       Get.find<OrderController>().getLatestOrders().then((_) {
         if (!mounted || _pageIndex != 0 || _isOrderActive) return;
         final latestOrders = Get.find<OrderController>().latestOrderList;
@@ -320,11 +320,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       },
       child: GetBuilder<ProfileController>(
         builder: (profileController) {
-          final bool pendingReg = profileController.isPendingRegistrationBrowse;
+          final bool pendingReg =
+              profileController.isPendingRegistrationDashboard;
           _screens = [
             HomeScreen(
               key: _homeScreenKey,
-              pendingRegistrationBrowse: pendingReg,
+              pendingRegistrationDashboard: pendingReg,
               onNavigateToOrders: () => _setPage(2),
               onTapMenu: () => _scaffoldKey.currentState?.openDrawer(),
               onOrderActiveStatusChanged: (isActive) {
@@ -357,7 +358,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             drawer: DashboardDrawerWidget(
               profileController: profileController,
               pageIndex: _pageIndex,
-              isPendingRegistrationBrowse: pendingReg,
+              isPendingRegistrationDashboard: pendingReg,
               onSelectPage: (int index) {
                 Get.back();
                 _setPage(index);
@@ -458,6 +459,11 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                       if (pendingReg) {
                         return PendingRegistrationPanelWidget(
                           scrollController: scrollController,
+                          adminRevisionMessage: profileController
+                              .profileModel?.registrationRevisionMessage,
+                          showRevisionFootnote: profileController
+                                  .profileModel?.registrationRevisionRequired ==
+                              true,
                         );
                       }
                       return isOffline
@@ -489,7 +495,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   }
 
   void _setPage(int pageIndex) {
-    if (Get.find<ProfileController>().isPendingRegistrationBrowse &&
+    if (Get.find<ProfileController>().isPendingRegistrationDashboard &&
         pageIndex != 0) {
       showCustomSnackBar('registration_in_progress_title'.tr, isError: false);
       return;

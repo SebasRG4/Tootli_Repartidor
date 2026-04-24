@@ -16,14 +16,14 @@ class DashboardDrawerWidget extends StatelessWidget {
   final ProfileController profileController;
   final int pageIndex;
   final void Function(int page) onSelectPage;
-  final bool isPendingRegistrationBrowse;
+  final bool isPendingRegistrationDashboard;
 
   const DashboardDrawerWidget({
     super.key,
     required this.profileController,
     required this.pageIndex,
     required this.onSelectPage,
-    this.isPendingRegistrationBrowse = false,
+    this.isPendingRegistrationDashboard = false,
   });
 
   @override
@@ -51,9 +51,9 @@ class DashboardDrawerWidget extends StatelessWidget {
               name: name,
               email: email,
               phone: phone,
-              showPhoneLine: isPendingRegistrationBrowse,
+              showPhoneLine: isPendingRegistrationDashboard,
               imageUrl: imageUrl,
-              showNotifications: !isPendingRegistrationBrowse,
+              showNotifications: !isPendingRegistrationDashboard,
               onNotifications: () {
                 Get.back();
                 Get.toNamed(RouteHelper.getNotificationRoute());
@@ -68,7 +68,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                   0,
                 ),
                 children: [
-                  if (isPendingRegistrationBrowse) ...[
+                  if (isPendingRegistrationDashboard) ...[
                     _LogoutButton(
                       onTap: () {
                         Get.back();

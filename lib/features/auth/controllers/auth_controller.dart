@@ -117,6 +117,14 @@ class AuthController extends GetxController implements GetxService {
     _revisionSubmitExtras.clear();
   }
 
+  /// Mensaje del admin desde `get_profile` (p. ej. al abrir correcciones sin pasar por login).
+  void setRegistrationRevisionDisplay({required bool revisionRequired, String? message}) {
+    _registrationRevisionRequired = revisionRequired;
+    final String trimmed = message?.trim() ?? '';
+    _registrationRevisionMessage = trimmed.isEmpty ? null : trimmed;
+    update();
+  }
+
   Future<ResponseModel> login(String phone, String password) async {
     _isLoading = true;
     update();
@@ -163,8 +171,8 @@ class AuthController extends GetxController implements GetxService {
     );
     if (isSuccess) {
       clearRevisionRegistrationFlow();
-      await clearSharedData();
-      Get.offAllNamed(RouteHelper.getSignInRoute());
+      await Get.find<ProfileController>().getProfile();
+      Get.offAllNamed(RouteHelper.getInitialRoute());
       showCustomSnackBar('registration_revision_submitted'.tr, isError: false);
     } else {
       showCustomSnackBar('registration_revision_submit_failed'.tr, isError: true);

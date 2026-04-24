@@ -41,6 +41,8 @@ class ProfileModel {
   int? loyaltyPoint;
   String? applicationStatus;
   bool? registrationRevisionRequired;
+  /// Texto que el admin escribe al solicitar correcciones del registro (no es chat).
+  String? registrationRevisionMessage;
   bool? pendingRegistrationBrowse;
 
   ProfileModel({
@@ -86,6 +88,7 @@ class ProfileModel {
     this.loyaltyPoint,
     this.applicationStatus,
     this.registrationRevisionRequired,
+    this.registrationRevisionMessage,
     this.pendingRegistrationBrowse,
   });
 
@@ -138,6 +141,8 @@ class ProfileModel {
     loyaltyPoint = json['loyalty_point'];
     applicationStatus = json['application_status']?.toString();
     registrationRevisionRequired = json['registration_revision_required'] == true;
+    registrationRevisionMessage =
+        json['registration_revision_message']?.toString();
     pendingRegistrationBrowse = json['pending_registration_browse'] == true;
   }
 
@@ -185,6 +190,7 @@ class ProfileModel {
     data['loyalty_point'] = loyaltyPoint;
     data['application_status'] = applicationStatus;
     data['registration_revision_required'] = registrationRevisionRequired;
+    data['registration_revision_message'] = registrationRevisionMessage;
     data['pending_registration_browse'] = pendingRegistrationBrowse;
     return data;
   }

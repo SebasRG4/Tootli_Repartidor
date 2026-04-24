@@ -20,12 +20,29 @@ class ProfileController extends GetxController implements GetxService {
   ProfileModel? _profileModel;
   ProfileModel? get profileModel => _profileModel;
 
-  /// Registro enviado, pendiente de aprobación: mapa visible pero sin pedidos ni menú operativo.
+  /// Cualquier registro aún en estado `pending`: panel inferior, drawer limitado, sin pedidos.
+  bool get isPendingRegistrationDashboard {
+    final ProfileModel? m = _profileModel;
+    return m != null && m.applicationStatus == 'pending';
+  }
+
+  /// Solo la fase “esperando primera revisión” (sin correcciones abiertas): sí enviar ubicación al backend.
   bool get isPendingRegistrationBrowse {
     final ProfileModel? m = _profileModel;
     if (m == null) return false;
+    if (!isPendingRegistrationDashboard) return false;
+    if (m.registrationRevisionRequired == true) return false;
     if (m.pendingRegistrationBrowse == true) return true;
-    return m.applicationStatus == 'pending' && m.registrationRevisionRequired != true;
+    return m.applicationStatus == 'pending';
+  }
+
+  /// Enviar coordenadas al backend mientras no está en línea (p. ej. registro pendiente o desconectado aprobado).
+  bool _sendLocationToBackendWhileInactive() {
+    final ProfileModel? m = _profileModel;
+    if (m == null) return false;
+    if (isPendingRegistrationBrowse) return true;
+    if (m.applicationStatus == 'approved') return true;
+    return false;
   }
 
   bool _isLoading = false;
@@ -50,6 +67,7 @@ class ProfileController extends GetxController implements GetxService {
         profileServiceInterface.checkPermission(() => startLocationRecord());
       } else {
         stopLocationRecord();
+        profileServiceInterface.checkPermission(() => startMapLocationWhileInactive());
       }
     }
     update();
@@ -100,9 +118,10 @@ class ProfileController extends GetxController implements GetxService {
         profileServiceInterface.checkPermission(() => startLocationRecord());
       } else {
         stopLocationRecord();
+        profileServiceInterface.checkPermission(() => startMapLocationWhileInactive());
       }
     } else {
-      if (isPendingRegistrationBrowse) {
+      if (isPendingRegistrationDashboard) {
         showCustomSnackBar('registration_in_progress_title'.tr, isError: false);
       } else {
         showCustomSnackBar(responseModel.message, isError: true);
@@ -131,9 +150,22 @@ class ProfileController extends GetxController implements GetxService {
   void startLocationRecord() {
     _timer?.cancel();
     NotificationHelper.startLocationService();
-    recordLocation(); // Obtener ubicación inmediatamente
+    recordLocation(sendToServer: true);
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      recordLocation();
+      recordLocation(sendToServer: true);
+    });
+  }
+
+  /// GPS para centrar el mapa cuando el repartidor no está en línea (desconectado o registro pendiente).
+  void startMapLocationWhileInactive() {
+    _timer?.cancel();
+    final bool send = _sendLocationToBackendWhileInactive();
+    if (send) {
+      NotificationHelper.startLocationService();
+    }
+    recordLocation(sendToServer: send);
+    _timer = Timer.periodic(Duration(seconds: send ? 30 : 20), (timer) {
+      recordLocation(sendToServer: send);
     });
   }
 
@@ -142,7 +174,7 @@ class ProfileController extends GetxController implements GetxService {
     NotificationHelper.stopService();
   }
 
-  Future<void> recordLocation() async {
+  Future<void> recordLocation({bool sendToServer = true}) async {
     try {
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied ||
@@ -159,6 +191,11 @@ class ProfileController extends GetxController implements GetxService {
         latitude: locationResult.latitude,
         longitude: locationResult.longitude,
       );
+      update();
+
+      if (!sendToServer) {
+        return;
+      }
 
       if (Get.find<SplashController>().configModel!.webSocketStatus!) {
         await profileServiceInterface.recordWebSocketLocation(_recordLocation!);

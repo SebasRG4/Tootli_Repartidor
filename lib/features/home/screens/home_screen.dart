@@ -33,12 +33,13 @@ import 'dart:math';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
-    this.pendingRegistrationBrowse = false,
+    this.pendingRegistrationDashboard = false,
     this.onNavigateToOrders,
     this.onTapMenu,
     this.onOrderActiveStatusChanged,
   });
-  final bool pendingRegistrationBrowse;
+  /// Registro con `application_status` pending (revisión inicial o correcciones del admin).
+  final bool pendingRegistrationDashboard;
   final Function()? onNavigateToOrders;
   final Function()? onTapMenu;
   final Function(bool isActive)? onOrderActiveStatusChanged;
@@ -93,7 +94,8 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void didUpdateWidget(HomeScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.pendingRegistrationBrowse && !widget.pendingRegistrationBrowse) {
+    if (oldWidget.pendingRegistrationDashboard &&
+        !widget.pendingRegistrationDashboard) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _loadData();
       });
@@ -108,7 +110,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
-    if (widget.pendingRegistrationBrowse) {
+    if (widget.pendingRegistrationDashboard) {
       await Get.find<ProfileController>().getProfile();
       final int? zoneId = Get.find<ProfileController>().profileModel?.zoneId;
       if (zoneId != null) {
@@ -386,7 +388,7 @@ class HomeScreenState extends State<HomeScreen> {
                       ),
 
                       // Notification Button
-                      if (!profileController.isPendingRegistrationBrowse)
+                      if (!profileController.isPendingRegistrationDashboard)
                       Positioned(
                         top:
                             context.mediaQueryPadding.top +
@@ -784,7 +786,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void simulateOrderRequest() {
-    if (widget.pendingRegistrationBrowse) return;
+    if (widget.pendingRegistrationDashboard) return;
     // Datos de prueba para simular un pedido en Mexicaltzingo (DIF)
     OrderModel mockOrder = OrderModel(
       id: 999,
@@ -821,7 +823,7 @@ class HomeScreenState extends State<HomeScreen> {
   /// Muestra el bottom sheet moderno con datos reales del pedido.
   /// Soporta actualizaciones (ej. de dummy model a modelo real con datos de red).
   void showOrderRequest(OrderModel order) {
-    if (widget.pendingRegistrationBrowse) return;
+    if (widget.pendingRegistrationDashboard) return;
     print("\n┌──────────────────────────────────────────────┐");
     print("│  🏠 HomeScreen.showOrderRequest(${order.id})      │");
     print("└──────────────────────────────────────────────┘");
