@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/delivery_man_body_model.dart';
+import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_result.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/repositories/auth_repository_interface.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
@@ -22,7 +23,7 @@ class AuthRepository implements AuthRepositoryInterface {
   }
 
   @override
-  Future<bool> registerDeliveryMan(
+  Future<RegisterDmResult> registerDeliveryMan(
     DeliveryManBodyModel deliveryManBody,
     List<MultipartBody> multiParts,
   ) async {
@@ -31,7 +32,7 @@ class AuthRepository implements AuthRepositoryInterface {
       deliveryManBody.toJson(),
       multiParts,
     );
-    return (response.statusCode == 200);
+    return RegisterDmResult.fromResponse(response);
   }
 
   @override

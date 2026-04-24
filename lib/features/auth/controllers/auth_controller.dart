@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/delivery_man_body_model.dart';
+import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_result.dart';
+import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
@@ -136,8 +138,13 @@ class AuthController extends GetxController implements GetxService {
     _isLoading = true;
     update();
     List<MultipartBody> multiParts = authServiceInterface.prepareMultiPartsBody(_pickedImage, _pickedIdentities);
-    bool isSuccess = await authServiceInterface.registerDeliveryMan(deliveryManBody, multiParts);
-    if (isSuccess) {
+    final RegisterDmResult result = await authServiceInterface.registerDeliveryMan(deliveryManBody, multiParts);
+    if (result.success && result.token != null) {
+      await authServiceInterface.saveUserToken(result.token!, result.zoneTopic, result.topic);
+      await authServiceInterface.updateToken();
+      await Get.find<ProfileController>().getProfile();
+      Get.offAllNamed(RouteHelper.getInitialRoute());
+    } else if (result.legacyHttpOkWithoutToken) {
       Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
     }
     _isLoading = false;

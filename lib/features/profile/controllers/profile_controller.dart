@@ -20,6 +20,14 @@ class ProfileController extends GetxController implements GetxService {
   ProfileModel? _profileModel;
   ProfileModel? get profileModel => _profileModel;
 
+  /// Registro enviado, pendiente de aprobación: mapa visible pero sin pedidos ni menú operativo.
+  bool get isPendingRegistrationBrowse {
+    final ProfileModel? m = _profileModel;
+    if (m == null) return false;
+    if (m.pendingRegistrationBrowse == true) return true;
+    return m.applicationStatus == 'pending' && m.registrationRevisionRequired != true;
+  }
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 

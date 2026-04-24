@@ -16,12 +16,14 @@ class DashboardDrawerWidget extends StatelessWidget {
   final ProfileController profileController;
   final int pageIndex;
   final void Function(int page) onSelectPage;
+  final bool isPendingRegistrationBrowse;
 
   const DashboardDrawerWidget({
     super.key,
     required this.profileController,
     required this.pageIndex,
     required this.onSelectPage,
+    this.isPendingRegistrationBrowse = false,
   });
 
   @override
@@ -48,6 +50,7 @@ class DashboardDrawerWidget extends StatelessWidget {
               name: name,
               email: email,
               imageUrl: imageUrl,
+              showNotifications: !isPendingRegistrationBrowse,
               onNotifications: () {
                 Get.back();
                 Get.toNamed(RouteHelper.getNotificationRoute());
@@ -62,6 +65,57 @@ class DashboardDrawerWidget extends StatelessWidget {
                   0,
                 ),
                 children: [
+                  if (isPendingRegistrationBrowse) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                      margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeLarge),
+                      decoration: BoxDecoration(
+                        color: primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: primary.withValues(alpha: 0.35)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: primary, size: 22),
+                              const SizedBox(width: Dimensions.paddingSizeSmall),
+                              Expanded(
+                                child: Text(
+                                  'registration_in_progress_title'.tr,
+                                  style: robotoBold.copyWith(
+                                    fontSize: Dimensions.fontSizeDefault,
+                                    color: theme.textTheme.bodyLarge?.color,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: Dimensions.paddingSizeSmall),
+                          Text(
+                            'registration_in_progress_drawer_hint'.tr,
+                            style: robotoRegular.copyWith(
+                              fontSize: Dimensions.fontSizeSmall,
+                              color: theme.hintColor,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    _LogoutButton(
+                      onTap: () {
+                        Get.back();
+                        Get.find<AuthController>().clearSharedData();
+                        Get.find<ProfileController>().stopLocationRecord();
+                        PusherService.instance.disconnect();
+                        Get.offAllNamed(RouteHelper.getSignInRoute());
+                      },
+                    ),
+                    SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
+                  ] else ...[
                   Text(
                     'drawer_summary'.tr,
                     style: robotoMedium.copyWith(
@@ -162,6 +216,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                     },
                   ),
                   SizedBox(height: MediaQuery.paddingOf(context).bottom + 8),
+                  ],
                 ],
               ),
             ),
@@ -177,6 +232,7 @@ class _DrawerHeader extends StatelessWidget {
   final String name;
   final String email;
   final String? imageUrl;
+  final bool showNotifications;
   final VoidCallback onNotifications;
 
   const _DrawerHeader({
@@ -184,6 +240,7 @@ class _DrawerHeader extends StatelessWidget {
     required this.name,
     required this.email,
     required this.imageUrl,
+    this.showNotifications = true,
     required this.onNotifications,
   });
 
@@ -264,15 +321,18 @@ class _DrawerHeader extends StatelessWidget {
                 ],
               ),
             ),
-            IconButton(
-              onPressed: onNotifications,
-              tooltip: 'drawer_notifications'.tr,
-              style: IconButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Colors.white.withValues(alpha: 0.12),
-              ),
-              icon: const Icon(Icons.notifications_none_rounded),
-            ),
+            if (showNotifications)
+              IconButton(
+                onPressed: onNotifications,
+                tooltip: 'drawer_notifications'.tr,
+                style: IconButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                ),
+                icon: const Icon(Icons.notifications_none_rounded),
+              )
+            else
+              const SizedBox(width: 8),
           ],
         ),
       ),

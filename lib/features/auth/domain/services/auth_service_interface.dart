@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/delivery_man_body_model.dart';
+import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_result.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 
 abstract class AuthServiceInterface {
@@ -19,7 +20,7 @@ abstract class AuthServiceInterface {
   bool isNotificationActive();
   void setNotificationActive(bool isActive);
   Future<bool> clearUserNumberAndPassword();
-  Future<bool> registerDeliveryMan(DeliveryManBodyModel deliveryManBody, List<MultipartBody> multiParts);
+  Future<RegisterDmResult> registerDeliveryMan(DeliveryManBodyModel deliveryManBody, List<MultipartBody> multiParts);
   Future<bool> submitRegistrationRevision(
     DeliveryManBodyModel deliveryManBody,
     List<MultipartBody> multiParts,

@@ -582,17 +582,18 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                                 text: 'identity_image'.tr,
                                 style: robotoBold.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color),
                               ),
-                              if (!_registrationRevisionMode)
-                                TextSpan(
-                                  text: '*',
-                                  style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red),
-                                ),
+                              TextSpan(
+                                text: '*',
+                                style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red),
+                              ),
                             ]),
                           ),
                           const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
                           Text(
-                            _registrationRevisionMode ? 'optional_new_identity_images'.tr : 'image_format_and_ratio_for_profile'.tr,
+                            _registrationRevisionMode
+                                ? 'optional_new_identity_images'.tr
+                                : 'identity_document_both_sides_hint'.tr,
                             style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor),
                           ),
                           const SizedBox(height: Dimensions.paddingSizeLarge),
@@ -775,22 +776,33 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                       showCustomSnackBar('select_identity_type'.tr);
                     }else if(identityNumber.isEmpty) {
                       showCustomSnackBar('enter_delivery_man_identity_number'.tr);
-                    }else if(authController.pickedIdentities.isEmpty && !_registrationRevisionMode) {
-                      showCustomSnackBar('please_upload_identity_image'.tr);
+                    }else if(_registrationRevisionMode) {
+                      final int idCount = authController.pickedIdentities.length;
+                      if (idCount > 0 && idCount < 2) {
+                        showCustomSnackBar('identity_two_sides_required'.tr);
+                      } else {
+                        final DeliveryManBodyModel body = DeliveryManBodyModel(
+                          fName: fName, lName: lName,
+                          password: password.isEmpty ? null : password,
+                          phone: numberWithCountryCode, email: email,
+                          identityNumber: identityNumber, identityType: authController.selectedIdentityType,
+                          earning: authController.selectedDmTypeId, zoneId: addressController.selectedDeliveryZoneId,
+                          vehicleId: authController.selectedVehicleId, referCode: _referTextController.text,
+                        );
+                        authController.submitRegistrationRevision(body);
+                      }
+                    }else if(authController.pickedIdentities.length < 2) {
+                      showCustomSnackBar('identity_two_sides_required'.tr);
                     }else {
                       final DeliveryManBodyModel body = DeliveryManBodyModel(
                         fName: fName, lName: lName,
-                        password: _registrationRevisionMode && password.isEmpty ? null : password,
+                        password: password,
                         phone: numberWithCountryCode, email: email,
                         identityNumber: identityNumber, identityType: authController.selectedIdentityType,
                         earning: authController.selectedDmTypeId, zoneId: addressController.selectedDeliveryZoneId,
                         vehicleId: authController.selectedVehicleId, referCode: _referTextController.text,
                       );
-                      if (_registrationRevisionMode) {
-                        authController.submitRegistrationRevision(body);
-                      } else {
-                        authController.registerDeliveryMan(body);
-                      }
+                      authController.registerDeliveryMan(body);
                     }
                   }
                 },

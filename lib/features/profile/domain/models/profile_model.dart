@@ -39,6 +39,9 @@ class ProfileModel {
   String? refCode;
   double? referalEarning;
   int? loyaltyPoint;
+  String? applicationStatus;
+  bool? registrationRevisionRequired;
+  bool? pendingRegistrationBrowse;
 
   ProfileModel({
     this.id,
@@ -81,6 +84,9 @@ class ProfileModel {
     this.refCode,
     this.referalEarning,
     this.loyaltyPoint,
+    this.applicationStatus,
+    this.registrationRevisionRequired,
+    this.pendingRegistrationBrowse,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -130,6 +136,9 @@ class ProfileModel {
     refCode = json['ref_code'];
     referalEarning = json['referal_earning']?.toDouble();
     loyaltyPoint = json['loyalty_point'];
+    applicationStatus = json['application_status']?.toString();
+    registrationRevisionRequired = json['registration_revision_required'] == true;
+    pendingRegistrationBrowse = json['pending_registration_browse'] == true;
   }
 
   Map<String, dynamic> toJson() {
@@ -174,6 +183,9 @@ class ProfileModel {
     data['ref_code'] = refCode;
     data['referal_earning'] = referalEarning;
     data['loyalty_point'] = loyaltyPoint;
+    data['application_status'] = applicationStatus;
+    data['registration_revision_required'] = registrationRevisionRequired;
+    data['pending_registration_browse'] = pendingRegistrationBrowse;
     return data;
   }
 }

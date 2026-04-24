@@ -33,10 +33,12 @@ import 'dart:math';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
+    this.pendingRegistrationBrowse = false,
     this.onNavigateToOrders,
     this.onTapMenu,
     this.onOrderActiveStatusChanged,
   });
+  final bool pendingRegistrationBrowse;
   final Function()? onNavigateToOrders;
   final Function()? onTapMenu;
   final Function(bool isActive)? onOrderActiveStatusChanged;
@@ -88,6 +90,16 @@ class HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  @override
+  void didUpdateWidget(HomeScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.pendingRegistrationBrowse && !widget.pendingRegistrationBrowse) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadData();
+      });
+    }
+  }
+
   void _refreshGrids() {
     int? zoneId = Get.find<ProfileController>().profileModel?.zoneId;
     if (zoneId != null) {
@@ -96,6 +108,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    if (widget.pendingRegistrationBrowse) {
+      await Get.find<ProfileController>().getProfile();
+      final int? zoneId = Get.find<ProfileController>().profileModel?.zoneId;
+      if (zoneId != null) {
+        Get.find<AddressController>().getGridList(zoneId);
+      }
+      return;
+    }
     // These methods are synchronous or return void, call them separately
     Get.find<OrderController>().getIgnoreList();
     Get.find<OrderController>().removeFromIgnoreList();
@@ -763,6 +783,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void simulateOrderRequest() {
+    if (widget.pendingRegistrationBrowse) return;
     // Datos de prueba para simular un pedido en Mexicaltzingo (DIF)
     OrderModel mockOrder = OrderModel(
       id: 999,
@@ -799,6 +820,7 @@ class HomeScreenState extends State<HomeScreen> {
   /// Muestra el bottom sheet moderno con datos reales del pedido.
   /// Soporta actualizaciones (ej. de dummy model a modelo real con datos de red).
   void showOrderRequest(OrderModel order) {
+    if (widget.pendingRegistrationBrowse) return;
     print("\n┌──────────────────────────────────────────────┐");
     print("│  🏠 HomeScreen.showOrderRequest(${order.id})      │");
     print("└──────────────────────────────────────────────┘");
