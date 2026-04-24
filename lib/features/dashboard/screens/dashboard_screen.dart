@@ -54,6 +54,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   /// IDs de pedidos ya enviados al HomeScreen para evitar duplicados
   final Set<int> _shownOrderIds = {};
 
+  bool? _lastPendingRegistration;
+  bool _handledRegistrationApprovalTransition = false;
+
   @override
   void initState() {
     super.initState();
@@ -257,24 +260,28 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       NotificationHelper.setAppInForeground(true);
-      
-      // Reconectar inmediatamente el WebSocket de Soketi si se durmió por iOS/Android
-      PusherService.instance.disconnect();
-      final profileModel = Get.find<ProfileController>().profileModel;
-      if (profileModel != null && profileModel.id != null) {
-        PusherService.instance.initPusher(profileModel.id!);
-      }
 
-      // 🛡️ Mecanismo de seguridad (Fallback): Si onMessageOpenedApp de FCM falla al 
-      // tocar el banner (común en iOS), rescatamos los pedidos asignados consultando la red.
-      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
-      Get.find<OrderController>().getLatestOrders().then((_) {
-        if (!mounted || _pageIndex != 0 || _isOrderActive) return;
-        final latestOrders = Get.find<OrderController>().latestOrderList;
-        if (latestOrders != null && latestOrders.isNotEmpty) {
-          _dispatchOrderToHome(latestOrders.first);
-        }
-      });
+      // Refrescar perfil al volver al primer plano (p. ej. admin acaba de aprobar el registro).
+      if (Get.isRegistered<ProfileController>()) {
+        Get.find<ProfileController>().getProfile().then((_) {
+          if (!mounted) return;
+          PusherService.instance.disconnect();
+          final profileModel = Get.find<ProfileController>().profileModel;
+          if (profileModel != null && profileModel.id != null) {
+            PusherService.instance.initPusher(profileModel.id!);
+          }
+          if (Get.find<ProfileController>().isPendingRegistrationDashboard) {
+            return;
+          }
+          Get.find<OrderController>().getLatestOrders().then((_) {
+            if (!mounted || _pageIndex != 0 || _isOrderActive) return;
+            final latestOrders = Get.find<OrderController>().latestOrderList;
+            if (latestOrders != null && latestOrders.isNotEmpty) {
+              _dispatchOrderToHome(latestOrders.first);
+            }
+          });
+        });
+      }
 
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       NotificationHelper.setAppInForeground(false);
@@ -322,6 +329,22 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         builder: (profileController) {
           final bool pendingReg =
               profileController.isPendingRegistrationDashboard;
+          if (pendingReg) {
+            _handledRegistrationApprovalTransition = false;
+          } else if (_lastPendingRegistration == true && !pendingReg) {
+            if (!_handledRegistrationApprovalTransition) {
+              _handledRegistrationApprovalTransition = true;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted) return;
+                _startLatestOrdersPolling();
+                if (Get.isRegistered<MissionController>()) {
+                  Get.find<MissionController>().getMissionList();
+                }
+              });
+            }
+          }
+          _lastPendingRegistration = pendingReg;
+
           _screens = [
             HomeScreen(
               key: _homeScreenKey,

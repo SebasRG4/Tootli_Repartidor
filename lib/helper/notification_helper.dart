@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/chat/controllers/chat_controller.dart';
 import 'package:sixam_mart_delivery/features/dashboard/screens/dashboard_screen.dart';
@@ -154,6 +155,16 @@ class NotificationHelper {
           type == 'dm_registration_approved' ||
           type == 'dm_registration_denied') {
         NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        if (Get.isRegistered<ProfileController>()) {
+          Get.find<ProfileController>().getProfile();
+        }
+        if (type == 'dm_registration_approved') {
+          showCustomSnackBar(
+            'dm_registration_approved_snackbar'.tr,
+            isError: false,
+            getXSnackBar: false,
+          );
+        }
         if (Get.isRegistered<NotificationController>()) {
           try {
             Get.find<NotificationController>().getNotificationList();
@@ -204,6 +215,14 @@ class NotificationHelper {
       }
       try {
         if (message.data.isNotEmpty) {
+          final String? openedType = message.data['type']?.toString();
+          if (openedType == 'dm_registration_approved' ||
+              openedType == 'dm_registration_denied' ||
+              openedType == 'dm_registration_revision') {
+            if (Get.isRegistered<ProfileController>()) {
+              Get.find<ProfileController>().getProfile();
+            }
+          }
           NotificationBodyModel notificationBody = convertNotification(
             message.data,
           )!;

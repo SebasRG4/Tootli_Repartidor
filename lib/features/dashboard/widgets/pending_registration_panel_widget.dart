@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
+import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
@@ -112,6 +113,14 @@ class PendingRegistrationPanelWidget extends StatelessWidget {
               fontSize: Dimensions.fontSizeSmall,
               color: theme.hintColor,
               height: 1.35,
+            ),
+          ),
+          const SizedBox(height: Dimensions.paddingSizeDefault),
+          Center(
+            child: OutlinedButton.icon(
+              onPressed: () => Get.find<ProfileController>().getProfile(),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: Text('refresh_registration_status'.tr),
             ),
           ),
           if (showRevisionFootnote) ...[

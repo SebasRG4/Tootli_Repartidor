@@ -271,6 +271,8 @@
   "dm_cancel_evidence_optional": "Evidencia opcional (fotos, máx. 3)",
   "dm_cancel_evidence_max_photos": "Máximo 3 fotos de evidencia",
   "dm_cancel_attach_audio": "Adjuntar audio (opcional)",
+  "refresh_registration_status": "Actualizar estado",
+  "dm_registration_approved_snackbar": "¡Aprobado! Ya puedes empezar a volar con Tootli.",
   "you_did_not_select_select_any_reason": "No seleccionó seleccionar ningún motivo",
   "select": "Seleccionar",
   "complete_registration_process_to_serve_as_delivery_man_in_this_platform": "Completa el proceso de registro para servir como repartidor en esta plataforma.",
