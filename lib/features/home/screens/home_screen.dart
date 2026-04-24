@@ -386,6 +386,7 @@ class HomeScreenState extends State<HomeScreen> {
                       ),
 
                       // Notification Button
+                      if (!profileController.isPendingRegistrationBrowse)
                       Positioned(
                         top:
                             context.mediaQueryPadding.top +

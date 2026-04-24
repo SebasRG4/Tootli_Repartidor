@@ -33,6 +33,7 @@ class DashboardDrawerWidget extends StatelessWidget {
     final surface = theme.scaffoldBackgroundColor;
     final name = profileController.profileModel?.fName ?? '';
     final email = profileController.profileModel?.email ?? '';
+    final String phone = profileController.profileModel?.phone ?? '';
     final imageUrl = profileController.profileModel?.imageFullUrl;
 
     return Drawer(
@@ -49,6 +50,8 @@ class DashboardDrawerWidget extends StatelessWidget {
               primary: primary,
               name: name,
               email: email,
+              phone: phone,
+              showPhoneLine: isPendingRegistrationBrowse,
               imageUrl: imageUrl,
               showNotifications: !isPendingRegistrationBrowse,
               onNotifications: () {
@@ -66,45 +69,6 @@ class DashboardDrawerWidget extends StatelessWidget {
                 ),
                 children: [
                   if (isPendingRegistrationBrowse) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-                      margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeLarge),
-                      decoration: BoxDecoration(
-                        color: primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: primary.withValues(alpha: 0.35)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.info_outline_rounded, color: primary, size: 22),
-                              const SizedBox(width: Dimensions.paddingSizeSmall),
-                              Expanded(
-                                child: Text(
-                                  'registration_in_progress_title'.tr,
-                                  style: robotoBold.copyWith(
-                                    fontSize: Dimensions.fontSizeDefault,
-                                    color: theme.textTheme.bodyLarge?.color,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: Dimensions.paddingSizeSmall),
-                          Text(
-                            'registration_in_progress_drawer_hint'.tr,
-                            style: robotoRegular.copyWith(
-                              fontSize: Dimensions.fontSizeSmall,
-                              color: theme.hintColor,
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                     _LogoutButton(
                       onTap: () {
                         Get.back();
@@ -231,6 +195,8 @@ class _DrawerHeader extends StatelessWidget {
   final Color primary;
   final String name;
   final String email;
+  final String phone;
+  final bool showPhoneLine;
   final String? imageUrl;
   final bool showNotifications;
   final VoidCallback onNotifications;
@@ -239,6 +205,8 @@ class _DrawerHeader extends StatelessWidget {
     required this.primary,
     required this.name,
     required this.email,
+    this.phone = '',
+    this.showPhoneLine = false,
     required this.imageUrl,
     this.showNotifications = true,
     required this.onNotifications,
@@ -308,16 +276,52 @@ class _DrawerHeader extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    email,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(
-                      fontSize: Dimensions.fontSizeSmall,
-                      color: Colors.white.withValues(alpha: 0.88),
-                      height: 1.25,
+                  if (showPhoneLine && phone.isNotEmpty) ...[
+                    Text(
+                      phone,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: robotoMedium.copyWith(
+                        fontSize: Dimensions.fontSizeDefault,
+                        color: Colors.white,
+                        height: 1.2,
+                      ),
                     ),
-                  ),
+                    if (email.isNotEmpty) const SizedBox(height: 4),
+                  ],
+                  if (email.isNotEmpty)
+                    Text(
+                      email,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: robotoRegular.copyWith(
+                        fontSize: Dimensions.fontSizeSmall,
+                        color: Colors.white.withValues(alpha: 0.88),
+                        height: 1.25,
+                      ),
+                    ),
+                  if (!showPhoneLine && email.isEmpty && phone.isNotEmpty)
+                    Text(
+                      phone,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: robotoRegular.copyWith(
+                        fontSize: Dimensions.fontSizeSmall,
+                        color: Colors.white.withValues(alpha: 0.88),
+                        height: 1.25,
+                      ),
+                    ),
+                  if (showPhoneLine) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'registration_in_progress_title'.tr,
+                      style: robotoMedium.copyWith(
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.85),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

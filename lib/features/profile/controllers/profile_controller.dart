@@ -102,7 +102,11 @@ class ProfileController extends GetxController implements GetxService {
         stopLocationRecord();
       }
     } else {
-      showCustomSnackBar(responseModel.message, isError: true);
+      if (isPendingRegistrationBrowse) {
+        showCustomSnackBar('registration_in_progress_title'.tr, isError: false);
+      } else {
+        showCustomSnackBar(responseModel.message, isError: true);
+      }
     }
     update();
     return responseModel.isSuccess;

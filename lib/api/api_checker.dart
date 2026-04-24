@@ -1,3 +1,4 @@
+import 'package:sixam_mart_delivery/common/models/error_response.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
@@ -11,6 +12,17 @@ class ApiChecker {
       Get.find<ProfileController>().stopLocationRecord();
       Get.offAllNamed(RouteHelper.getSignInRoute());
     }else {
+      if (response.statusCode == 403 &&
+          response.body != null &&
+          response.body is Map) {
+        try {
+          final err = ErrorResponse.fromJson(response.body);
+          final String? code = err.errors?.isNotEmpty == true ? err.errors!.first.code : null;
+          if (code == 'registration-pending') {
+            return;
+          }
+        } catch (_) {}
+      }
       showCustomSnackBar(response.statusText);
     }
   }
