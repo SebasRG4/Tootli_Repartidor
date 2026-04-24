@@ -1,3 +1,4 @@
+import 'package:audio_session/audio_session.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 /// Servicio singleton que permite que NotificationHelper (sin contexto)
@@ -39,10 +40,19 @@ class OrderNotificationService {
   /// Mismo audio que un pedido real (`alert_new_delivery.mp3`), sin deduplicación ni callback.
   /// Útil para la simulación UI (FAB bug) sin confundir con `notifyOrderRequest`.
   void playOrderRequestAlertSound() {
+    _playOrderRequestAlertSoundAsync();
+  }
+
+  Future<void> _playOrderRequestAlertSoundAsync() async {
     try {
-      _audioPlayer.stop().then((_) {
-        _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
-      });
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (e) {
+      print("[OrderNotifService] ⚠️ AudioSession setActive: $e");
+    }
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
     } catch (e) {
       print("[OrderNotifService] ⚠️ Could not play audio: $e");
     }
