@@ -786,9 +786,11 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   /// Simula solicitud de pedido solo en UI (mock fijo, id 999). Invocado desde el FAB bug en [DashboardScreen].
-  /// No pasa por FCM, `OrderNotificationService`, `latest-orders` ni backend: no es el mismo flujo que un pedido real.
+  /// Reproduce el mismo audio que un pedido real vía [OrderNotificationService.playOrderRequestAlertSound].
+  /// No pasa por FCM, `notifyOrderRequest`, `latest-orders` ni backend: no es el mismo flujo que un pedido real.
   void simulateOrderRequest() {
     if (widget.pendingRegistrationDashboard) return;
+    OrderNotificationService.instance.playOrderRequestAlertSound();
     // Datos de prueba para simular un pedido en Mexicaltzingo (DIF)
     OrderModel mockOrder = OrderModel(
       id: 999,

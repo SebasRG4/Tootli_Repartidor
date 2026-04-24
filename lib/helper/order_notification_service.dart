@@ -36,6 +36,18 @@ class OrderNotificationService {
     }
   }
 
+  /// Mismo audio que un pedido real (`alert_new_delivery.mp3`), sin deduplicación ni callback.
+  /// Útil para la simulación UI (FAB bug) sin confundir con `notifyOrderRequest`.
+  void playOrderRequestAlertSound() {
+    try {
+      _audioPlayer.stop().then((_) {
+        _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
+      });
+    } catch (e) {
+      print("[OrderNotifService] ⚠️ Could not play audio: $e");
+    }
+  }
+
   /// Llamado desde NotificationHelper o PusherService cuando el repartidor
   /// tiene una notificación de tipo [order_request] o [new_order].
   void notifyOrderRequest(int orderId) {
@@ -52,16 +64,7 @@ class OrderNotificationService {
     }
 
     print("[OrderNotifService] 📨 notifyOrderRequest($orderId) called");
-    
-    // 🔊 Forzar reproducción de audio cada vez que un pedido superó el deduplicador
-    //    y va a mostrarse en la pantalla del usuario.
-    try {
-      _audioPlayer.stop().then((_) {
-        _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
-      });
-    } catch (e) {
-      print("[OrderNotifService] ⚠️ Could not play audio: $e");
-    }
+    playOrderRequestAlertSound();
 
     print("[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}");
     if (_onOrderRequestTapped != null) {
