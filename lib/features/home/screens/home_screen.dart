@@ -968,7 +968,7 @@ class HomeScreenState extends State<HomeScreen> {
     // Guard: el widget puede haberse desmontado
     if (!mounted) return;
 
-    // Pintar rápido línea recta o marcadores para evitar que el Bottom Sheet se trabe
+    // Solo marcadores (sin polilínea) hasta tener rutas GPS; evita el “flash” de línea recta / Haversine.
     setState(() {
       _drawLinesAndMarkersOnMap(
         dmLocation,
@@ -978,17 +978,14 @@ class HomeScreenState extends State<HomeScreen> {
         segment2Points,
         storeMarker,
         destinationMarker,
-        0, // Sin distancia real aún
+        0,
+        drawPolylines: false,
       );
     });
 
-    // Ajustar cámara inicial rápidamente
     _fitCamera(dmLocation, storeLocation, destinationLocation);
 
-    // Ajustar cámara inicial rápidamente
-    _fitCamera(dmLocation, storeLocation, destinationLocation);
-
-    // Sustituir línea recta por ruta real (Mapbox Directions, modo driving) en paralelo
+    // Rutas reales (Mapbox Directions, modo driving) en paralelo
     Future.wait([
       _getRoutePolyline(dmLocation, storeLocation),
       _getRoutePolyline(storeLocation, destinationLocation),
@@ -1026,10 +1023,42 @@ class HomeScreenState extends State<HomeScreen> {
           storeMarker,
           destinationMarker,
           totalDistance,
+          drawPolylines: true,
         );
       });
     }).catchError((e) {
       debugPrint("[HomeScreen] Error parallelizing polylines: $e");
+      if (!mounted) return;
+      double fallbackDist = 0;
+      for (int i = 0; i < segment1Points.length - 1; i++) {
+        fallbackDist += _calculateDistance(
+          segment1Points[i].latitude,
+          segment1Points[i].longitude,
+          segment1Points[i + 1].latitude,
+          segment1Points[i + 1].longitude,
+        );
+      }
+      for (int i = 0; i < segment2Points.length - 1; i++) {
+        fallbackDist += _calculateDistance(
+          segment2Points[i].latitude,
+          segment2Points[i].longitude,
+          segment2Points[i + 1].latitude,
+          segment2Points[i + 1].longitude,
+        );
+      }
+      setState(() {
+        _drawLinesAndMarkersOnMap(
+          dmLocation,
+          storeLocation,
+          destinationLocation,
+          segment1Points,
+          segment2Points,
+          storeMarker,
+          destinationMarker,
+          fallbackDist,
+          drawPolylines: true,
+        );
+      });
     });
   }
 
@@ -1041,8 +1070,9 @@ class HomeScreenState extends State<HomeScreen> {
     List<LatLng> segment2Points,
     Uint8List storeMarker,
     Uint8List destinationMarker,
-    double totalDistance,
-  ) {
+    double totalDistance, {
+    bool drawPolylines = true,
+  }) {
     int minutes = (totalDistance / 333).ceil();
     if (minutes == 0 && totalDistance > 0) minutes = 1;
 
@@ -1079,48 +1109,50 @@ class HomeScreenState extends State<HomeScreen> {
         );
       }
 
-      // Segmento 1: Repartidor -> Tienda (Solo si no hemos recogido)
-      if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('delivery_to_store'),
-            points: segment1Points,
-            color: Theme.of(Get.context!).primaryColor,
-            width: 5,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-          ),
-        );
-      }
+      if (drawPolylines) {
+        // Segmento 1: Repartidor -> Tienda (Solo si no hemos recogido)
+        if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('delivery_to_store'),
+              points: segment1Points,
+              color: Theme.of(Get.context!).primaryColor,
+              width: 5,
+              jointType: JointType.round,
+              startCap: Cap.roundCap,
+              endCap: Cap.roundCap,
+            ),
+          );
+        }
 
-      // Segmento 2: Tienda -> Cliente (Solo si ya recogimos el pedido)
-      if (_orderPhase == 'going_to_customer') {
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('store_to_destination'),
-            points: segment2Points,
-            color: Theme.of(Get.context!).primaryColor,
-            width: 5,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-          ),
-        );
-      } else if (_orderPhase == 'none') {
-        // En vista previa mostramos la ruta al cliente punteada
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('store_to_destination'),
-            points: segment2Points,
-            color: Theme.of(Get.context!).primaryColor.withOpacity(0.6),
-            width: 5,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-            patterns: [PatternItem.dash(15), PatternItem.gap(10)],
-          ),
-        );
+        // Segmento 2: Tienda -> Cliente (Solo si ya recogimos el pedido)
+        if (_orderPhase == 'going_to_customer') {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('store_to_destination'),
+              points: segment2Points,
+              color: Theme.of(Get.context!).primaryColor,
+              width: 5,
+              jointType: JointType.round,
+              startCap: Cap.roundCap,
+              endCap: Cap.roundCap,
+            ),
+          );
+        } else if (_orderPhase == 'none') {
+          // En vista previa mostramos la ruta al cliente punteada (misma geometría que Mapbox cuando aplica)
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('store_to_destination'),
+              points: segment2Points,
+              color: Theme.of(Get.context!).primaryColor.withValues(alpha: 0.6),
+              width: 5,
+              jointType: JointType.round,
+              startCap: Cap.roundCap,
+              endCap: Cap.roundCap,
+              patterns: [PatternItem.dash(15), PatternItem.gap(10)],
+            ),
+          );
+        }
       }
   }
 
