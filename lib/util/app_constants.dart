@@ -32,6 +32,9 @@ class AppConstants {
   static const String profileUri = '/api/v1/delivery-man/profile?token=';
   static const String updateOrderStatusUri =
       '/api/v1/delivery-man/update-order-status';
+  /// Motivos fijos (order_cancel_reasons, user_type=deliveryman). Requiere ?token=
+  static const String deliveryManCancelReasonsUri =
+      '/api/v1/delivery-man/cancel-reasons?token=';
   static const String ignoreOrderUri = '/api/v1/delivery-man/ignore-order';
   static const String updatePaymentStatusUri =
       '/api/v1/delivery-man/update-payment-status';

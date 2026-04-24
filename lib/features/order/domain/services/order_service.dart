@@ -128,6 +128,15 @@ class OrderService implements OrderServiceInterface {
   }
 
   @override
+  List<MultipartBody> prepareCancelEvidenceImages(List<XFile> cancelEvidenceFiles) {
+    final List<MultipartBody> multiParts = [];
+    for (final XFile file in cancelEvidenceFiles) {
+      multiParts.add(MultipartBody('cancel_evidence[]', file));
+    }
+    return multiParts;
+  }
+
+  @override
   Future<List<OrderCountModel>?> getOrderCount(String type) async {
     return await orderRepositoryInterface.getOrderCount(type);
   }

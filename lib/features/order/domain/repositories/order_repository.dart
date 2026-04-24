@@ -24,15 +24,22 @@ class OrderRepository implements OrderRepositoryInterface {
   @override
   Future<List<CancellationData>?> getCancelReasons() async {
     List<CancellationData>? orderCancelReasons;
-    Response response = await apiClient.getData(
-      '${AppConstants.orderCancellationUri}?offset=1&limit=30&type=deliveryman',
+    final String token = _getUserToken();
+    final Response response = await apiClient.getData(
+      '${AppConstants.deliveryManCancelReasonsUri}$token',
     );
-    if (response.statusCode == 200) {
-      OrderCancellationBody orderCancellationBody =
-          OrderCancellationBody.fromJson(response.body);
-      orderCancelReasons = [];
-      for (var element in orderCancellationBody.reasons!) {
-        orderCancelReasons.add(element);
+    if (response.statusCode == 200 && response.body is Map) {
+      final Map<String, dynamic> map = Map<String, dynamic>.from(response.body as Map);
+      final dynamic raw = map['reasons'];
+      if (raw is List) {
+        orderCancelReasons = [];
+        for (final dynamic item in raw) {
+          if (item is Map) {
+            orderCancelReasons.add(
+              CancellationData.fromJson(Map<String, dynamic>.from(item)),
+            );
+          }
+        }
       }
     }
     return orderCancelReasons;
@@ -96,13 +103,15 @@ class OrderRepository implements OrderRepositoryInterface {
 
     Map<String, String> data;
 
+    final String otpField = updateStatusBody.otp ?? '';
+
     if (updateStatusBody.isParcel ?? false) {
       data = {
         '_method': 'put',
         'token': updateStatusBody.token!,
         'order_id': updateStatusBody.orderId.toString(),
         'status': updateStatusBody.status.toString(),
-        'otp': updateStatusBody.otp.toString(),
+        'otp': otpField,
         'reason': updateStatusBody.reasons.toString(),
         'note': updateStatusBody.comment ?? '',
       };
@@ -112,21 +121,47 @@ class OrderRepository implements OrderRepositoryInterface {
         'token': updateStatusBody.token!,
         'order_id': updateStatusBody.orderId.toString(),
         'status': updateStatusBody.status.toString(),
-        'otp': updateStatusBody.otp.toString(),
+        'otp': otpField,
         'reason': updateStatusBody.reason ?? '',
       };
+      if (updateStatusBody.status == AppConstants.canceled) {
+        if (updateStatusBody.cancelReasonId != null) {
+          data['cancel_reason_id'] = updateStatusBody.cancelReasonId.toString();
+        }
+        final String detail = updateStatusBody.cancellationDetail?.trim() ?? '';
+        if (detail.isNotEmpty) {
+          data['cancellation_detail'] = detail;
+        }
+        if (updateStatusBody.cancelLat != null &&
+            updateStatusBody.cancelLng != null) {
+          data['cancel_lat'] = updateStatusBody.cancelLat!;
+          data['cancel_lng'] = updateStatusBody.cancelLng!;
+        }
+      }
     }
 
-    Response response = await apiClient.postMultipartData(
+    final Response response = await apiClient.postMultipartData(
       AppConstants.updateOrderStatusUri,
       data,
       proofAttachment,
       handleError: false,
     );
     if (response.statusCode == 200) {
-      responseModel = ResponseModel(true, response.body['message']);
+      final dynamic body = response.body;
+      final String msg = body is Map && body['message'] != null
+          ? body['message'].toString()
+          : 'OK';
+      responseModel = ResponseModel(true, msg);
     } else {
-      responseModel = ResponseModel(false, response.statusText);
+      String? errorMessage = response.statusText;
+      final dynamic body = response.body;
+      if (body is Map && body['errors'] is List && (body['errors'] as List).isNotEmpty) {
+        final dynamic first = (body['errors'] as List).first;
+        if (first is Map) {
+          errorMessage = first['message'] as String? ?? errorMessage;
+        }
+      }
+      responseModel = ResponseModel(false, errorMessage ?? 'Error');
     }
     return responseModel;
   }
@@ -178,7 +213,22 @@ class OrderRepository implements OrderRepositoryInterface {
     if (response.statusCode == 200) {
       responseModel = ResponseModel(true, response.body['message']);
     } else {
-      responseModel = ResponseModel(false, response.statusText);
+      String? errorMessage;
+      final body = response.body;
+      if (body is Map && body['errors'] is List && (body['errors'] as List).isNotEmpty) {
+        final first = (body['errors'] as List).first;
+        if (first is Map) {
+          errorMessage = first['message'] as String?;
+          final mk = (first['message_key'] as String?) ?? (first['code'] as String?);
+          if ((errorMessage == null || errorMessage.isEmpty) && mk != null && mk.isNotEmpty) {
+            final localized = 'accept_order_error_$mk'.tr;
+            if (localized != 'accept_order_error_$mk') {
+              errorMessage = localized;
+            }
+          }
+        }
+      }
+      responseModel = ResponseModel(false, errorMessage ?? response.statusText);
     }
     return responseModel;
   }

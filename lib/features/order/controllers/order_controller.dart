@@ -1,4 +1,6 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
@@ -60,6 +62,18 @@ class OrderController extends GetxController implements GetxService {
 
   String? _cancelReason = '';
   String? get cancelReason => _cancelReason;
+
+  int? _selectedCancelReasonId;
+  int? get selectedCancelReasonId => _selectedCancelReasonId;
+
+  final List<XFile> _pickedCancelEvidence = [];
+  List<XFile> get pickedCancelEvidence =>
+      List<XFile>.unmodifiable(_pickedCancelEvidence);
+
+  XFile? _cancelAudio;
+  XFile? get cancelAudioFile => _cancelAudio;
+
+  static const int maxCancelEvidencePhotos = 3;
 
   List<CancellationData>? _orderCancelReasons;
   List<CancellationData>? get orderCancelReasons => _orderCancelReasons;
@@ -153,16 +167,66 @@ class OrderController extends GetxController implements GetxService {
     update();
   }
 
-  void setOrderCancelReason(String? reason) {
-    _cancelReason = reason;
+  void resetDmCancellationSheet() {
+    _selectedCancelReasonId = null;
+    _cancelReason = '';
+    _pickedCancelEvidence.clear();
+    _cancelAudio = null;
+    update();
+  }
+
+  void setSelectedCancelReason(int? id, String? reasonLabel) {
+    _selectedCancelReasonId = id;
+    _cancelReason = reasonLabel ?? '';
+    update();
+  }
+
+  void pickCancelEvidenceImage({required bool isCamera}) async {
+    if (_pickedCancelEvidence.length >= maxCancelEvidencePhotos) {
+      showCustomSnackBar('dm_cancel_evidence_max_photos'.tr, isError: true);
+      return;
+    }
+    final XFile? xFile = await ImagePicker().pickImage(
+      source: isCamera ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 70,
+    );
+    if (xFile != null) {
+      _pickedCancelEvidence.add(xFile);
+      update();
+    }
+  }
+
+  void removeCancelEvidenceAt(int index) {
+    if (index >= 0 && index < _pickedCancelEvidence.length) {
+      _pickedCancelEvidence.removeAt(index);
+      update();
+    }
+  }
+
+  Future<void> pickCancelAudio() async {
+    final FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.audio,
+      allowMultiple: false,
+    );
+    if (result != null && result.files.single.path != null) {
+      _cancelAudio = XFile(result.files.single.path!);
+      update();
+    }
+  }
+
+  void clearCancelAudio() {
+    _cancelAudio = null;
     update();
   }
 
   Future<void> getOrderCancelReasons() async {
-    List<CancellationData>? orderCancelReasons = await orderServiceInterface
-        .getCancelReasons();
+    resetDmCancellationSheet();
+    _orderCancelReasons = null;
+    update();
+    final List<CancellationData>? orderCancelReasons =
+        await orderServiceInterface.getCancelReasons();
+    _orderCancelReasons = [];
     if (orderCancelReasons != null) {
-      _orderCancelReasons = [];
       _orderCancelReasons!.addAll(orderCancelReasons);
     }
     update();
@@ -304,32 +368,71 @@ class OrderController extends GetxController implements GetxService {
     List<String>? reasons,
     String? comment,
     bool stopOtherDataCall = false,
+    int? cancelReasonId,
+    String? cancellationDetail,
   }) async {
     _isLoading = true;
     update();
+    final bool isParcel = parcel ?? false;
+    final bool isStoreCancel =
+        status == AppConstants.canceled && !isParcel;
+
     List<MultipartBody> multiParts = orderServiceInterface
         .prepareOrderProofImages(_pickedPrescriptions);
-    UpdateStatusBodyModel updateStatusBody = UpdateStatusBodyModel(
+    if (isStoreCancel) {
+      multiParts = [...multiParts, ...orderServiceInterface.prepareCancelEvidenceImages(_pickedCancelEvidence)];
+      if (_cancelAudio != null) {
+        multiParts.add(MultipartBody('cancel_audio', _cancelAudio));
+      }
+    }
+
+    String? cancelLat;
+    String? cancelLng;
+    if (isStoreCancel) {
+      try {
+        final Position p = await Geolocator.getCurrentPosition();
+        cancelLat = p.latitude.toString();
+        cancelLng = p.longitude.toString();
+      } catch (_) {}
+    }
+
+    final UpdateStatusBodyModel updateStatusBody = UpdateStatusBodyModel(
       orderId: currentOrder.id,
       status: status,
       reason: reason,
       otp:
           status == AppConstants.delivered ||
-              (parcel! && status == AppConstants.pickedUp)
+              (isParcel && status == AppConstants.pickedUp)
           ? _otp
           : null,
       isParcel: parcel,
       comment: comment,
       reasons: reasons,
+      cancelReasonId: isStoreCancel ? cancelReasonId : null,
+      cancellationDetail: isStoreCancel ? cancellationDetail : null,
+      cancelLat: isStoreCancel ? cancelLat : null,
+      cancelLng: isStoreCancel ? cancelLng : null,
     );
-    ResponseModel responseModel = await orderServiceInterface.updateOrderStatus(
+    final ResponseModel responseModel =
+        await orderServiceInterface.updateOrderStatus(
       updateStatusBody,
       multiParts,
     );
-    Get.back(result: responseModel.isSuccess);
-      if (responseModel.isSuccess) {
-        _pickedPrescriptions = []; // Limpiar fotos después de éxito
-        if (back) {
+
+    if (responseModel.isSuccess) {
+      _pickedPrescriptions = [];
+      _pickedCancelEvidence.clear();
+      _cancelAudio = null;
+      _selectedCancelReasonId = null;
+      _cancelReason = '';
+
+      if (Get.isDialogOpen == true) {
+        Get.back(result: true);
+      }
+      if (Get.isBottomSheetOpen == true) {
+        Get.back(result: true);
+      }
+      if (back) {
         Get.back();
       }
       if (gotoDashboard) {
@@ -338,8 +441,7 @@ class OrderController extends GetxController implements GetxService {
       if (!stopOtherDataCall) {
         Get.find<ProfileController>().getProfile();
 
-        // Auto-reset to 'all' for handover and post-handover status changes
-        List<String> autoResetStatuses = ['picked_up'];
+        final List<String> autoResetStatuses = ['picked_up'];
         if (autoResetStatuses.contains(currentOrder.orderStatus) &&
             _selectedRunningStatus != 'all') {
           _selectedRunningStatus = 'all';

@@ -8,7 +8,26 @@ class UpdateStatusBodyModel {
   List<String>? reasons;
   String? comment;
   bool? isParcel;
-  UpdateStatusBodyModel({this.token, this.orderId, this.status, this.otp, this.reason, this.reasons, this.comment, this.isParcel});
+  /// Cancelación pedido tienda (no parcel): id en order_cancel_reasons.
+  int? cancelReasonId;
+  String? cancellationDetail;
+  String? cancelLat;
+  String? cancelLng;
+
+  UpdateStatusBodyModel({
+    this.token,
+    this.orderId,
+    this.status,
+    this.otp,
+    this.reason,
+    this.reasons,
+    this.comment,
+    this.isParcel,
+    this.cancelReasonId,
+    this.cancellationDetail,
+    this.cancelLat,
+    this.cancelLng,
+  });
 
   UpdateStatusBodyModel.fromJson(Map<String, dynamic> json) {
     token = json['token'];

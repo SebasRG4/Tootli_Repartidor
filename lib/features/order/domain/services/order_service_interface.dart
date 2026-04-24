@@ -27,6 +27,7 @@ abstract class OrderServiceInterface{
   List<int?> prepareIgnoreIdList(List<IgnoreModel> ignoredRequests);
   List<IgnoreModel> tempList(DateTime currentTime, List<IgnoreModel> ignoredRequests);
   List<MultipartBody> prepareOrderProofImages(List<XFile> pickedPrescriptions);
+  List<MultipartBody> prepareCancelEvidenceImages(List<XFile> cancelEvidenceFiles);
   Future<ParcelCancellationReasonsModel?> getParcelCancellationReasons({required bool isBeforePickup});
   Future<bool> addParcelReturnDate({required int orderId, required String returnDate});
   Future<bool> submitParcelReturn({required int orderId, required String orderStatus, required int returnOtp});
