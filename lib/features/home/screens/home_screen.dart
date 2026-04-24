@@ -785,9 +785,8 @@ class HomeScreenState extends State<HomeScreen> {
     return MapboxDirectionsHelper.getDrivingRoute(origin, destination);
   }
 
-  /// Simula una solicitud de pedido en UI (sin backend). Antes se invocaba desde el FAB
-  /// con icono de bug en [DashboardScreen]; quedó comentado allí para producción.
-  /// Para volver a usarlo: descomenta el bloque `bug_button` en `dashboard_screen.dart`.
+  /// Simula solicitud de pedido solo en UI (mock fijo, id 999). Invocado desde el FAB bug en [DashboardScreen].
+  /// No pasa por FCM, `OrderNotificationService`, `latest-orders` ni backend: no es el mismo flujo que un pedido real.
   void simulateOrderRequest() {
     if (widget.pendingRegistrationDashboard) return;
     // Datos de prueba para simular un pedido en Mexicaltzingo (DIF)

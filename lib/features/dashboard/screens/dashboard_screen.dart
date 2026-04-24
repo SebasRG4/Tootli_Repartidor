@@ -431,7 +431,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     ),
                   ),
 
-                // Botón flotante de ubicación (y antes un FAB "bug" para simular pedido — ver comentario abajo).
+                // FAB debug (simular pedido) + ubicación — se ocultan con pedido activo o registro pendiente.
                 if (hasSlider && !_isOrderActive && !pendingReg)
                   Positioned(
                     bottom:
@@ -440,9 +440,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     right: Dimensions.paddingSizeDefault,
                     child: Column(
                       children: [
-                        /*
-                        // ── DEBUG: simulaba solicitud de pedido sin backend (HomeScreenState.simulateOrderRequest).
-                        //    Desactivado en producción; para reactivar, descomenta este bloque.
+                        // DEBUG: solo UI + polilínea; no es FCM/API ni OrderNotificationService (ver HomeScreenState.simulateOrderRequest).
                         FloatingActionButton.small(
                           heroTag: 'bug_button',
                           onPressed: () {
@@ -455,7 +453,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                           ),
                         ),
                         const SizedBox(height: Dimensions.paddingSizeSmall),
-                        */
 
                         // Location Button
                         FloatingActionButton.small(
