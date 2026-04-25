@@ -35,6 +35,7 @@ get_changed_files.sh
 changed_files.zip
 pubspec.lock
 ios/Podfile.lock
+ios/build/
 
 # Web related
 lib/generated_plugin_registrant.dart
