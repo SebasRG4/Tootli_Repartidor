@@ -18,12 +18,12 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_app_bar_widget.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/order_item_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/info_card_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
 import '../widgets/custom_order_details_card.dart';
 
 class OrderDetailsScreen extends StatefulWidget {
@@ -328,17 +328,48 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     longitude: parcel ? controllerOrderModel.receiverDetails!.longitude : controllerOrderModel.deliveryAddress!.longitude,
                     showButton: controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded',
-                    isStore: parcel ? false : true, isChatAllow: showChatPermission,
-                    messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
-                      notificationBody: NotificationBodyModel(
-                        orderId: controllerOrderModel.id, customerId: controllerOrderModel.customer!.id,
-                      ),
-                      user: User(
-                        id: controllerOrderModel.customer!.id, fName: controllerOrderModel.customer!.fName,
-                        lName: controllerOrderModel.customer!.lName, imageFullUrl: controllerOrderModel.customer!.imageFullUrl,
-                          phone: controllerOrderModel.customer?.phone,
-                      ),
-                    )),
+                    isStore: parcel ? false : true,
+                    isChatAllow: showChatPermission || controllerOrderModel.tootliDirectTrackable == true,
+                    messageOnTap: () {
+                      final int? oid = controllerOrderModel.id;
+                      final bool useTootliDirectChat =
+                          oid != null &&
+                          (controllerOrderModel.tootliDirectTrackable ==
+                                  true ||
+                              controllerOrderModel
+                                  .hasTootliDirectPublicTrackingUrl);
+                      if (useTootliDirectChat) {
+                        Get.toNamed(
+                          RouteHelper.getTootliDirectTrackingChatRoute(oid!),
+                        );
+                        return;
+                      }
+                      final Customer? c = controllerOrderModel.customer;
+                      if (c == null) {
+                        if (controllerOrderModel.isGuest == true) {
+                          showCustomSnackBar(
+                            'tootli_direct_guest_chat_web_only'.tr,
+                            isError: false,
+                          );
+                        } else {
+                          showCustomSnackBar(
+                            'customer_not_found'.tr,
+                            isError: true,
+                          );
+                        }
+                        return;
+                      }
+                      Get.toNamed(RouteHelper.getChatRoute(
+                        notificationBody: NotificationBodyModel(
+                          orderId: controllerOrderModel.id, customerId: c.id,
+                        ),
+                        user: User(
+                          id: c.id, fName: c.fName,
+                          lName: c.lName, imageFullUrl: c.imageFullUrl,
+                            phone: c.phone,
+                        ),
+                      ));
+                    },
                     order: order,
                   ),
                   const SizedBox(height: Dimensions.paddingSizeLarge),

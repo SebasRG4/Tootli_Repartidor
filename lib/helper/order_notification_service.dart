@@ -1,5 +1,8 @@
-import 'package:audio_session/audio_session.dart';
+import 'dart:io';
+
+import 'package:audio_session/audio_session.dart' hide AndroidAudioFocus;
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 
 /// Servicio singleton que permite que NotificationHelper (sin contexto)
 /// comunique un tap en notificación de pedido al DashboardScreen activo.
@@ -49,6 +52,22 @@ class OrderNotificationService {
       await session.setActive(true);
     } catch (e) {
       print("[OrderNotifService] ⚠️ AudioSession setActive: $e");
+    }
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        await _audioPlayer.setAudioContext(
+          AudioContext(
+            android: AudioContextAndroid(
+              stayAwake: true,
+              contentType: AndroidContentType.sonification,
+              usageType: AndroidUsageType.notification,
+              audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+            ),
+          ),
+        );
+      } catch (e) {
+        print("[OrderNotifService] ⚠️ setAudioContext: $e");
+      }
     }
     try {
       await _audioPlayer.stop();

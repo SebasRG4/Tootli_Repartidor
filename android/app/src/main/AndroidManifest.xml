@@ -38,14 +38,14 @@
 
     <application
         tools:replace="android:label"
-        android:label="6amMart Delivery"
+        android:label="Tootli Repartidor"
         android:name="${applicationName}"
         android:extractNativeLibs="true"
         android:requestLegacyExternalStorage="true"
         android:usesCleartextTraffic="true"
         android:icon="@mipmap/ic_launcher">
         <meta-data android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyA-o6RpcHXEHwHyKECCTDjKL0trpZEMqhw"/>
+            android:value="AIzaSyC8f1w3Isccq-TtAwQhJ0KCZmU6eOGlTrs"/>
 
         <activity
             android:name=".MainActivity"

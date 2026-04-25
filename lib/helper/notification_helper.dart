@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:audio_session/audio_session.dart';
+import 'package:audio_session/audio_session.dart' hide AndroidAudioFocus;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -88,6 +88,12 @@ class NotificationHelper {
               NotificationType.general: () => Get.toNamed(
                 RouteHelper.getNotificationRoute(fromNotification: true),
               ),
+              NotificationType.tootli_direct_chat: () {
+                final int? oid = payload.orderId;
+                if (oid != null) {
+                  Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid));
+                }
+              },
             };
 
             notificationActions[payload.notificationType]?.call();
@@ -171,6 +177,13 @@ class NotificationHelper {
             Get.find<NotificationController>().getNotificationList();
           } catch (_) {}
         }
+      } else if (type == 'tootli_direct_chat') {
+        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        try {
+          Get.find<OrderController>().getRunningOrders(1, status: 'all');
+          Get.find<OrderController>().getOrderCount(Get.find<OrderController>().orderType);
+          Get.find<NotificationController>().getNotificationList();
+        } catch (_) {}
       } else if (type == 'new_order' || type == 'order_request' || type == 'order_status') {
         print("[FCM-DEBUG] ✅ MATCHED order type: '$type'");
         print("[FCM-DEBUG] notifOrderId = $notifOrderId");
@@ -266,6 +279,12 @@ class NotificationHelper {
             NotificationType.general: () => Get.toNamed(
               RouteHelper.getNotificationRoute(fromNotification: true),
             ),
+            NotificationType.tootli_direct_chat: () {
+              final int? oid = notificationBody.orderId;
+              if (oid != null) {
+                Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid));
+              }
+            },
           };
 
           notificationActions[notificationBody.notificationType]?.call();
@@ -530,6 +549,14 @@ class NotificationHelper {
         return NotificationBodyModel(notificationType: NotificationType.otp);
       case 'message':
         return _handleMessageNotification(data);
+      case 'tootli_direct_chat':
+        if (orderId == null) {
+          return null;
+        }
+        return NotificationBodyModel(
+          orderId: orderId,
+          notificationType: NotificationType.tootli_direct_chat,
+        );
       case 'withdraw':
         return NotificationBodyModel(
           notificationType: NotificationType.withdraw,
@@ -681,6 +708,18 @@ class MyTaskHandler extends TaskHandler {
     if (p == null) return;
     try {
       await _ensureAlertAudioSession();
+      if (!kIsWeb && Platform.isAndroid) {
+        await p.setAudioContext(
+          AudioContext(
+            android: AudioContextAndroid(
+              stayAwake: true,
+              contentType: AndroidContentType.sonification,
+              usageType: AndroidUsageType.notification,
+              audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+            ),
+          ),
+        );
+      }
       await p.stop();
       await p.play(AssetSource('alert_new_delivery.mp3'));
     } catch (_) {}

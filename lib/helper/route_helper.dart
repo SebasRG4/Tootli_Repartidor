@@ -26,6 +26,7 @@ import 'package:sixam_mart_delivery/features/forgot_password/screens/verificatio
 import 'package:sixam_mart_delivery/features/html/screens/html_viewer_screen.dart';
 import 'package:sixam_mart_delivery/features/notification/screens/notification_screen.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_details_screen.dart';
+import 'package:sixam_mart_delivery/features/order/screens/tootli_direct_tracking_chat_screen.dart';
 import 'package:sixam_mart_delivery/features/profile/screens/update_profile_screen.dart';
 import 'package:sixam_mart_delivery/features/splash/screens/splash_screen.dart';
 import 'package:sixam_mart_delivery/features/update/screens/update_screen.dart';
@@ -52,6 +53,7 @@ class RouteHelper {
   static const String privacy = '/privacy-policy';
   static const String update = '/update';
   static const String chatScreen = '/chat-screen';
+  static const String tootliDirectTrackingChat = '/tootli-direct-tracking-chat';
   static const String conversationListScreen = '/conversation-list-screen';
   static const String deliveryManRegistration = '/delivery-man-registration';
   static const String disbursement = '/disbursement';
@@ -130,6 +132,9 @@ class RouteHelper {
   }
 
   static String getConversationListRoute() => conversationListScreen;
+
+  static String getTootliDirectTrackingChatRoute(int orderId) =>
+      '$tootliDirectTrackingChat?order_id=$orderId';
   static String getDeliverymanRegistrationRoute() => deliveryManRegistration;
   static String getDisbursementRoute() => disbursement;
   static String getWithdrawMethodRoute({bool isFromDashBoard = false}) =>
@@ -250,6 +255,15 @@ class RouteHelper {
     GetPage(
       name: update,
       page: () => UpdateScreen(isUpdate: Get.parameters['update'] == 'true'),
+    ),
+    GetPage(
+      name: tootliDirectTrackingChat,
+      page: () {
+        final String id = Get.parameters['order_id'] ?? '0';
+        return TootliDirectTrackingChatScreen(
+          orderId: int.tryParse(id) ?? 0,
+        );
+      },
     ),
     GetPage(
       name: chatScreen,

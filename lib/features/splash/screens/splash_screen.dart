@@ -116,6 +116,12 @@ class SplashScreenState extends State<SplashScreen> {
       NotificationType.otp: () => null,
       NotificationType.unassign: () => Get.to(const DashboardScreen(pageIndex: 1)),
       NotificationType.message: () => Get.toNamed(RouteHelper.getChatRoute(notificationBody: notificationBody, conversationId: notificationBody?.conversationId, fromNotification: true)),
+      NotificationType.tootli_direct_chat: () {
+        final int? oid = notificationBody?.orderId;
+        if (oid != null) {
+          Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid));
+        }
+      },
       NotificationType.general: () => Get.toNamed(RouteHelper.getNotificationRoute(fromNotification: true)),
     };
 

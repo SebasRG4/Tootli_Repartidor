@@ -189,6 +189,15 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
   }
 
   void _chatWithCustomer() {
+    final int? oid = widget.orderModel.id;
+    final bool useTootliDirectChat =
+        oid != null &&
+        (widget.orderModel.tootliDirectTrackable == true ||
+            widget.orderModel.hasTootliDirectPublicTrackingUrl);
+    if (useTootliDirectChat) {
+      Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid!));
+      return;
+    }
     if (widget.orderModel.customer != null) {
       Get.toNamed(
         RouteHelper.getChatRoute(
@@ -205,9 +214,47 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
           ),
         ),
       );
-    } else {
-      showCustomSnackBar('Información del cliente no disponible');
+      return;
     }
+    if (widget.orderModel.isGuest == true) {
+      showCustomSnackBar(
+        'tootli_direct_guest_chat_web_only'.tr,
+        isError: false,
+      );
+      return;
+    }
+    final int? fallbackCustomerId =
+        widget.orderModel.userId ?? widget.orderModel.deliveryAddress?.userId;
+    if (fallbackCustomerId != null) {
+      final addr = widget.orderModel.deliveryAddress;
+      final String rawName = (addr?.contactPersonName ?? '').trim();
+      String fName = 'Cliente';
+      String lName = '';
+      if (rawName.isNotEmpty) {
+        final List<String> parts = rawName.split(RegExp(r'\s+'));
+        fName = parts.first;
+        if (parts.length > 1) {
+          lName = parts.sublist(1).join(' ');
+        }
+      }
+      Get.toNamed(
+        RouteHelper.getChatRoute(
+          notificationBody: NotificationBodyModel(
+            orderId: widget.orderModel.id,
+            customerId: fallbackCustomerId,
+          ),
+          user: User(
+            id: fallbackCustomerId,
+            fName: fName,
+            lName: lName,
+            imageFullUrl: '',
+            phone: addr?.contactPersonNumber,
+          ),
+        ),
+      );
+      return;
+    }
+    showCustomSnackBar('customer_not_found'.tr, isError: true);
   }
 
   void _showSupportBottomSheet() {

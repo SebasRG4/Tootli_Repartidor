@@ -110,6 +110,10 @@ class AppConstants {
   static const String orderCount = '/api/v1/delivery-man/orders-count';
   static const String missionUri = '/api/v1/delivery-man/missions';
 
+  /// Chat seguimiento Tootli Direct (mismo hilo que la web del enlace).
+  static const String tootliDirectTrackingChatUri =
+      '/api/v1/delivery-man/tootli-direct-tracking-chat';
+
   ///chat url
   static const String getConversationListUri =
       '/api/v1/delivery-man/message/list';

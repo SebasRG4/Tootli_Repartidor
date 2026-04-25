@@ -41,10 +41,16 @@ class InfoCardWidget extends StatelessWidget {
           Text(title, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
           Spacer(),
 
-          isStore && isChatAllow ? order.isGuest! ? const SizedBox() : GestureDetector(
-            onTap:  messageOnTap as void Function()?,
-            child: Image.asset(Images.chatIcon, width: 24),
-          ) : const SizedBox(),
+          isStore && isChatAllow
+              ? (order.isGuest == true &&
+                      order.tootliDirectTrackable != true &&
+                      !order.hasTootliDirectPublicTrackingUrl)
+                  ? const SizedBox()
+                  : GestureDetector(
+                      onTap: messageOnTap as void Function()?,
+                      child: Image.asset(Images.chatIcon, width: 24),
+                    )
+              : const SizedBox(),
           SizedBox(width: Dimensions.paddingSizeSmall),
           GestureDetector(
             onTap: () async {

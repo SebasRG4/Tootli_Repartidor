@@ -97,6 +97,24 @@ void main() {
       });
     });
 
+    group('tipo tootli_direct_chat', () {
+      test('retorna null si order_id falta', () {
+        final result = NotificationHelper.convertNotification({
+          'type': 'tootli_direct_chat',
+        });
+        expect(result, isNull);
+      });
+
+      test('mapea con order_id', () {
+        final result = NotificationHelper.convertNotification({
+          'type': 'tootli_direct_chat',
+          'order_id': '501',
+        });
+        expect(result?.notificationType, equals(NotificationType.tootli_direct_chat));
+        expect(result?.orderId, equals(501));
+      });
+    });
+
     // ── tipos sin order_id ─────────────────────────────────────
     group('tipos que no necesitan order_id', () {
       test('block retorna NotificationType.block', () {

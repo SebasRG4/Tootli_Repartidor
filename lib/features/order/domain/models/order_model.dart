@@ -86,6 +86,11 @@ class OrderModel {
   String? canceled;
   ParcelCancellation? parcelCancellation;
   double? bringChangeAmount;
+  /// Pedido con seguimiento Tootli Direct: chat con cliente vía API dedicada (no Pusher).
+  bool? tootliDirectTrackable;
+
+  /// URL pública `/rastreo-orden/tootli-directo/...` (invitado): el chat del cliente está en la web.
+  String? customerTrackingUrl;
 
   OrderModel({
     this.id,
@@ -142,7 +147,13 @@ class OrderModel {
     this.canceled,
     this.parcelCancellation,
     this.bringChangeAmount,
+    this.tootliDirectTrackable,
+    this.customerTrackingUrl,
   });
+
+  /// Hay enlace público de seguimiento (misma página donde el invitado chatea).
+  bool get hasTootliDirectPublicTrackingUrl =>
+      (customerTrackingUrl ?? '').trim().isNotEmpty;
 
   OrderModel.fromJson(Map<String, dynamic> json) {
     id = json['id'];
@@ -218,6 +229,17 @@ class OrderModel {
     canceled = json['canceled'];
     parcelCancellation = json['parcel_cancellation'] != null ? ParcelCancellation.fromJson(json['parcel_cancellation']) : null;
     bringChangeAmount = json['bring_change_amount']?.toDouble();
+    final dynamic td = json['tootli_direct_trackable'];
+    if (td == null) {
+      tootliDirectTrackable = null;
+    } else if (td is bool) {
+      tootliDirectTrackable = td;
+    } else {
+      tootliDirectTrackable = td == 1 || td == '1' || td == true;
+    }
+    final dynamic ct = json['customer_tracking_url'];
+    final String ctStr = ct?.toString().trim() ?? '';
+    customerTrackingUrl = ctStr.isEmpty ? null : ctStr;
   }
 
   Map<String, dynamic> toJson() {
@@ -287,6 +309,8 @@ class OrderModel {
       data['parcel_cancellation'] = parcelCancellation!.toJson();
     }
     data['bring_change_amount'] = bringChangeAmount;
+    data['tootli_direct_trackable'] = tootliDirectTrackable;
+    data['customer_tracking_url'] = customerTrackingUrl;
     return data;
   }
 }

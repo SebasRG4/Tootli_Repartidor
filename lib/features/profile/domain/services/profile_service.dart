@@ -101,13 +101,11 @@ class ProfileService implements ProfileServiceInterface {
           },
         ),
       );
-    } else if (permission == LocationPermission.deniedForever ||
-        (GetPlatform.isIOS
-            ? false
-            : permission == LocationPermission.whileInUse)) {
+    } else if (permission == LocationPermission.deniedForever) {
       Get.dialog(
         LocationAccessDialog(
           onConfirm: () async {
+            Get.back();
             await Geolocator.openAppSettings();
             Future.delayed(const Duration(seconds: 3), () {
               if (GetPlatform.isAndroid) checkPermission(callback);
