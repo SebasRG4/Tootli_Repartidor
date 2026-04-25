@@ -26,6 +26,39 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationHelper {
+  static bool _foregroundTaskInitialized = false;
+
+  /// Debe ejecutarse antes de [startLocationService]/[startService] y al arranque de la app (móvil).
+  static Future<void> ensureForegroundTaskInitialized() async {
+    if (_foregroundTaskInitialized) {
+      return;
+    }
+    if (kIsWeb || !(GetPlatform.isAndroid || GetPlatform.isIOS)) {
+      return;
+    }
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: '6ammart',
+        channelName: 'Tootli Repartidor',
+        channelDescription:
+            'Ubicación en vivo y avisos de pedido mientras la app está activa o en segundo plano.',
+        onlyAlertOnce: false,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: true,
+        playSound: false,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(10000),
+        autoRunOnBoot: false,
+        autoRunOnMyPackageReplaced: false,
+        allowWakeLock: true,
+        allowWifiLock: true,
+      ),
+    );
+    _foregroundTaskInitialized = true;
+  }
+
   static Future<void> initialize(
     FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin,
   ) async {
@@ -298,13 +331,14 @@ class NotificationHelper {
   /// Start Persistent Location Service
   @pragma('vm:entry-point')
   static Future<ServiceRequestResult> startLocationService() async {
+    await ensureForegroundTaskInitialized();
     if (await FlutterForegroundTask.isRunningService) {
       return FlutterForegroundTask.restartService();
     } else {
       return FlutterForegroundTask.startService(
         serviceId: 257,
         notificationTitle: 'Tootli operativo',
-        notificationText: 'Rastreando ubicación en tiempo real',
+        notificationText: 'Rastreando tu ubicación (segundo plano)',
         callback: locationStartCallback,
       );
     }
@@ -316,6 +350,7 @@ class NotificationHelper {
     String? orderId,
     NotificationType notificationType,
   ) async {
+    await ensureForegroundTaskInitialized();
     if (orderId != null) {
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('latest_order_request_id', orderId);
@@ -649,37 +684,12 @@ Future<void> myBackgroundMessageHandler(RemoteMessage message) async {
           notificationBody.notificationType ==
               NotificationType.order_request)) {
     FlutterForegroundTask.initCommunicationPort();
-    await _initService();
+    await NotificationHelper.ensureForegroundTaskInitialized();
     await NotificationHelper.startService(
       notificationBody.orderId?.toString(),
       notificationBody.notificationType!,
     );
   }
-}
-
-/// Initialize Foreground Service
-@pragma('vm:entry-point')
-Future<void> _initService() async {
-  FlutterForegroundTask.init(
-    androidNotificationOptions: AndroidNotificationOptions(
-      channelId: '6ammart',
-      channelName: 'Foreground Service Notification',
-      channelDescription:
-          'This notification appears when the foreground service is running.',
-      onlyAlertOnce: false,
-    ),
-    iosNotificationOptions: const IOSNotificationOptions(
-      showNotification: false,
-      playSound: false,
-    ),
-    foregroundTaskOptions: ForegroundTaskOptions(
-      eventAction: ForegroundTaskEventAction.repeat(5000),
-      autoRunOnBoot: false,
-      autoRunOnMyPackageReplaced: false,
-      allowWakeLock: true,
-      allowWifiLock: true,
-    ),
-  );
 }
 
 /// Foreground Service entry point
@@ -797,7 +807,9 @@ void locationStartCallback() {
 
 class LocationTaskHandler extends TaskHandler {
   @override
-  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {}
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    await _recordLocation();
+  }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
@@ -810,6 +822,17 @@ class LocationTaskHandler extends TaskHandler {
       String? token = prefs.getString(AppConstants.token);
       if (token == null || token.isEmpty) return;
 
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        final requested = await Geolocator.requestPermission();
+        if (requested == LocationPermission.denied ||
+            requested == LocationPermission.deniedForever) {
+          return;
+        }
+      } else if (permission == LocationPermission.deniedForever) {
+        return;
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
@@ -819,21 +842,20 @@ class LocationTaskHandler extends TaskHandler {
 
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}${AppConstants.recordLocationUri}'),
-        headers: {
+        headers: const {
           'Content-Type': 'application/json; charset=UTF-8',
-          'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
           'token': token,
           'latitude': position.latitude,
           'longitude': position.longitude,
-          'location': 'Background Update',
+          'location': 'Foreground service',
         }),
       );
 
-      debugPrint('Background Location update: ${response.statusCode}');
+      debugPrint('ForegroundTask location POST: ${response.statusCode}');
     } catch (e) {
-      debugPrint('Background Location error: $e');
+      debugPrint('ForegroundTask location error: $e');
     }
   }
 

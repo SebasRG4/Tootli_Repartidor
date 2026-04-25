@@ -27,6 +27,11 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   FlutterForegroundTask.initCommunicationPort();
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.android)) {
+    await NotificationHelper.ensureForegroundTaskInitialized();
+  }
 
   // Sesión de audio tipo “reproductor” para que el alerta de pedido siga en segundo plano / pantalla bloqueada (iOS/Android).
   if (!kIsWeb &&
