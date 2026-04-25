@@ -199,9 +199,10 @@ class ProfileController extends GetxController implements GetxService {
 
       if (Get.find<SplashController>().configModel!.webSocketStatus!) {
         await profileServiceInterface.recordWebSocketLocation(_recordLocation!);
-      } else {
-        await profileServiceInterface.recordLocation(_recordLocation!);
       }
+      // Siempre persistir por HTTP: el rastreo web (Tootli Directo) lee delivery_histories;
+      // con solo WebSocket la ubicación puede no llegar a BD si Reverb no procesa el evento.
+      await profileServiceInterface.recordLocation(_recordLocation!);
     } catch (e) {
       // ignore
     }
