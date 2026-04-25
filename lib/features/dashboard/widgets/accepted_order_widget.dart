@@ -444,12 +444,22 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
               InkWell(
                 onTap: _showSupportBottomSheet,
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  alignment: Alignment.center,
                   decoration: const BoxDecoration(
                     color: Colors.red,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.emergency, color: Colors.white),
+                  child: Text(
+                    'SOS',
+                    style: robotoBold.copyWith(
+                      color: Colors.white,
+                      fontSize: 11,
+                      height: 1,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ),
               ),
             ],
