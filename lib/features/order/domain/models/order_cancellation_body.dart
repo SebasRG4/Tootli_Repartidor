@@ -37,6 +37,8 @@ class CancellationData {
   int? status;
   String? createdAt;
   String? updatedAt;
+  /// Backend: motivo marcado como exento de cola de revisión de strike (p. ej. accidente).
+  bool exemptStrikeReview = false;
 
   CancellationData({
     this.id,
@@ -45,6 +47,7 @@ class CancellationData {
     this.status,
     this.createdAt,
     this.updatedAt,
+    this.exemptStrikeReview = false,
   });
 
   CancellationData.fromJson(Map<String, dynamic> json) {
@@ -54,6 +57,8 @@ class CancellationData {
     status = json['status'];
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
+    exemptStrikeReview = json['exempt_strike_review'] == true ||
+        json['exempt_strike_review'] == 1;
   }
 
   Map<String, dynamic> toJson() {
@@ -64,6 +69,7 @@ class CancellationData {
     data['status'] = status;
     data['created_at'] = createdAt;
     data['updated_at'] = updatedAt;
+    data['exempt_strike_review'] = exemptStrikeReview;
     return data;
   }
 }

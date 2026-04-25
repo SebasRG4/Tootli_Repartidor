@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
@@ -18,6 +20,15 @@ import 'package:geolocator/geolocator.dart';
 /// El API `update-order-status` no comprueba distancia; esto es solo cliente.
 /// Poner en `false` antes de producción.
 const bool kDisableDeliveryProximityCheckForQa = true;
+
+/// Distancia máxima (m) al punto de entrega para iniciar el temporizador de contacto.
+const double _kCustomerContactTimerProximityM = 100;
+
+/// Llamadas al cliente (desde el botón de la app) requeridas antes de iniciar el temporizador.
+const int _kCustomerContactMinCalls = 3;
+
+/// Duración del temporizador una vez iniciado (después de proximidad + llamadas).
+const int _kCustomerContactCountdownSeconds = 600;
 
 class AcceptedOrderWidget extends StatefulWidget {
   final OrderModel orderModel;
@@ -43,6 +54,253 @@ class AcceptedOrderWidget extends StatefulWidget {
 class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
   double _sliderValue = 0.0;
   bool _isCheckingProximity = false;
+
+  Timer? _customerProximityPollTimer;
+  Timer? _customerContactCountdownTimer;
+  bool _within100mOfCustomer = false;
+  int _customerTelLaunchCount = 0;
+  bool _customerContactCountdownStarted = false;
+  int? _customerContactSecondsRemaining;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.phase == 'going_to_customer') {
+      _startCustomerContactMonitoring();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopAndResetCustomerContactTimer();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(AcceptedOrderWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final idChanged = oldWidget.orderModel.id != widget.orderModel.id;
+    final wasCustomer = oldWidget.phase == 'going_to_customer';
+    final isCustomer = widget.phase == 'going_to_customer';
+
+    if (idChanged || (wasCustomer && !isCustomer)) {
+      _stopAndResetCustomerContactTimer();
+    }
+    if (isCustomer && (!wasCustomer || idChanged)) {
+      _startCustomerContactMonitoring();
+    }
+  }
+
+  void _stopAndResetCustomerContactTimer() {
+    _customerProximityPollTimer?.cancel();
+    _customerProximityPollTimer = null;
+    _customerContactCountdownTimer?.cancel();
+    _customerContactCountdownTimer = null;
+    _within100mOfCustomer = false;
+    _customerTelLaunchCount = 0;
+    _customerContactCountdownStarted = false;
+    _customerContactSecondsRemaining = null;
+  }
+
+  void _startCustomerContactMonitoring() {
+    if (widget.phase != 'going_to_customer') return;
+    _customerProximityPollTimer?.cancel();
+    _customerProximityPollTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _pollCustomerProximityForContactTimer(),
+    );
+    unawaited(_pollCustomerProximityForContactTimer());
+  }
+
+  Future<void> _pollCustomerProximityForContactTimer() async {
+    if (!mounted || widget.phase != 'going_to_customer') return;
+
+    if (kDisableDeliveryProximityCheckForQa) {
+      if (!_within100mOfCustomer) {
+        setState(() => _within100mOfCustomer = true);
+      }
+      _tryStartCustomerContactCountdown();
+      return;
+    }
+
+    final double lat =
+        double.tryParse(widget.orderModel.deliveryAddress?.latitude ?? '') ??
+            0;
+    final double lng =
+        double.tryParse(widget.orderModel.deliveryAddress?.longitude ?? '') ??
+            0;
+    if (lat == 0 && lng == 0) return;
+
+    try {
+      final Position p = await Geolocator.getCurrentPosition();
+      final double d = Geolocator.distanceBetween(
+        p.latitude,
+        p.longitude,
+        lat,
+        lng,
+      );
+      final bool within = d <= _kCustomerContactTimerProximityM;
+      if (within != _within100mOfCustomer) {
+        setState(() => _within100mOfCustomer = within);
+      }
+      _tryStartCustomerContactCountdown();
+    } catch (_) {}
+  }
+
+  void _tryStartCustomerContactCountdown() {
+    if (!mounted ||
+        _customerContactCountdownStarted ||
+        widget.phase != 'going_to_customer') {
+      return;
+    }
+    if (!_within100mOfCustomer || _customerTelLaunchCount < _kCustomerContactMinCalls) {
+      return;
+    }
+    _customerContactCountdownStarted = true;
+    _customerProximityPollTimer?.cancel();
+    _customerProximityPollTimer = null;
+    setState(() {
+      _customerContactSecondsRemaining = _kCustomerContactCountdownSeconds;
+    });
+    _customerContactCountdownTimer?.cancel();
+    _customerContactCountdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      final int? prev = _customerContactSecondsRemaining;
+      if (prev == null || prev <= 0) {
+        t.cancel();
+        return;
+      }
+      final int next = prev - 1;
+      setState(() => _customerContactSecondsRemaining = next);
+      if (next <= 0) {
+        t.cancel();
+      }
+    });
+  }
+
+  String _formatMmSs(int seconds) {
+    final int m = seconds ~/ 60;
+    final int s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildCustomerContactTimerCard(BuildContext context) {
+    final int calls = _customerTelLaunchCount.clamp(0, 999);
+    final bool callsOk = calls >= _kCustomerContactMinCalls;
+    final bool locOk = _within100mOfCustomer;
+    final int? sec = _customerContactSecondsRemaining;
+    final bool finished = sec != null && sec <= 0 && _customerContactCountdownStarted;
+
+    return Container(
+      margin: const EdgeInsets.only(top: Dimensions.paddingSizeDefault),
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+        border: Border.all(
+          color: Theme.of(context).primaryColor.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.contact_phone_outlined, color: Theme.of(context).primaryColor, size: 22),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'dm_customer_contact_timer_title'.tr,
+                  style: robotoMedium.copyWith(fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _timerRequirementRow(
+            context,
+            done: callsOk,
+            label:
+                '${'dm_customer_contact_calls_label'.tr} $calls / $_kCustomerContactMinCalls',
+          ),
+          const SizedBox(height: 6),
+          _timerRequirementRow(
+            context,
+            done: locOk,
+            label: locOk
+                ? 'dm_customer_contact_within_100'.tr
+                : 'dm_customer_contact_not_within_100'.tr,
+          ),
+          const SizedBox(height: 12),
+          if (!_customerContactCountdownStarted)
+            Text(
+              'dm_customer_contact_timer_waiting'.tr,
+              style: robotoRegular.copyWith(
+                fontSize: 12,
+                color: Theme.of(context).hintColor,
+              ),
+            )
+          else if (finished)
+            Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.green.shade700, size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'dm_customer_contact_timer_done'.tr,
+                    style: robotoMedium.copyWith(
+                      fontSize: 13,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          else
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'dm_customer_contact_timer_running'.tr,
+                  style: robotoRegular.copyWith(fontSize: 12),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatMmSs(sec ?? 0),
+                  style: robotoBold.copyWith(
+                    fontSize: 28,
+                    color: Theme.of(context).primaryColor,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timerRequirementRow(
+    BuildContext context, {
+    required bool done,
+    required String label,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          done ? Icons.check_circle : Icons.radio_button_unchecked,
+          size: 18,
+          color: done ? Colors.green.shade700 : Theme.of(context).hintColor,
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(label, style: robotoRegular.copyWith(fontSize: 12))),
+      ],
+    );
+  }
 
   void _showNavigationOptions() {
     Get.bottomSheet(
@@ -163,6 +421,10 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
           'tel:$phone',
           mode: LaunchMode.externalApplication,
         );
+        if (mounted && widget.phase == 'going_to_customer') {
+          setState(() => _customerTelLaunchCount++);
+          _tryStartCustomerContactCountdown();
+        }
       } else {
         showCustomSnackBar('Could not launch dialer');
       }
@@ -641,19 +903,23 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
             ),
 
           if (widget.phase == 'going_to_customer')
-            GetBuilder<OrderController>(
-              builder: (orderController) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 20),
-                    Text(
-                      'Prueba de entrega (Foto):',
-                      style: robotoMedium.copyWith(fontSize: 14),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildCustomerContactTimerCard(context),
+                GetBuilder<OrderController>(
+                  builder: (orderController) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const SizedBox(height: 20),
+                        Text(
+                          'Prueba de entrega (Foto):',
+                          style: robotoMedium.copyWith(fontSize: 14),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
                         InkWell(
                           onTap: () => orderController.pickCameraDirectly(),
                           child: Container(
@@ -768,9 +1034,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                           ),
                         ],
                       ),
-                  ],
-                );
-              },
+                      ],
+                    );
+                  },
+                ),
+              ],
             ),
 
           const SizedBox(height: 30),

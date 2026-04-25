@@ -173,11 +173,27 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
                                       width: Dimensions.paddingSizeExtraSmall,
                                     ),
                                     Expanded(
-                                      child: Text(
-                                        r.reason ?? '',
-                                        style: robotoRegular,
-                                        maxLines: 4,
-                                        overflow: TextOverflow.ellipsis,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            r.reason ?? '',
+                                            style: robotoRegular,
+                                            maxLines: 4,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          if (r.exemptStrikeReview)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 4),
+                                              child: Text(
+                                                'dm_cancel_exempt_strike_review_hint'.tr,
+                                                style: robotoRegular.copyWith(
+                                                  fontSize: 11,
+                                                  color: Theme.of(context).hintColor,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                   ],
