@@ -11,23 +11,30 @@ class CustomCheckBoxWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () => onClick(!value),
-      child: Row(children: [
-        Expanded(child: Text(title, style: robotoRegular.copyWith(
-          color: value ? Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.6) : Theme.of(context).hintColor,
-          fontWeight: value ? FontWeight.w500 : FontWeight.w400,
-        ))),
-
-        Checkbox(
-          value: value,
-          onChanged: (bool? isActive) => onClick(isActive ?? false),
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          activeColor: Theme.of(context).primaryColor,
-          side: BorderSide(
-            color: value ? Theme.of(context).primaryColor : Theme.of(context).disabledColor.withValues(alpha: 0.5),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: value ? Theme.of(context).primaryColor.withOpacity(0.05) : Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: value ? Theme.of(context).primaryColor : Theme.of(context).disabledColor.withOpacity(0.2),
+            width: value ? 1.5 : 1,
           ),
         ),
-
-      ]),
+        child: Row(children: [
+          Expanded(child: Text(title, style: robotoRegular.copyWith(
+            color: value ? Theme.of(context).primaryColor : Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+            fontWeight: value ? FontWeight.w600 : FontWeight.w400,
+            fontSize: 14,
+          ))),
+          if (value)
+            Icon(Icons.check_circle, color: Theme.of(context).primaryColor, size: 22)
+          else
+            Icon(Icons.radio_button_unchecked, color: Theme.of(context).disabledColor.withOpacity(0.5), size: 22),
+        ]),
+      ),
     );
   }
 }
