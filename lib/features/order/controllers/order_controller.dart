@@ -980,7 +980,8 @@ class OrderController extends GetxController implements GetxService {
         id: 0,
         fName: 'Soporte',
         lName: 'Tootli',
-        imageFullUrl: '',
+        phone: 'Administración',
+        imageFullUrl: Get.find<SplashController>().configModel?.logoFullUrl ?? '',
       ),
     );
 
