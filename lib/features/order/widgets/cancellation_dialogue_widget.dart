@@ -102,31 +102,32 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
               children: [
                 Container(
                   width: 500,
-                  padding: const EdgeInsets.symmetric(
-                    vertical: Dimensions.paddingSizeSmall,
-                  ),
+                  padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).cardColor,
-                    boxShadow: Get.isDarkMode
-                        ? null
-                        : [
-                            BoxShadow(
-                              color: Colors.grey[200]!,
-                              spreadRadius: 1,
-                              blurRadius: 5,
-                            ),
-                          ],
+                    color: Colors.red.withOpacity(0.05),
+                    border: Border(bottom: BorderSide(color: Colors.red.withOpacity(0.1))),
                   ),
-                  child: Column(
+                  child: Row(
                     children: [
-                      Text(
-                        'select_cancellation_reasons'.tr,
-                        style: robotoMedium.copyWith(
-                          color: Theme.of(context).primaryColor,
-                          fontSize: Dimensions.fontSizeLarge,
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+                      ),
+                      const SizedBox(width: Dimensions.paddingSizeSmall),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Solicitar Cancelación', style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red)),
+                            const SizedBox(height: 4),
+                            Text('El equipo de soporte evaluará tu solicitud.', style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor)),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: Dimensions.paddingSizeExtraSmall),
                     ],
                   ),
                 ),
@@ -147,57 +148,70 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
                           ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
                             itemCount: reasons.length,
                             itemBuilder: (context, index) {
                               final r = reasons[index];
                               final bool selected =
                                   orderController.selectedCancelReasonId ==
                                   r.id;
-                              return ListTile(
-                                dense: true,
+                              return InkWell(
                                 onTap: () {
                                   orderController.setSelectedCancelReason(
                                     r.id,
                                     r.reason,
                                   );
                                 },
-                                title: Row(
-                                  children: [
-                                    Icon(
-                                      selected
-                                          ? Icons.radio_button_checked
-                                          : Icons.radio_button_off,
-                                      color: Theme.of(context).primaryColor,
-                                      size: 18,
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  decoration: BoxDecoration(
+                                    color: selected ? Theme.of(context).primaryColor.withOpacity(0.05) : Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(
+                                      color: selected ? Theme.of(context).primaryColor : Theme.of(context).disabledColor.withOpacity(0.2),
+                                      width: selected ? 1.5 : 1,
                                     ),
-                                    const SizedBox(
-                                      width: Dimensions.paddingSizeExtraSmall,
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            r.reason ?? '',
-                                            style: robotoRegular,
-                                            maxLines: 4,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          if (r.exemptStrikeReview)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 4),
-                                              child: Text(
-                                                'dm_cancel_exempt_strike_review_hint'.tr,
-                                                style: robotoRegular.copyWith(
-                                                  fontSize: 11,
-                                                  color: Theme.of(context).hintColor,
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              r.reason ?? '',
+                                              style: robotoRegular.copyWith(
+                                                color: selected ? Theme.of(context).primaryColor : Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.8),
+                                                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                                                fontSize: 14,
+                                              ),
+                                              maxLines: 4,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (r.exemptStrikeReview)
+                                              Padding(
+                                                padding: const EdgeInsets.only(top: 4),
+                                                child: Text(
+                                                  'dm_cancel_exempt_strike_review_hint'.tr,
+                                                  style: robotoRegular.copyWith(
+                                                    fontSize: 11,
+                                                    color: Theme.of(context).hintColor,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(width: 8),
+                                      if (selected)
+                                        Icon(Icons.check_circle, color: Theme.of(context).primaryColor, size: 22)
+                                      else
+                                        Icon(Icons.radio_button_unchecked, color: Theme.of(context).disabledColor.withOpacity(0.5), size: 22),
+                                    ],
+                                  ),
                                 ),
                               );
                             },
@@ -217,14 +231,20 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
                               ),
                             ),
                           ),
+                        const SizedBox(height: Dimensions.paddingSizeDefault),
+                        Text(
+                          'Detalles adicionales (opcional)',
+                          style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeDefault),
+                        ),
                         const SizedBox(height: Dimensions.paddingSizeSmall),
                         TextField(
                           controller: _detailController,
-                          maxLines: 2,
+                          maxLines: 3,
                           decoration: InputDecoration(
-                            labelText: 'dm_cancel_detail_optional'.tr,
-                            hintText: 'dm_cancel_detail_hint'.tr,
-                            border: const OutlineInputBorder(),
+                            hintText: 'Describe brevemente la situación...',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                            ),
                           ),
                         ),
                         const SizedBox(height: Dimensions.paddingSizeSmall),
@@ -241,19 +261,20 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
                       ? Row(
                           children: [
                             Expanded(
-                              child: CustomButtonWidget(
-                                buttonText: 'cancel'.tr,
-                                backgroundColor:
-                                    Theme.of(context).disabledColor,
-                                radius: 50,
+                              child: TextButton(
                                 onPressed: () => Get.back(),
+                                child: Text(
+                                  'continue_delivery'.tr,
+                                  style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor),
+                                ),
                               ),
                             ),
                             const SizedBox(width: Dimensions.paddingSizeSmall),
                             Expanded(
                               child: CustomButtonWidget(
-                                buttonText: 'submit'.tr,
-                                radius: 50,
+                                buttonText: 'Contactar a Soporte',
+                                color: Colors.red,
+                                radius: Dimensions.radiusDefault,
                                 onPressed: loadingReasons
                                     ? null
                                     : () => _submit(orderController),
