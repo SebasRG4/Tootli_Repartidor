@@ -100,15 +100,15 @@ class _CancellationReasonBottomSheetState extends State<CancellationReasonBottom
                 isLoading: orderController.isLoading,
                 onPressed: () async {
                   if((orderController.selectedParcelCancelReason != null && orderController.selectedParcelCancelReason!.isNotEmpty) || commentController.text.isNotEmpty) {
-                    await orderController.updateOrderStatus(OrderModel(id: widget.orderId), parcel: true, AppConstants.canceled, reasons: orderController.selectedParcelCancelReason,
-                      comment: commentController.text.trim(), stopOtherDataCall: true).then((success) async {
-                      if(success) {
-                        showCustomBottomSheet(
-                          child: ParcelReturnDateTimeBottomSheet(orderId: widget.orderId, canceledDateTime: orderController.orderModel!.canceled!),
-                        );
-                        await orderController.getOrderWithId(widget.orderId);
-                      }
-                    });
+                    String reasonText = orderController.selectedParcelCancelReason?.join(', ') ?? '';
+                    if (commentController.text.trim().isNotEmpty) {
+                      reasonText += ' - Detalles: ${commentController.text.trim()}';
+                    }
+                    Get.back();
+                    await orderController.openAdminSupportChatForCancelRequest(
+                      orderId: widget.orderId,
+                      cancellationReason: reasonText,
+                    );
                   }else{
                     if(orderController.selectedParcelCancelReason != null && orderController.selectedParcelCancelReason!.isNotEmpty){
                       showCustomSnackBar('you_did_not_select_any_reason'.tr);

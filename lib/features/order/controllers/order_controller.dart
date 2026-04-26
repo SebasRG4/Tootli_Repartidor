@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,6 +16,8 @@ import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dar
 import 'package:sixam_mart_delivery/features/order/domain/models/update_status_body_model.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/ignore_model.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_cancellation_body.dart';
+import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
+import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
@@ -802,5 +806,191 @@ class OrderController extends GetxController implements GetxService {
     _selectedRunningStatus = status;
     update();
     getRunningOrders(1, status: status);
+  }
+
+  // --- Contexto cancelación: timer contacto cliente (mapa) + chat soporte ---
+
+  int? _cancelContactSnapshotOrderId;
+  String _cancelContactSnapshotPhase = '';
+  int _cancelContactSnapshotCalls = 0;
+  bool _cancelContactSnapshotWithin100m = false;
+  bool _cancelContactSnapshotCountdownStarted = false;
+  int? _cancelContactSnapshotSecondsRemaining;
+  String? _cancelSupportPrefillQueued;
+
+  void logCustomerCallAttemptToServer(
+    int orderId,
+    int attemptNumber,
+    int confirmedAtMs,
+  ) {
+    unawaited(
+      orderServiceInterface.logCustomerCallAttempt(
+        orderId: orderId,
+        attemptNumber: attemptNumber,
+        confirmedAtMs: confirmedAtMs,
+      ),
+    );
+  }
+
+  void reportDeliveryCancelContactSnapshot({
+    required int? orderId,
+    required String phase,
+    required int customerCallCount,
+    required bool within100mOfCustomer,
+    required bool contactCountdownStarted,
+    int? contactSecondsRemaining,
+  }) {
+    if (orderId == null) return;
+    if (phase != 'going_to_customer') {
+      if (_cancelContactSnapshotOrderId == orderId) {
+        _cancelContactSnapshotOrderId = null;
+        _cancelContactSnapshotPhase = '';
+        _cancelContactSnapshotCalls = 0;
+        _cancelContactSnapshotWithin100m = false;
+        _cancelContactSnapshotCountdownStarted = false;
+        _cancelContactSnapshotSecondsRemaining = null;
+      }
+      return;
+    }
+    _cancelContactSnapshotOrderId = orderId;
+    _cancelContactSnapshotPhase = phase;
+    _cancelContactSnapshotCalls = customerCallCount;
+    _cancelContactSnapshotWithin100m = within100mOfCustomer;
+    _cancelContactSnapshotCountdownStarted = contactCountdownStarted;
+    _cancelContactSnapshotSecondsRemaining = contactSecondsRemaining;
+  }
+
+  String? consumeCancelSupportPrefill() {
+    final String? s = _cancelSupportPrefillQueued;
+    _cancelSupportPrefillQueued = null;
+    return s;
+  }
+
+  static String _mmSsFromSeconds(int totalSeconds) {
+    final int m = totalSeconds ~/ 60;
+    final int s = totalSeconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _buildCancelSupportPrefillMessage({
+    required int orderId,
+    OrderModel? order,
+    double? dmLat,
+    double? dmLng,
+    String? cancellationReason,
+  }) {
+    final StringBuffer buf = StringBuffer();
+    buf.writeln('dm_cancel_support_message_header'.tr);
+    buf.writeln('');
+    buf.writeln('${'dm_cancel_support_order_label'.tr}: #$orderId');
+    final String orderType = order?.orderType ?? '';
+    buf.writeln('${'dm_cancel_support_order_type_label'.tr}: $orderType');
+
+    final String addr = order?.orderType == 'parcel'
+        ? (order?.receiverDetails?.address ??
+            order?.deliveryAddress?.address ??
+            '—')
+        : (order?.deliveryAddress?.address ?? '—');
+    buf.writeln('${'dm_cancel_support_address_label'.tr}: $addr');
+
+    if (dmLat != null && dmLng != null) {
+      buf.writeln(
+        '${'dm_cancel_support_dm_location_label'.tr}: ${dmLat.toStringAsFixed(6)}, ${dmLng.toStringAsFixed(6)}',
+      );
+    } else {
+      buf.writeln(
+        '${'dm_cancel_support_dm_location_label'.tr}: ${'dm_cancel_support_dm_location_na'.tr}',
+      );
+    }
+
+    final bool snapshotForThisOrder = _cancelContactSnapshotOrderId != null &&
+        _cancelContactSnapshotOrderId == orderId;
+    final bool isParcel = order?.orderType == 'parcel';
+
+    if (cancellationReason != null && cancellationReason.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Motivo de cancelación solicitado: $cancellationReason');
+    }
+
+    buf.writeln('');
+    buf.writeln('${'dm_cancel_support_contact_rules_title'.tr}:');
+    if (isParcel || !snapshotForThisOrder) {
+      buf.writeln('dm_cancel_support_timer_na'.tr);
+    } else {
+      buf.writeln(
+        '${'dm_cancel_support_route_phase_label'.tr}: $_cancelContactSnapshotPhase',
+      );
+      buf.writeln(
+        '${'dm_cancel_support_calls_label'.tr}: $_cancelContactSnapshotCalls / 3',
+      );
+      buf.writeln(
+        '${'dm_cancel_support_within_100m_label'.tr}: ${_cancelContactSnapshotWithin100m ? 'dm_cancel_support_yes'.tr : 'dm_cancel_support_no'.tr}',
+      );
+      if (!_cancelContactSnapshotCountdownStarted) {
+        buf.writeln('dm_cancel_support_timer_not_started'.tr);
+      } else if ((_cancelContactSnapshotSecondsRemaining ?? 1) <= 0) {
+        buf.writeln('dm_cancel_support_timer_done'.tr);
+      } else {
+        buf.writeln(
+          '${'dm_cancel_support_timer_running'.tr}: ${_mmSsFromSeconds(_cancelContactSnapshotSecondsRemaining ?? 0)}',
+        );
+      }
+    }
+
+    buf.writeln('');
+    buf.write('dm_cancel_support_footer'.tr);
+    return buf.toString();
+  }
+
+  /// Abre chat con administración con datos del pedido y reglas de contacto; al cerrar el chat ejecuta [afterReturn].
+  Future<void> openAdminSupportChatForCancelRequest({
+    required int orderId,
+    OrderModel? order,
+    VoidCallback? afterReturn,
+    String? cancellationReason,
+  }) async {
+    double? dmLat;
+    double? dmLng;
+    try {
+      final Position p = await Geolocator.getCurrentPosition();
+      dmLat = p.latitude;
+      dmLng = p.longitude;
+    } catch (_) {
+      try {
+        final r = Get.find<ProfileController>().recordLocationBody;
+        dmLat = r?.latitude;
+        dmLng = r?.longitude;
+      } catch (_) {}
+    }
+
+    _cancelSupportPrefillQueued = _buildCancelSupportPrefillMessage(
+      orderId: orderId,
+      order: order,
+      dmLat: dmLat,
+      dmLng: dmLng,
+      cancellationReason: cancellationReason,
+    );
+
+    final String route = RouteHelper.getChatRoute(
+      notificationBody: NotificationBodyModel(
+        type: AppConstants.admin,
+        orderId: orderId,
+      ),
+      user: User(
+        id: 0,
+        fName: 'Soporte',
+        lName: 'Tootli',
+        imageFullUrl: '',
+      ),
+    );
+
+    await Get.toNamed(route);
+    _cancelSupportPrefillQueued = null;
+
+    if (afterReturn != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        afterReturn();
+      });
+    }
   }
 }

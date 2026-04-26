@@ -141,4 +141,16 @@ class OrderService implements OrderServiceInterface {
     return await orderRepositoryInterface.getOrderCount(type);
   }
 
+  @override
+  Future<void> logCustomerCallAttempt({
+    required int orderId,
+    required int attemptNumber,
+    required int confirmedAtMs,
+  }) async {
+    await orderRepositoryInterface.logCustomerCallAttempt(
+      orderId: orderId,
+      attemptNumber: attemptNumber,
+      confirmedAtMs: confirmedAtMs,
+    );
+  }
 }

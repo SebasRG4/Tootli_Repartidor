@@ -144,7 +144,9 @@ class ParcelBottomView extends StatelessWidget {
       buttonText: 'cancel'.tr,
       isBorder: true, transparent: true,
       fontColor: Theme.of(Get.context!).textTheme.bodyLarge!.color,
-      onPressed: () => _handleParcelCancellation(order),
+      onPressed: () async {
+        await _handleParcelCancellation(order);
+      },
     );
   }
 
@@ -240,13 +242,8 @@ class ParcelBottomView extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeLarge),
       child: InkWell(
-        onTap: () {
-          showCustomBottomSheet(
-            child: CancellationReasonBottomSheet(
-              isBeforePickup: _isBeforePickup(order),
-              orderId: order.id!,
-            ),
-          );
+        onTap: () async {
+          await _handleParcelCancellation(order);
         },
         child: Center(
           child: Text(
@@ -299,12 +296,18 @@ class ParcelBottomView extends StatelessWidget {
   }
 
 // Parcel action handlers
-  void _handleParcelCancellation(OrderModel order) {
-    showCustomBottomSheet(
-      child: CancellationReasonBottomSheet(
-        isBeforePickup: _isBeforePickup(order),
-        orderId: order.id!,
-      ),
+  Future<void> _handleParcelCancellation(OrderModel order) async {
+    await orderController.openAdminSupportChatForCancelRequest(
+      orderId: order.id!,
+      order: order,
+      afterReturn: () {
+        showCustomBottomSheet(
+          child: CancellationReasonBottomSheet(
+            isBeforePickup: _isBeforePickup(order),
+            orderId: order.id!,
+          ),
+        );
+      },
     );
   }
 

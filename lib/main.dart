@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:audio_session/audio_session.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
@@ -8,6 +9,7 @@ import 'package:sixam_mart_delivery/features/splash/controllers/splash_controlle
 import 'package:sixam_mart_delivery/common/controllers/theme_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
+import 'package:sixam_mart_delivery/helper/dm_contact_timer_helper.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/theme/dark_theme.dart';
 import 'package:sixam_mart_delivery/theme/light_theme.dart';
@@ -26,10 +28,16 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  FlutterForegroundTask.initCommunicationPort();
+  await initializeDateFormatting();
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.android)) {
+    await DmContactTimerHelper.ensureLocalTimezone();
+  }
+  FlutterForegroundTask.initCommunicationPort();
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+      defaultTargetPlatform == TargetPlatform.android)) {
     await NotificationHelper.ensureForegroundTaskInitialized();
   }
 

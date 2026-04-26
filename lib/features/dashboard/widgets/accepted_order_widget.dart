@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
@@ -15,6 +17,13 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:intl/intl.dart';
+import 'package:sixam_mart_delivery/helper/dm_call_log_verification_helper.dart';
+import 'package:sixam_mart_delivery/helper/dm_contact_timer_helper.dart';
+import 'package:sixam_mart_delivery/main.dart' show flutterLocalNotificationsPlugin;
+import 'package:sixam_mart_delivery/common/widgets/custom_bottom_sheet_widget.dart';
+import 'package:sixam_mart_delivery/features/order/widgets/cancellation_dialogue_widget.dart';
+import 'package:sixam_mart_delivery/features/order/widgets/parcel_cancelation/cancellation_reason_bottom_sheet.dart';
 
 /// QA: `true` omite la validación de proximidad (100 m tienda / 500 m cliente).
 /// El API `update-order-status` no comprueba distancia; esto es solo cliente.
@@ -51,7 +60,8 @@ class AcceptedOrderWidget extends StatefulWidget {
   State<AcceptedOrderWidget> createState() => _AcceptedOrderWidgetState();
 }
 
-class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
+class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
+    with WidgetsBindingObserver {
   double _sliderValue = 0.0;
   bool _isCheckingProximity = false;
 
@@ -61,19 +71,61 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
   int _customerTelLaunchCount = 0;
   bool _customerContactCountdownStarted = false;
   int? _customerContactSecondsRemaining;
+  bool _awaitingCallReturnConfirm = false;
+  /// Marca al abrir [tel:]; en Android se usa con el registro de llamadas.
+  DateTime? _customerCallLaunchedAt;
+  static const String _prefPrefixCalls = 'dm_cust_confirmed_call_attempts_';
+  static const String _prefPrefixEndMs = 'dm_cust_contact_timer_end_ms_';
+  static const String _prefPrefixStarted = 'dm_cust_contact_timer_started_';
+  static const String _prefPrefixStartMs = 'dm_cust_contact_timer_start_ms_';
+  static const String _prefPrefixAttemptsJson = 'dm_cust_call_attempts_json_';
+
+  /// Hora límite del temporizador (misma lógica que en disco).
+  int? _countdownDeadlineMs;
+  int? _countdownStartMs;
+
+  int? get _oid => widget.orderModel.id;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.phase == 'going_to_customer') {
-      _startCustomerContactMonitoring();
+      unawaited(_restoreContactTimerFromPrefs().then((_) {
+        if (widget.phase == 'going_to_customer') {
+          _startCustomerContactMonitoring();
+        }
+      }));
     }
   }
 
   @override
   void dispose() {
-    _stopAndResetCustomerContactTimer();
+    WidgetsBinding.instance.removeObserver(this);
+    _disposeLocalContactTimersOnly();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      return;
+    }
+    if (widget.phase != 'going_to_customer') {
+      return;
+    }
+    if (_awaitingCallReturnConfirm) {
+      _awaitingCallReturnConfirm = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        unawaited(_processCustomerCallAfterDialer());
+      });
+    }
+    if (_customerContactCountdownStarted) {
+      unawaited(_syncCountdownFromStoredDeadline());
+    }
   }
 
   @override
@@ -87,11 +139,27 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
       _stopAndResetCustomerContactTimer();
     }
     if (isCustomer && (!wasCustomer || idChanged)) {
-      _startCustomerContactMonitoring();
+      unawaited(_restoreContactTimerFromPrefs().then((_) {
+        if (mounted && widget.phase == 'going_to_customer') {
+          _startCustomerContactMonitoring();
+        }
+      }));
     }
   }
 
+  void _disposeLocalContactTimersOnly() {
+    _customerProximityPollTimer?.cancel();
+    _customerProximityPollTimer = null;
+    _customerContactCountdownTimer?.cancel();
+    _customerContactCountdownTimer = null;
+  }
+
   void _stopAndResetCustomerContactTimer() {
+    _awaitingCallReturnConfirm = false;
+    _customerCallLaunchedAt = null;
+    _countdownDeadlineMs = null;
+    _countdownStartMs = null;
+    unawaited(_clearContactOrderPrefs());
     _customerProximityPollTimer?.cancel();
     _customerProximityPollTimer = null;
     _customerContactCountdownTimer?.cancel();
@@ -100,6 +168,277 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     _customerTelLaunchCount = 0;
     _customerContactCountdownStarted = false;
     _customerContactSecondsRemaining = null;
+    _syncCancelContactSnapshotToOrderController();
+  }
+
+  void _syncCancelContactSnapshotToOrderController() {
+    final int? oid = widget.orderModel.id;
+    if (oid == null || !Get.isRegistered<OrderController>()) return;
+    Get.find<OrderController>().reportDeliveryCancelContactSnapshot(
+      orderId: oid,
+      phase: widget.phase,
+      customerCallCount: _customerTelLaunchCount,
+      within100mOfCustomer: _within100mOfCustomer,
+      contactCountdownStarted: _customerContactCountdownStarted,
+      contactSecondsRemaining: _customerContactSecondsRemaining,
+    );
+  }
+
+  Future<void> _restoreContactTimerFromPrefs() async {
+    final int? oid = _oid;
+    if (oid == null) {
+      return;
+    }
+    final SharedPreferences p = await SharedPreferences.getInstance();
+    _customerTelLaunchCount = p.getInt('$_prefPrefixCalls$oid') ?? 0;
+    _customerContactCountdownStarted =
+        p.getBool('$_prefPrefixStarted$oid') ?? false;
+    _countdownStartMs = p.getInt('$_prefPrefixStartMs$oid');
+    final int? endMs = p.getInt('$_prefPrefixEndMs$oid');
+    if (endMs != null && _customerContactCountdownStarted) {
+      _countdownDeadlineMs = endMs;
+      final int left = ((endMs - DateTime.now().millisecondsSinceEpoch) / 1000)
+          .ceil()
+          .clamp(0, _kCustomerContactCountdownSeconds);
+      _customerContactSecondsRemaining = left;
+      if (left > 0) {
+        _customerContactCountdownStarted = true;
+        _customerProximityPollTimer?.cancel();
+        _customerProximityPollTimer = null;
+        _runCountdownTicker();
+        await DmContactTimerHelper.scheduleCountdownEndNotification(
+          flutterLocalNotificationsPlugin,
+          orderId: oid,
+          deadlineMs: endMs,
+          title: 'dm_contact_timer_notif_title'.tr,
+          body: 'dm_contact_timer_notif_body'
+              .trParams({'orderId': oid.toString()}),
+        );
+      } else {
+        await DmContactTimerHelper.cancelEndNotification(
+          flutterLocalNotificationsPlugin,
+          orderId: oid,
+        );
+      }
+    }
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _persistCallCount() async {
+    final int? oid = _oid;
+    if (oid == null) {
+      return;
+    }
+    final SharedPreferences p = await SharedPreferences.getInstance();
+    await p.setInt('$_prefPrefixCalls$oid', _customerTelLaunchCount);
+  }
+
+  Future<void> _appendAndPersistCallAttempt(int attempt, int atMs) async {
+    final int? oid = _oid;
+    if (oid == null) {
+      return;
+    }
+    final SharedPreferences p = await SharedPreferences.getInstance();
+    final String key = '$_prefPrefixAttemptsJson$oid';
+    final String? raw = p.getString(key);
+    List<dynamic> list;
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        list = (jsonDecode(raw) as List<dynamic>?) ?? <dynamic>[];
+      } catch (_) {
+        list = <dynamic>[];
+      }
+    } else {
+      list = <dynamic>[];
+    }
+    list.add(<String, int>{'a': attempt, 't': atMs});
+    await p.setString(key, jsonEncode(list));
+  }
+
+  Future<void> _persistCountdownState(int startMs, int deadlineMs) async {
+    final int? oid = _oid;
+    if (oid == null) {
+      return;
+    }
+    _countdownDeadlineMs = deadlineMs;
+    _countdownStartMs = startMs;
+    final SharedPreferences p = await SharedPreferences.getInstance();
+    await p.setInt('$_prefPrefixEndMs$oid', deadlineMs);
+    await p.setInt('$_prefPrefixStartMs$oid', startMs);
+    await p.setBool('$_prefPrefixStarted$oid', true);
+    await DmContactTimerHelper.scheduleCountdownEndNotification(
+      flutterLocalNotificationsPlugin,
+      orderId: oid,
+      deadlineMs: deadlineMs,
+      title: 'dm_contact_timer_notif_title'.tr,
+      body: 'dm_contact_timer_notif_body'
+          .trParams({'orderId': oid.toString()}),
+    );
+  }
+
+  Future<void> _clearContactOrderPrefs() async {
+    final int? oid = _oid;
+    if (oid == null) {
+      return;
+    }
+    await DmContactTimerHelper.cancelEndNotification(
+      flutterLocalNotificationsPlugin,
+      orderId: oid,
+    );
+    final SharedPreferences p = await SharedPreferences.getInstance();
+    await p.remove('$_prefPrefixCalls$oid');
+    await p.remove('$_prefPrefixEndMs$oid');
+    await p.remove('$_prefPrefixStarted$oid');
+    await p.remove('$_prefPrefixStartMs$oid');
+    await p.remove('$_prefPrefixAttemptsJson$oid');
+  }
+
+  Future<void> _syncCountdownFromStoredDeadline() async {
+    final int? d = _countdownDeadlineMs;
+    if (d == null) {
+      await _restoreContactTimerFromPrefs();
+    }
+    int? end = _countdownDeadlineMs;
+    if (end == null) {
+      final int? oid = _oid;
+      if (oid == null) {
+        return;
+      }
+      final SharedPreferences p = await SharedPreferences.getInstance();
+      end = p.getInt('$_prefPrefixEndMs$oid');
+      _countdownDeadlineMs = end;
+      _countdownStartMs = p.getInt('$_prefPrefixStartMs$oid');
+    }
+    if (end == null) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    final int left = ((end - DateTime.now().millisecondsSinceEpoch) / 1000)
+        .ceil()
+        .clamp(0, _kCustomerContactCountdownSeconds);
+    setState(() => _customerContactSecondsRemaining = left);
+    _syncCancelContactSnapshotToOrderController();
+    if (left > 0) {
+      _runCountdownTicker();
+    }
+  }
+
+  /// Tras [tel:]: en Android, permiso de registro + comprobación; si no, o no coincide, diálogo.
+  Future<void> _processCustomerCallAfterDialer() async {
+    if (!mounted || widget.phase != 'going_to_customer') {
+      return;
+    }
+    final String? target =
+        widget.orderModel.deliveryAddress?.contactPersonNumber ??
+            widget.orderModel.customer?.phone;
+
+    if (DmCallLogVerificationHelper.isAndroid) {
+      final bool granted = await DmCallLogVerificationHelper.ensureCallLogAccess();
+      if (!granted) {
+        _showCustomerCallConfirmDialog(
+          hint: 'dm_customer_call_log_needs_phone_permission'.tr,
+        );
+        return;
+      }
+      final DateTime notBefore = (_customerCallLaunchedAt ?? DateTime.now())
+          .subtract(const Duration(minutes: 1));
+      final bool found = await DmCallLogVerificationHelper
+          .hasRecentOutgoingCallTo(
+        targetPhoneRaw: target,
+        notBefore: notBefore,
+      );
+      if (found && mounted && widget.phase == 'going_to_customer') {
+        showCustomSnackBar('dm_customer_call_log_detected'.tr, isError: false);
+        await _applyCustomerCallAttemptConfirmed();
+        return;
+      }
+      _showCustomerCallConfirmDialog(
+        hint: 'dm_customer_call_log_not_matched'.tr,
+      );
+      return;
+    }
+    _showCustomerCallConfirmDialog();
+  }
+
+  Future<void> _applyCustomerCallAttemptConfirmed() async {
+    if (!mounted || widget.phase != 'going_to_customer') {
+      return;
+    }
+    int nextAttempt = 0;
+    setState(() {
+      if (_customerTelLaunchCount < 999) {
+        _customerTelLaunchCount++;
+      }
+      nextAttempt = _customerTelLaunchCount;
+    });
+    final int at = DateTime.now().millisecondsSinceEpoch;
+    await _persistCallCount();
+    if (nextAttempt > 0 && nextAttempt <= 3) {
+      await _appendAndPersistCallAttempt(nextAttempt, at);
+      if (Get.isRegistered<OrderController>() && widget.orderModel.id != null) {
+        Get.find<OrderController>().logCustomerCallAttemptToServer(
+          widget.orderModel.id!,
+          nextAttempt,
+          at,
+        );
+      }
+    }
+    await _tryStartCustomerContactCountdown();
+    _syncCancelContactSnapshotToOrderController();
+  }
+
+  void _showCustomerCallConfirmDialog({String? hint}) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: Text('dm_customer_call_confirm_title'.tr),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('dm_customer_call_confirm_body'.tr),
+                if (hint != null && hint.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    hint,
+                    style: robotoRegular.copyWith(
+                      fontSize: 12,
+                      color: Theme.of(ctx).hintColor,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                _awaitingCallReturnConfirm = false;
+              },
+              child: Text('no'.tr),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                if (mounted && widget.phase == 'going_to_customer') {
+                  await _applyCustomerCallAttemptConfirmed();
+                }
+                _awaitingCallReturnConfirm = false;
+              },
+              child: Text('yes'.tr),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _startCustomerContactMonitoring() {
@@ -110,6 +449,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
       (_) => _pollCustomerProximityForContactTimer(),
     );
     unawaited(_pollCustomerProximityForContactTimer());
+    _syncCancelContactSnapshotToOrderController();
   }
 
   Future<void> _pollCustomerProximityForContactTimer() async {
@@ -119,7 +459,8 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
       if (!_within100mOfCustomer) {
         setState(() => _within100mOfCustomer = true);
       }
-      _tryStartCustomerContactCountdown();
+      unawaited(_tryStartCustomerContactCountdown());
+      _syncCancelContactSnapshotToOrderController();
       return;
     }
 
@@ -143,11 +484,12 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
       if (within != _within100mOfCustomer) {
         setState(() => _within100mOfCustomer = within);
       }
-      _tryStartCustomerContactCountdown();
+      unawaited(_tryStartCustomerContactCountdown());
     } catch (_) {}
+    _syncCancelContactSnapshotToOrderController();
   }
 
-  void _tryStartCustomerContactCountdown() {
+  Future<void> _tryStartCustomerContactCountdown() async {
     if (!mounted ||
         _customerContactCountdownStarted ||
         widget.phase != 'going_to_customer') {
@@ -159,22 +501,39 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     _customerContactCountdownStarted = true;
     _customerProximityPollTimer?.cancel();
     _customerProximityPollTimer = null;
+    final int startMs = DateTime.now().millisecondsSinceEpoch;
+    final int deadline = startMs + const Duration(
+      seconds: _kCustomerContactCountdownSeconds,
+    ).inMilliseconds;
+    await _persistCountdownState(startMs, deadline);
+    if (!mounted) {
+      return;
+    }
     setState(() {
       _customerContactSecondsRemaining = _kCustomerContactCountdownSeconds;
     });
+    _runCountdownTicker();
+    _syncCancelContactSnapshotToOrderController();
+  }
+
+  void _runCountdownTicker() {
     _customerContactCountdownTimer?.cancel();
-    _customerContactCountdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+    _customerContactCountdownTimer =
+        Timer.periodic(const Duration(seconds: 1), (Timer t) {
       if (!mounted) {
         t.cancel();
         return;
       }
-      final int? prev = _customerContactSecondsRemaining;
-      if (prev == null || prev <= 0) {
+      final int? end = _countdownDeadlineMs;
+      if (end == null) {
         t.cancel();
         return;
       }
-      final int next = prev - 1;
+      final int next = ((end - DateTime.now().millisecondsSinceEpoch) / 1000)
+          .ceil()
+          .clamp(0, _kCustomerContactCountdownSeconds);
       setState(() => _customerContactSecondsRemaining = next);
+      _syncCancelContactSnapshotToOrderController();
       if (next <= 0) {
         t.cancel();
       }
@@ -185,6 +544,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     final int m = seconds ~/ 60;
     final int s = seconds % 60;
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  String _formatHhMmLocal(int startMs) {
+    return DateFormat('HH:mm', 'es_MX')
+        .format(DateTime.fromMillisecondsSinceEpoch(startMs));
   }
 
   Widget _buildCustomerContactTimerCard(BuildContext context) {
@@ -224,7 +588,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
             context,
             done: callsOk,
             label:
-                '${'dm_customer_contact_calls_label'.tr} $calls / $_kCustomerContactMinCalls',
+                '${'dm_customer_contact_calls_label_confirmed'.tr} $calls / $_kCustomerContactMinCalls',
           ),
           const SizedBox(height: 6),
           _timerRequirementRow(
@@ -276,6 +640,18 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                     fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
+                if (_countdownStartMs != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'dm_customer_contact_timer_start_at'.trParams({
+                      'time': _formatHhMmLocal(_countdownStartMs!),
+                    }),
+                    style: robotoRegular.copyWith(
+                      fontSize: 11,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
+                ],
               ],
             ),
         ],
@@ -417,16 +793,20 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     String? phone = widget.orderModel.deliveryAddress?.contactPersonNumber ?? widget.orderModel.customer?.phone;
     if (phone != null && phone.isNotEmpty) {
       if (await canLaunchUrlString('tel:$phone')) {
+        if (mounted && widget.phase == 'going_to_customer') {
+          _awaitingCallReturnConfirm = true;
+          _customerCallLaunchedAt = DateTime.now();
+        }
         await launchUrlString(
           'tel:$phone',
           mode: LaunchMode.externalApplication,
         );
         if (mounted && widget.phase == 'going_to_customer') {
-          setState(() => _customerTelLaunchCount++);
-          _tryStartCustomerContactCountdown();
+          _syncCancelContactSnapshotToOrderController();
         }
       } else {
         showCustomSnackBar('Could not launch dialer');
+        _awaitingCallReturnConfirm = false;
       }
     } else {
       showCustomSnackBar('Phone number not found');
@@ -457,7 +837,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
         (widget.orderModel.tootliDirectTrackable == true ||
             widget.orderModel.hasTootliDirectPublicTrackingUrl);
     if (useTootliDirectChat) {
-      Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid!));
+      Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid));
       return;
     }
     if (widget.orderModel.customer != null) {
@@ -519,17 +899,45 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     showCustomSnackBar('customer_not_found'.tr, isError: true);
   }
 
+  bool _parcelIsBeforePickup() {
+    final String? s = widget.orderModel.orderStatus;
+    return s == AppConstants.processing ||
+        s == AppConstants.accepted ||
+        s == AppConstants.confirmed ||
+        s == AppConstants.handover;
+  }
+
   void _showSupportBottomSheet() {
+    final OrderController orderController = Get.find<OrderController>();
+    final int? oid = widget.orderModel.id;
+    if (oid == null) {
+      return;
+    }
+    final bool isParcel = widget.orderModel.orderType == 'parcel';
+    final double bottomPad = MediaQuery.of(context).viewPadding.bottom;
+    
+    final bool isTimerFinished = widget.phase == 'going_to_customer' &&
+        _customerContactSecondsRemaining != null &&
+        _customerContactSecondsRemaining! <= 0 &&
+        _customerContactCountdownStarted;
+
     Get.bottomSheet(
       Container(
-        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+        width: double.infinity,
+        padding: EdgeInsets.only(
+          left: Dimensions.paddingSizeLarge,
+          right: Dimensions.paddingSizeLarge,
+          top: Dimensions.paddingSizeLarge,
+          bottom: bottomPad + Dimensions.paddingSizeDefault,
+        ),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Container(
               height: 4,
               width: 40,
@@ -539,13 +947,58 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
               ),
             ),
             const SizedBox(height: 15),
-            Text('Centro de Soporte', style: robotoBold.copyWith(fontSize: 18)),
-            const SizedBox(height: 25),
+            Text('Opciones de Soporte y Cancelación', style: robotoBold.copyWith(fontSize: 18)),
+            const SizedBox(height: 8),
+            Text(
+              'Selecciona la opción que mejor describa tu problema.',
+              textAlign: TextAlign.center,
+              style: robotoRegular.copyWith(
+                fontSize: 12,
+                color: Theme.of(context).hintColor,
+              ),
+            ),
+            const SizedBox(height: 20),
             _buildSupportOption(
-              'Soporte Tootli',
-              'Comunícate con nuestro equipo por chat',
-              Icons.chat,
+              'Cliente no responde (Enviar evidencia)',
+              'Envía el contador de 10 min a Soporte para cancelar sin penalización.',
+              Icons.support_agent,
               Colors.blue,
+              () {
+                if (isParcel) {
+                  showCustomBottomSheet(
+                    child: CancellationReasonBottomSheet(
+                      isBeforePickup: _parcelIsBeforePickup(),
+                      orderId: oid,
+                    ),
+                  );
+                } else {
+                  Get.dialog(
+                    CancellationDialogueWidget(orderId: oid),
+                  );
+                }
+              },
+              isEnabled: isTimerFinished,
+            ),
+            const SizedBox(height: 12),
+            _buildSupportOption(
+              'Emergencia / Vehículo descompuesto',
+              'Sube una foto de evidencia si tuviste un problema logístico.',
+              Icons.cancel_outlined,
+              Colors.orange.shade800,
+              () {
+                orderController.openAdminSupportChatForCancelRequest(
+                  orderId: oid,
+                  order: widget.orderModel,
+                  cancellationReason: 'Accidente o emergencia (repartidor)',
+                );
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildSupportOption(
+              'Chat General con Soporte',
+              'Comunícate con soporte para cualquier otra duda.',
+              Icons.chat_bubble_outline,
+              Colors.teal,
               () {
                 Get.toNamed(
                   RouteHelper.getChatRoute(
@@ -554,19 +1007,19 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                       orderId: widget.orderModel.id,
                     ),
                     user: User(
-                       id: 0,
-                       fName: 'Soporte',
-                       lName: 'Tootli',
-                       imageFullUrl: '',
+                      id: 0,
+                      fName: 'Soporte',
+                      lName: 'Tootli',
+                      imageFullUrl: '',
                     ),
                   ),
                 );
               },
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 12),
             _buildSupportOption(
               'Emergencia (911)',
-              'Solo para casos de gravedad',
+              'Llamar al 911 en caso de accidente o asalto.',
               Icons.emergency_share,
               Colors.red,
               () => launchUrlString(
@@ -575,9 +1028,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
               ),
             ),
             const SizedBox(height: 20),
-          ],
+            ],
+          ),
         ),
       ),
+      isScrollControlled: true,
     );
   }
 
@@ -586,29 +1041,32 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
     String subtitle,
     IconData icon,
     Color color,
-    Function onTap,
-  ) {
+    Function onTap, {
+    bool isEnabled = true,
+  }) {
     return InkWell(
-      onTap: () {
+      onTap: isEnabled ? () {
         Get.back();
         onTap();
+      } : () {
+        showCustomSnackBar('Esta opción se habilitará cuando termines de esperar al cliente (10 min).', isError: true);
       },
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.05),
+          color: isEnabled ? color.withOpacity(0.05) : Colors.grey.withOpacity(0.05),
           borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: isEnabled ? color.withOpacity(0.2) : Colors.grey.withOpacity(0.2)),
         ),
         child: Row(
           children: [
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: isEnabled ? color.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: isEnabled ? color : Colors.grey, size: 24),
             ),
             const SizedBox(width: 15),
             Expanded(
@@ -617,7 +1075,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                 children: [
                   Text(
                     title,
-                    style: robotoBold.copyWith(fontSize: 16, color: color),
+                    style: robotoBold.copyWith(fontSize: 16, color: isEnabled ? color : Colors.grey),
                   ),
                   Text(
                     subtitle,
@@ -632,7 +1090,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
             Icon(
               Icons.arrow_forward_ios,
               size: 16,
-              color: Theme.of(context).disabledColor,
+              color: isEnabled ? Theme.of(context).disabledColor : Colors.grey.withOpacity(0.5),
             ),
           ],
         ),
@@ -660,36 +1118,38 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
         children: [
           // Order ID and Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Pedido #${widget.orderModel.id}',
-                    style: robotoBold.copyWith(fontSize: 24),
-                  ),
-                  Text(
-                    widget.phase == 'going_to_store'
-                        ? 'En camino al restaurante'
-                        : widget.phase == 'at_store'
-                            ? 'Preparando entrega'
-                            : 'En camino al cliente',
-                    style: robotoRegular.copyWith(
-                      color: Theme.of(context).primaryColor,
-                      fontSize: 14,
-                    ),
-                  ),
-                  if (widget.estimatedArrivalTime != null)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'Llega antes de ${widget.estimatedArrivalTime}',
-                      style: robotoMedium.copyWith(
-                        color: Colors.orange,
-                        fontSize: 12,
+                      'Pedido #${widget.orderModel.id}',
+                      style: robotoBold.copyWith(fontSize: 24),
+                    ),
+                    Text(
+                      widget.phase == 'going_to_store'
+                          ? 'En camino al restaurante'
+                          : widget.phase == 'at_store'
+                              ? 'Preparando entrega'
+                              : 'En camino al cliente',
+                      style: robotoRegular.copyWith(
+                        color: Theme.of(context).primaryColor,
+                        fontSize: 14,
                       ),
                     ),
-                ],
+                    if (widget.estimatedArrivalTime != null)
+                      Text(
+                        'Llega antes de ${widget.estimatedArrivalTime}',
+                        style: robotoMedium.copyWith(
+                          color: Colors.orange,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -703,6 +1163,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget> {
                   color: Theme.of(context).primaryColor,
                 ),
               ),
+              const SizedBox(width: 8),
               InkWell(
                 onTap: _showSupportBottomSheet,
                 child: Container(

@@ -114,6 +114,10 @@ class AppConstants {
   static const String tootliDirectTrackingChatUri =
       '/api/v1/delivery-man/tootli-direct-tracking-chat';
 
+  /// Registro de intentos de contacto (declaración al volver de tel:).
+  static const String logCustomerCallAttemptUri =
+      '/api/v1/delivery-man/log-customer-call-attempt';
+
   ///chat url
   static const String getConversationListUri =
       '/api/v1/delivery-man/message/list';

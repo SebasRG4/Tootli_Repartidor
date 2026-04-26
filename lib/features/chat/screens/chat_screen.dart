@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/helper/pusher_service.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/chat/controllers/chat_controller.dart';
+import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/models/notification_body_model.dart';
 import 'package:sixam_mart_delivery/features/chat/domain/models/conversation_model.dart';
@@ -81,8 +82,21 @@ class _ChatScreenState extends State<ChatScreen> {
     _isLoggedIn = Get.find<AuthController>().isLoggedIn();
     Get.find<ChatController>().getMessages(1, widget.notificationBody!, widget.user, widget.conversationId, firstLoad: true);
     
-    if (widget.notificationBody?.type == AppConstants.admin && widget.notificationBody?.orderId != null) {
-      _inputMessageController.text = 'Soporte para el pedido #${widget.notificationBody!.orderId}: ';
+    String? prefill;
+    if (Get.isRegistered<OrderController>()) {
+      prefill = Get.find<OrderController>().consumeCancelSupportPrefill();
+    }
+    if (prefill != null && prefill.isNotEmpty) {
+      _inputMessageController.text = prefill;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!Get.find<ChatController>().isSendButtonActive) {
+          Get.find<ChatController>().toggleSendButtonActivity();
+        }
+      });
+    } else if (widget.notificationBody?.type == AppConstants.admin &&
+        widget.notificationBody?.orderId != null) {
+      _inputMessageController.text =
+          'Soporte para el pedido #${widget.notificationBody!.orderId}: ';
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!Get.find<ChatController>().isSendButtonActive) {
           Get.find<ChatController>().toggleSendButtonActivity();

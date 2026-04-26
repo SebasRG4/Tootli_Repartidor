@@ -368,4 +368,25 @@ class OrderRepository implements OrderRepositoryInterface {
   Future<dynamic> getList() {
     throw UnimplementedError();
   }
+
+  @override
+  Future<void> logCustomerCallAttempt({
+    required int orderId,
+    required int attemptNumber,
+    required int confirmedAtMs,
+  }) async {
+    if (_getUserToken().isEmpty) {
+      return;
+    }
+    await apiClient.postData(
+      AppConstants.logCustomerCallAttemptUri,
+      {
+        'token': _getUserToken(),
+        'order_id': orderId,
+        'attempt_number': attemptNumber,
+        'confirmed_at_ms': confirmedAtMs,
+      },
+      handleError: false,
+    );
+  }
 }

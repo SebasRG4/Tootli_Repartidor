@@ -47,36 +47,37 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
     final List<CancellationData>? reasons = orderController.orderCancelReasons;
     final bool hasCatalog = reasons != null && reasons.isNotEmpty;
 
+    if (widget.orderId == null) {
+      return;
+    }
+
+    String reasonText = '';
+
     if (hasCatalog) {
       if (orderController.selectedCancelReasonId == null) {
         showCustomSnackBar('please_select_cancellation_reason'.tr);
         return;
       }
-      await orderController.updateOrderStatus(
-        OrderModel(id: widget.orderId),
-        AppConstants.canceled,
-        back: true,
-        cancelReasonId: orderController.selectedCancelReasonId,
-        cancellationDetail: _detailController.text.trim().isEmpty
-            ? null
-            : _detailController.text.trim(),
-      );
-      return;
+      final r = reasons.firstWhereOrNull((element) => element.id == orderController.selectedCancelReasonId);
+      reasonText = r?.reason ?? '';
+    } else {
+      final String free = _legacyReasonController.text.trim();
+      if (free.isEmpty) {
+        showCustomSnackBar('please_enter_cancellation_reason'.tr);
+        return;
+      }
+      reasonText = free;
     }
 
-    final String free = _legacyReasonController.text.trim();
-    if (free.isEmpty) {
-      showCustomSnackBar('please_enter_cancellation_reason'.tr);
-      return;
+    if (_detailController.text.trim().isNotEmpty) {
+      reasonText += ' - Detalles: ${_detailController.text.trim()}';
     }
-    await orderController.updateOrderStatus(
-      OrderModel(id: widget.orderId),
-      AppConstants.canceled,
-      back: true,
-      reason: free,
-      cancellationDetail: _detailController.text.trim().isEmpty
-          ? null
-          : _detailController.text.trim(),
+
+    Get.back();
+
+    await orderController.openAdminSupportChatForCancelRequest(
+      orderId: widget.orderId!,
+      cancellationReason: reasonText,
     );
   }
 
@@ -227,111 +228,6 @@ class _CancellationDialogueWidgetState extends State<CancellationDialogueWidget>
                           ),
                         ),
                         const SizedBox(height: Dimensions.paddingSizeSmall),
-                        Text(
-                          'dm_cancel_evidence_optional'.tr,
-                          style: robotoMedium.copyWith(
-                            fontSize: Dimensions.fontSizeSmall,
-                          ),
-                        ),
-                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-                        Row(
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: orderController.isLoading
-                                  ? null
-                                  : () => orderController.pickCancelEvidenceImage(
-                                        isCamera: true,
-                                      ),
-                              icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                              label: Text('from_camera'.tr),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              onPressed: orderController.isLoading
-                                  ? null
-                                  : () => orderController.pickCancelEvidenceImage(
-                                        isCamera: false,
-                                      ),
-                              icon: const Icon(Icons.photo_library_outlined, size: 18),
-                              label: Text('from_gallery'.tr),
-                            ),
-                          ],
-                        ),
-                        if (orderController.pickedCancelEvidence.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: List.generate(
-                                orderController.pickedCancelEvidence.length,
-                                (i) {
-                                  final path =
-                                      orderController.pickedCancelEvidence[i].path;
-                                  return Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(6),
-                                        child: Image.file(
-                                          File(path),
-                                          width: 64,
-                                          height: 64,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      Positioned(
-                                        right: -6,
-                                        top: -6,
-                                        child: InkWell(
-                                          onTap: () => orderController
-                                              .removeCancelEvidenceAt(i),
-                                          child: const CircleAvatar(
-                                            radius: 12,
-                                            backgroundColor: Colors.black54,
-                                            child: Icon(
-                                              Icons.close,
-                                              size: 14,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: Dimensions.paddingSizeSmall),
-                        Row(
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: orderController.isLoading
-                                  ? null
-                                  : () => orderController.pickCancelAudio(),
-                              icon: const Icon(Icons.mic_none, size: 18),
-                              label: Text('dm_cancel_attach_audio'.tr),
-                            ),
-                            if (orderController.cancelAudioFile != null) ...[
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  orderController.cancelAudioFile!.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: robotoRegular.copyWith(fontSize: 12),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: orderController.isLoading
-                                    ? null
-                                    : orderController.clearCancelAudio,
-                                icon: const Icon(Icons.delete_outline),
-                              ),
-                            ],
-                          ],
-                        ),
                       ],
                     ),
                   ),

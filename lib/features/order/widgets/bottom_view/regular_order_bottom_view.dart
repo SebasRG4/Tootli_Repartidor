@@ -130,9 +130,15 @@ class RegularOrderBottomView extends StatelessWidget {
 
   Widget _buildOrderCancelButton(OrderController orderController) {
     return TextButton(
-      onPressed: () {
-        orderController.resetDmCancellationSheet();
-        Get.dialog(CancellationDialogueWidget(orderId: orderId));
+      onPressed: () async {
+        await orderController.openAdminSupportChatForCancelRequest(
+          orderId: orderId,
+          order: controllerOrderModel,
+          afterReturn: () {
+            orderController.resetDmCancellationSheet();
+            Get.dialog(CancellationDialogueWidget(orderId: orderId));
+          },
+        );
       },
       style: TextButton.styleFrom(
         minimumSize: const Size(1170, 50),

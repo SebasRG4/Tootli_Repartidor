@@ -20,4 +20,9 @@ abstract class OrderRepositoryInterface implements RepositoryInterface {
   Future<bool> addParcelReturnDate({required int orderId, required String returnDate});
   Future<bool> submitParcelReturn({required int orderId, required String orderStatus, required int returnOtp});
   Future<List<OrderCountModel>?>  getOrderCount(String type);
+  Future<void> logCustomerCallAttempt({
+    required int orderId,
+    required int attemptNumber,
+    required int confirmedAtMs,
+  });
 }
