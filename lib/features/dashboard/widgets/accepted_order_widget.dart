@@ -1113,9 +1113,10 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
         ],
       ),
       padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
           // Order ID and Header
           Row(
             children: [
@@ -1605,6 +1606,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
           ),
           const SizedBox(height: 10),
         ],
+      ),
       ),
     );
   }

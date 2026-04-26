@@ -45,8 +45,7 @@ class _CancellationReasonBottomSheetState extends State<CancellationReasonBottom
         child: Stack(children: [
           Padding(
             padding: const EdgeInsets.only(left: Dimensions.paddingSizeSmall, right: Dimensions.paddingSizeSmall),
-            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Center(
                 child: Container(
                   height: 5, width: 40,
@@ -57,46 +56,89 @@ class _CancellationReasonBottomSheetState extends State<CancellationReasonBottom
                 ),
               ),
               const SizedBox(height: Dimensions.paddingSizeLarge),
+              
+              Container(
+                padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                  border: Border.all(color: Colors.red.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 24),
+                    ),
+                    const SizedBox(width: Dimensions.paddingSizeSmall),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Solicitar Cancelación', style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge, color: Colors.red)),
+                          const SizedBox(height: 4),
+                          Text('El equipo de soporte evaluará tu solicitud.', style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: Dimensions.paddingSizeLarge),
 
-              orderController.parcelCancellationReasons != null && orderController.parcelCancellationReasons!.isNotEmpty ? Text('please_select_cancellation_reason'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge)) : SizedBox(),
+              orderController.parcelCancellationReasons != null && orderController.parcelCancellationReasons!.isNotEmpty ? Text('Motivo principal', style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge)) : SizedBox(),
 
               orderController.parcelCancellationReasons != null ? orderController.parcelCancellationReasons!.isNotEmpty ? Flexible(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
-                  shrinkWrap: true,
-                  itemCount: orderController.parcelCancellationReasons?.length,
-                  itemBuilder: (context, index) {
-                    final reason = orderController.parcelCancellationReasons?[index];
-                    return CustomCheckBoxWidget(
-                      title: reason?.reason ?? '',
-                      value: orderController.isReasonSelected(reason?.reason ?? ''),
-                      onClick: (bool? selected) {
-                        orderController.toggleParcelCancelReason(reason!.reason!, selected ?? false);
-                      },
-                    );
-                  },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                    border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.1)),
+                  ),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeExtraSmall),
+                    shrinkWrap: true,
+                    itemCount: orderController.parcelCancellationReasons?.length,
+                    itemBuilder: (context, index) {
+                      final reason = orderController.parcelCancellationReasons?[index];
+                      return CustomCheckBoxWidget(
+                        title: reason?.reason ?? '',
+                        value: orderController.isReasonSelected(reason?.reason ?? ''),
+                        onClick: (bool? selected) {
+                          orderController.toggleParcelCancelReason(reason!.reason!, selected ?? false);
+                        },
+                      );
+                    },
+                  ),
                 ),
               ) : SizedBox() : const Center(child: Padding(padding: EdgeInsets.symmetric(vertical: Dimensions.paddingSizeDefault), child: CircularProgressIndicator())),
 
+              const SizedBox(height: Dimensions.paddingSizeSmall),
               Text(
-                'comments'.tr,
-                style: robotoBold.copyWith(fontSize: Dimensions.fontSizeExtraLarge),
+                'Detalles adicionales (opcional)',
+                style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeDefault),
               ),
               const SizedBox(height: Dimensions.paddingSizeSmall),
 
               CustomTextFieldWidget(
                 controller: commentController,
-                hintText: 'type_here_your_cancel_reason'.tr,
+                hintText: 'Describe brevemente la situación...',
                 showLabelText: false,
-                maxLines: 2,
+                maxLines: 3,
                 inputType: TextInputType.multiline,
                 inputAction: TextInputAction.done,
                 capitalization: TextCapitalization.sentences,
               ),
-              const SizedBox(height: Dimensions.paddingSizeLarge),
+              const SizedBox(height: Dimensions.paddingSizeExtraLarge),
 
               CustomButtonWidget(
-                buttonText: 'submit'.tr,
+                buttonText: 'Contactar a Soporte',
+                color: Colors.red,
                 isLoading: orderController.isLoading,
                 onPressed: () async {
                   if((orderController.selectedParcelCancelReason != null && orderController.selectedParcelCancelReason!.isNotEmpty) || commentController.text.isNotEmpty) {
@@ -110,11 +152,7 @@ class _CancellationReasonBottomSheetState extends State<CancellationReasonBottom
                       cancellationReason: reasonText,
                     );
                   }else{
-                    if(orderController.selectedParcelCancelReason != null && orderController.selectedParcelCancelReason!.isNotEmpty){
-                      showCustomSnackBar('you_did_not_select_any_reason'.tr);
-                    }else if(commentController.text.isNotEmpty){
-                      showCustomSnackBar('you_did_not_write_any_comment'.tr);
-                    }
+                    showCustomSnackBar('Por favor selecciona un motivo o escribe un comentario');
                   }
                 },
               ),
@@ -126,7 +164,7 @@ class _CancellationReasonBottomSheetState extends State<CancellationReasonBottom
                   child: Center(
                     child: Text(
                       'continue_delivery'.tr,
-                      style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge, decoration: TextDecoration.underline),
+                      style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor),
                     ),
                   ),
                 ),
