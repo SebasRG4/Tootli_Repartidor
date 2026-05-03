@@ -547,7 +547,7 @@ class HomeScreenState extends State<HomeScreen> {
                                     children: [
                                       Text(
                                         PriceConverterHelper.convertPrice(
-                                          profileController.profileModel?.balance ??
+                                          profileController.profileModel?.todaysEarning ??
                                               0,
                                         ),
                                         style: robotoMedium.copyWith(
