@@ -109,7 +109,7 @@ class AppConstants {
       '/api/v1/delivery-man/convert-loyalty-points';
   static const String orderCount = '/api/v1/delivery-man/orders-count';
   static const String missionUri = '/api/v1/delivery-man/missions';
-  static const String offlinePaymentMethodListUri = '/api/v1/config/offline-payment-method-list';
+  static const String offlinePaymentMethodListUri = '/api/v1/offline_payment_method_list';
   static const String makeOfflinePaymentUri = '/api/v1/delivery-man/make-offline-payment';
 
   /// Chat seguimiento Tootli Direct (mismo hilo que la web del enlace).

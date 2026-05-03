@@ -42,7 +42,7 @@ class _OfflinePaymentBottomSheetWidgetState extends State<OfflinePaymentBottomSh
           ),
           const SizedBox(height: Dimensions.paddingSizeLarge),
 
-          Text('select_offline_payment_method'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge)),
+          Text('Seleccionar método de pago', style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge)),
           const SizedBox(height: Dimensions.paddingSizeLarge),
 
           profileController.offlinePaymentMethods != null ? profileController.offlinePaymentMethods!.isNotEmpty ? ListView.builder(
@@ -74,7 +74,7 @@ class _OfflinePaymentBottomSheetWidgetState extends State<OfflinePaymentBottomSh
                 ),
               );
             },
-          ) : Center(child: Text('no_offline_payment_method_available'.tr)) : const Center(child: CircularProgressIndicator()),
+          ) : const Center(child: Text('No hay métodos de pago disponibles')) : const Center(child: CircularProgressIndicator()),
           const SizedBox(height: Dimensions.paddingSizeLarge),
         ]);
       }),

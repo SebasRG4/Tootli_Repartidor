@@ -750,5 +750,9 @@
   "payment_amount": "Monto del pago",
   "payment_instructions": "Instrucciones de pago",
   "fill_the_form_below": "Complete el siguiente formulario",
-  "is_required": "es obligatorio"
+  "is_required": "es obligatorio",
+  "total_debt": "Deuda total",
+  "pay_all": "Pagar todo",
+  "pay_half": "Pagar la mitad",
+  "custom": "Otro monto"
 }

@@ -20,11 +20,13 @@ class OfflinePaymentScreen extends StatefulWidget {
 
 class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
   final Map<String, TextEditingController> _controllers = {};
+  final TextEditingController _amountController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
+    _amountController.text = widget.amount.toStringAsFixed(2);
     for (var info in widget.method.methodInformations!) {
       _controllers[info.customerInput!] = TextEditingController();
     }
@@ -32,6 +34,7 @@ class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
 
   @override
   void dispose() {
+    _amountController.dispose();
     for (var controller in _controllers.values) {
       controller.dispose();
     }
@@ -52,17 +55,49 @@ class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
                   key: _formKey,
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor.withOpacity(0.05),
+                        color: Theme.of(context).primaryColor.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                        border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.2)),
                       ),
                       child: Column(children: [
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text('payment_amount'.tr, style: robotoRegular),
-                          Text(widget.amount.toStringAsFixed(2), style: robotoBold.copyWith(color: Theme.of(context).primaryColor)),
-                        ]),
+                        const Text('Deuda total', style: robotoRegular),
+                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                        Text(
+                          widget.amount.toStringAsFixed(2),
+                          style: robotoBold.copyWith(fontSize: Dimensions.fontSizeOverLarge, color: Theme.of(context).primaryColor),
+                        ),
                       ]),
+                    ),
+                    const SizedBox(height: Dimensions.paddingSizeDefault),
+
+                    Row(children: [
+                      _QuickAmountButton(
+                        label: 'Pagar todo',
+                        onTap: () => setState(() => _amountController.text = widget.amount.toStringAsFixed(2)),
+                      ),
+                      const SizedBox(width: Dimensions.paddingSizeSmall),
+                      _QuickAmountButton(
+                        label: 'Pagar la mitad',
+                        onTap: () => setState(() => _amountController.text = (widget.amount / 2).toStringAsFixed(2)),
+                      ),
+                      const SizedBox(width: Dimensions.paddingSizeSmall),
+                      _QuickAmountButton(
+                        label: 'Otro monto',
+                        onTap: () => setState(() => _amountController.clear()),
+                      ),
+                    ]),
+                    const SizedBox(height: Dimensions.paddingSizeLarge),
+
+                    CustomTextFieldWidget(
+                      labelText: 'Monto del pago',
+                      hintText: 'Monto del pago',
+                      controller: _amountController,
+                      inputType: TextInputType.number,
+                      isRequired: true,
+                      showTitle: true,
                     ),
                     const SizedBox(height: Dimensions.paddingSizeLarge),
 
@@ -116,21 +151,27 @@ class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
             Padding(
               padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
               child: !profileController.isLoading ? CustomButtonWidget(
-                buttonText: 'submit'.tr,
+                buttonText: 'Enviar pago',
                 onPressed: () {
                   bool isValid = true;
-                  for (var info in widget.method.methodInformations!) {
-                    if (info.isRequired == 1 && _controllers[info.customerInput!]!.text.isEmpty) {
-                      showCustomSnackBar('${info.customerPlaceholder!} ${'is_required'.tr}');
-                      isValid = false;
-                      break;
+                  if(_amountController.text.isEmpty) {
+                    showCustomSnackBar('Ingrese un monto válido');
+                    isValid = false;
+                  }
+                  if(isValid) {
+                    for (var info in widget.method.methodInformations!) {
+                      if (info.isRequired == 1 && _controllers[info.customerInput!]!.text.isEmpty) {
+                        showCustomSnackBar('${info.customerPlaceholder!} es obligatorio');
+                        isValid = false;
+                        break;
+                      }
                     }
                   }
 
                   if (isValid) {
                     Map<String, String> data = {
                       'method_id': widget.method.id.toString(),
-                      'amount': widget.amount.toString(),
+                      'amount': _amountController.text,
                     };
                     _controllers.forEach((key, controller) {
                       data[key] = controller.text;
@@ -149,6 +190,30 @@ class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
             ),
           ]);
         }),
+      ),
+    );
+  }
+}
+
+class _QuickAmountButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _QuickAmountButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+            border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.5)),
+          ),
+          child: Text(label, textAlign: TextAlign.center, style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+        ),
       ),
     );
   }
