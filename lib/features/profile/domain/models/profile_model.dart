@@ -44,6 +44,8 @@ class ProfileModel {
   /// Texto que el admin escribe al solicitar correcciones del registro (no es chat).
   String? registrationRevisionMessage;
   bool? pendingRegistrationBrowse;
+  double? cashLimitForOnlyPaid;
+  double? cashLimitForTotalBlock;
 
   ProfileModel({
     this.id,
@@ -90,6 +92,8 @@ class ProfileModel {
     this.registrationRevisionRequired,
     this.registrationRevisionMessage,
     this.pendingRegistrationBrowse,
+    this.cashLimitForOnlyPaid,
+    this.cashLimitForTotalBlock,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -144,6 +148,8 @@ class ProfileModel {
     registrationRevisionMessage =
         json['registration_revision_message']?.toString();
     pendingRegistrationBrowse = json['pending_registration_browse'] == true;
+    cashLimitForOnlyPaid = json['cash_limit_for_only_paid']?.toDouble();
+    cashLimitForTotalBlock = json['cash_limit_for_total_block']?.toDouble();
   }
 
   Map<String, dynamic> toJson() {
@@ -192,6 +198,8 @@ class ProfileModel {
     data['registration_revision_required'] = registrationRevisionRequired;
     data['registration_revision_message'] = registrationRevisionMessage;
     data['pending_registration_browse'] = pendingRegistrationBrowse;
+    data['cash_limit_for_only_paid'] = cashLimitForOnlyPaid;
+    data['cash_limit_for_total_block'] = cashLimitForTotalBlock;
     return data;
   }
 }

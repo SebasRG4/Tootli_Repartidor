@@ -22,6 +22,7 @@ import 'package:sixam_mart_delivery/features/home/widgets/earning_widget.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sixam_mart_delivery/helper/mapbox_directions_helper.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/premium_order_request_widget.dart';
+import 'package:sixam_mart_delivery/features/home/widgets/cash_progress_widget.dart';
 import 'package:sixam_mart_delivery/features/address/controllers/address_controller.dart';
 import 'package:sixam_mart_delivery/features/address/domain/models/zone_model.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
@@ -60,14 +61,13 @@ class HomeScreenState extends State<HomeScreen> {
   final Set<Polyline> _polylines = {};
   OrderModel? _activeOrderRequest;
   String _orderPhase = 'none'; // 'none', 'going_to_store', 'going_to_customer'
-  double? _lastLat;
-  double? _lastLng;
-  int _noMovementCount = 0;
   String? _estimatedArrivalTime;
-  Timer? _noMovementTimer;
   final AudioPlayer _governanceAudioPlayer = AudioPlayer();
   /// Último orderId enviado a showOrderRequest para evitar mostrar el mismo pedido dos veces
   int? _lastShownOrderId;
+  /// Marcadores precargados — se decodifican una sola vez en initState
+  Uint8List? _cachedStoreMarker;
+  Uint8List? _cachedDestinationMarker;
 
   @override
   void initState() {
@@ -76,6 +76,9 @@ class HomeScreenState extends State<HomeScreen> {
     _checkSystemNotification();
 
     _listener = AppLifecycleListener(onStateChange: _onStateChanged);
+
+    // Precargar marcadores del mapa una sola vez para evitar decodificación en cada pedido
+    _preloadMarkers();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
@@ -89,6 +92,15 @@ class HomeScreenState extends State<HomeScreen> {
     _gridTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _refreshGrids();
     });
+  }
+
+  Future<void> _preloadMarkers() async {
+    try {
+      _cachedStoreMarker = await _convertAssetToUnit8List(Images.store, width: 40);
+      _cachedDestinationMarker = await _convertAssetToUnit8List(Images.homeDelivery, width: 40);
+    } catch (e) {
+      debugPrint('[HomeScreen] Error precargando marcadores: $e');
+    }
   }
 
   @override
@@ -148,6 +160,7 @@ class HomeScreenState extends State<HomeScreen> {
         break;
       case AppLifecycleState.resumed:
         checkPermission();
+        _onAppResumed();
         break;
       case AppLifecycleState.inactive:
         break;
@@ -158,9 +171,51 @@ class HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Al volver al primer plano con un pedido activo, refresca el estado real
+  /// del pedido desde el servidor y redibuja la ruta. Evita la pantalla congelada.
+  Future<void> _onAppResumed() async {
+    if (!mounted || _activeOrderRequest == null) return;
+    final int? orderId = _activeOrderRequest!.id;
+    if (orderId == null) return;
+
+    debugPrint('[HomeScreen] resumed con pedido activo $orderId — refrescando...');
+    final OrderModel? refreshed =
+        await Get.find<OrderController>().fetchOrderForNotification(orderId);
+    if (!mounted || refreshed == null) return;
+
+    final String status = refreshed.orderStatus ?? '';
+    // Si el pedido ya terminó, limpiar la pantalla
+    if (status == 'delivered' || status == 'canceled' || status == 'returned' || status == 'failed') {
+      setState(() {
+        _activeOrderRequest = null;
+        _orderPhase = 'none';
+        _polylines.clear();
+        _markers.clear();
+      });
+      widget.onOrderActiveStatusChanged?.call(false);
+      return;
+    }
+
+    // Actualizar fase según el estado real del servidor
+    String newPhase = _orderPhase;
+    if (status == 'picked_up') {
+      newPhase = 'going_to_customer';
+    } else if (status == 'handover' || status == 'processing' || status == 'confirmed') {
+      newPhase = 'going_to_store';
+    }
+
+    setState(() {
+      _activeOrderRequest = refreshed;
+      _orderPhase = newPhase;
+    });
+    setPolyline(refreshed);
+  }
+
   Future<void> checkPermission() async {
     var notificationStatus = await Permission.notification.status;
     var batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+
+    if (!mounted) return;
 
     if (notificationStatus.isDenied || notificationStatus.isPermanentlyDenied) {
       setState(() {
@@ -241,7 +296,6 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _gridTimer?.cancel();
-    _noMovementTimer?.cancel();
     _governanceAudioPlayer.dispose();
     _listener.dispose();
     super.dispose();
@@ -464,45 +518,51 @@ class HomeScreenState extends State<HomeScreen> {
                             Dimensions.paddingSizeSmall,
                         left: 0,
                         right: 0,
-                        child: Center(
-                          child: GestureDetector(
-                            onTap: () => _showEarningsBottomSheet(
-                              context,
-                              profileController,
-                            ),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: Dimensions.paddingSizeLarge,
-                                vertical: Dimensions.paddingSizeSmall,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.black,
-                                borderRadius: BorderRadius.circular(50),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.3),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
+                        child: Column(
+                          children: [
+                            Center(
+                              child: GestureDetector(
+                                onTap: () => _showEarningsBottomSheet(
+                                  context,
+                                  profileController,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: Dimensions.paddingSizeLarge,
+                                    vertical: Dimensions.paddingSizeSmall,
                                   ),
-                                ],
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    PriceConverterHelper.convertPrice(
-                                      profileController.profileModel?.balance ??
-                                          0,
-                                    ),
-                                    style: robotoMedium.copyWith(
-                                      color: Colors.white,
-                                      fontSize: Dimensions.fontSizeSmall,
-                                    ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black,
+                                    borderRadius: BorderRadius.circular(50),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.3),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        PriceConverterHelper.convertPrice(
+                                          profileController.profileModel?.balance ??
+                                              0,
+                                        ),
+                                        style: robotoMedium.copyWith(
+                                          color: Colors.white,
+                                          fontSize: Dimensions.fontSizeSmall,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(height: Dimensions.paddingSizeSmall),
+                            const CashProgressWidget(),
+                          ],
                         ),
                       ),
 
@@ -745,7 +805,6 @@ class HomeScreenState extends State<HomeScreen> {
       _orderPhase = 'none';
       _polylines.clear();
       _markers.clear();
-      _noMovementCount = 0;
       _estimatedArrivalTime = null;
       _stopMovementTimer();
     });
@@ -828,23 +887,16 @@ class HomeScreenState extends State<HomeScreen> {
   /// Soporta actualizaciones (ej. de dummy model a modelo real con datos de red).
   void showOrderRequest(OrderModel order) {
     if (widget.pendingRegistrationDashboard) return;
-    print("\n┌──────────────────────────────────────────────┐");
-    print("│  🏠 HomeScreen.showOrderRequest(${order.id})      │");
-    print("└──────────────────────────────────────────────┘");
-    print("[HomeScreen] mounted=$mounted");
-    print("[HomeScreen] _activeOrderRequest=${_activeOrderRequest?.id}");
-    print("[HomeScreen] _lastShownOrderId=$_lastShownOrderId");
-    print("[HomeScreen] _orderPhase=$_orderPhase");
-    print("[HomeScreen] order.storeLat=${order.storeLat}, order.storeName=${order.storeName}");
+    debugPrint("[HomeScreen] showOrderRequest(${order.id}) phase=$_orderPhase active=${_activeOrderRequest?.id}");
 
     if (!mounted) {
-      print("[HomeScreen] ⛔ NOT MOUNTED - returning");
+      debugPrint("[HomeScreen] ⛔ NOT MOUNTED - returning");
       return;
     }
 
     // Si ya tenemos un pedido activo con DIFERENTE ID, ignorar el nuevo
     if (_activeOrderRequest != null && _activeOrderRequest!.id != order.id) {
-       print("[HomeScreen] ⛔ IGNORED - active order already ${_activeOrderRequest!.id}");
+       debugPrint("[HomeScreen] ⛔ IGNORED - active order already ${_activeOrderRequest!.id}");
        return;
     }
 
@@ -852,19 +904,19 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Deduplicación para pedidos nuevos (no updates)
     if (!isUpdate && order.id != null && order.id == _lastShownOrderId) {
-      print("[HomeScreen] ⛔ IGNORED - duplicate orderId ${order.id}");
+      debugPrint("[HomeScreen] ⛔ IGNORED - duplicate orderId ${order.id}");
       return;
     }
     _lastShownOrderId = order.id;
 
-    print("[HomeScreen] ✅ ${isUpdate ? 'UPDATING' : 'SHOWING'} bottom sheet for order ${order.id}");
+    debugPrint("[HomeScreen] ✅ ${isUpdate ? 'UPDATING' : 'SHOWING'} order ${order.id}");
 
     // Reproducir alerta sonora solo si es un pedido nuevo (no en update)
     if (!isUpdate) {
       try {
         _governanceAudioPlayer.stop(); // Solo detener previas si las hay
       } catch (e) {
-        print("[HomeScreen] Error stopping audio: $e");
+        debugPrint("[HomeScreen] Error stopping audio: $e");
       }
     }
 
@@ -872,7 +924,7 @@ class HomeScreenState extends State<HomeScreen> {
       _activeOrderRequest = order;
       if (!isUpdate) _orderPhase = 'none';
     });
-    print("[HomeScreen] ✅ setState called - _activeOrderRequest is now ${_activeOrderRequest?.id}");
+    debugPrint("[HomeScreen] ✅ setState called - order now ${_activeOrderRequest?.id}");
 
     if (!isUpdate) widget.onOrderActiveStatusChanged?.call(true);
 
@@ -883,26 +935,39 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
 
-  void restoreActiveOrder(OrderModel order) {
+  void restoreActiveOrder(OrderModel order) async {
     if (_activeOrderRequest != null) return;
 
+    // Mostrar el estado local inmediatamente para respuesta visual rápida
     setState(() {
       _activeOrderRequest = order;
-      if (order.orderStatus == 'picked_up') {
-        _orderPhase = 'going_to_customer';
-      } else {
-        _orderPhase = 'going_to_store';
-      }
-      _startMovementTimer();
+      _orderPhase = order.orderStatus == 'picked_up'
+          ? 'going_to_customer'
+          : 'going_to_store';
     });
-    
+    widget.onOrderActiveStatusChanged?.call(true);
+
+    // Obtener datos frescos del servidor en paralelo
+    final OrderModel? fresh =
+        await Get.find<OrderController>().fetchOrderForNotification(order.id!);
+    if (!mounted) return;
+
+    final OrderModel resolved = fresh ?? order;
     Get.find<OrderController>().getOrderDetails(
-      order.id,
-      order.orderType == 'parcel',
+      resolved.id,
+      resolved.orderType == 'parcel',
     );
 
-    widget.onOrderActiveStatusChanged?.call(true);
-    setPolyline(order);
+    // Actualizar con datos reales y redibujar ruta
+    if (fresh != null) {
+      setState(() {
+        _activeOrderRequest = fresh;
+        _orderPhase = fresh.orderStatus == 'picked_up'
+            ? 'going_to_customer'
+            : 'going_to_store';
+      });
+    }
+    setPolyline(resolved);
   }
 
   bool get isOrderActive => _activeOrderRequest != null;
@@ -956,14 +1021,14 @@ class HomeScreenState extends State<HomeScreen> {
     List<LatLng> segment1Points = [dmLocation, storeLocation];
     List<LatLng> segment2Points = [storeLocation, destinationLocation];
 
-    Uint8List storeMarker = await _convertAssetToUnit8List(
-      Images.store,
-      width: 40,
-    );
-    Uint8List destinationMarker = await _convertAssetToUnit8List(
-      Images.homeDelivery,
-      width: 40,
-    );
+    // Usar marcadores precargados (rápido) o cargarlos si aún no están listos
+    Uint8List storeMarker = _cachedStoreMarker ??
+        await _convertAssetToUnit8List(Images.store, width: 40);
+    Uint8List destinationMarker = _cachedDestinationMarker ??
+        await _convertAssetToUnit8List(Images.homeDelivery, width: 40);
+    // Guardar en caché para la próxima vez
+    _cachedStoreMarker ??= storeMarker;
+    _cachedDestinationMarker ??= destinationMarker;
 
     // Guard: el widget puede haberse desmontado
     if (!mounted) return;
@@ -1194,64 +1259,8 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _startMovementTimer() {
-    _noMovementTimer?.cancel();
-    _noMovementCount = 0;
-    _lastLat = Get.find<ProfileController>().recordLocationBody?.latitude;
-    _lastLng = Get.find<ProfileController>().recordLocationBody?.longitude;
-
-    _noMovementTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
-      if (_orderPhase != 'going_to_store' &&
-          _orderPhase != 'going_to_customer') {
-        _stopMovementTimer();
-        return;
-      }
-
-      /*
-      // COMENTADO MIENTRAS TANTO PARA EVITAR INACTIVIDAD
-      double? currentLat =
-          Get.find<ProfileController>().recordLocationBody?.latitude;
-      double? currentLng =
-          Get.find<ProfileController>().recordLocationBody?.longitude;
-
-      if (currentLat != null &&
-          currentLng != null &&
-          _lastLat != null &&
-          _lastLng != null) {
-        double distance = _calculateDistance(
-          _lastLat!,
-          _lastLng!,
-          currentLat,
-          currentLng,
-        );
-
-        if (distance < 50) {
-          _noMovementCount++;
-          // A partir de 1.5 min (3 checks de 30s) empieza a sonar
-          if (_noMovementCount == 3) {
-            _governanceAudioPlayer.play(AssetSource('Dms_no_moving.mp3'));
-            showCustomSnackBar(
-              '¡Muévete pronto! Si no avanzas, el pedido se cancelará automáticamente',
-              isError: true,
-            );
-          } else if (_noMovementCount > 3 && _noMovementCount < 6) {
-            // Repetir cada 30s hasta llegar a los 3 min
-            _governanceAudioPlayer.play(AssetSource('Dms_no_moving.mp3'));
-          } else if (_noMovementCount >= 6) {
-            // Llegamos a los 3 min (6 checks de 30s)
-            // _performCancellation(); // COMENTADO TEMPORALMENTE
-            _showUnassignedDialog();
-          }
-        } else {
-          _noMovementCount = 0;
-          _lastLat = currentLat;
-          _lastLng = currentLng;
-        }
-      } else {
-        _lastLat = currentLat;
-        _lastLng = currentLng;
-      }
-      */
-    });
+    // Timer reservado para la lógica de inactividad (actualmente deshabilitada).
+    // Cuando se reactive, descomentar el bloque interno en esta función.
   }
 
   void _showUnassignedDialog() {
@@ -1305,7 +1314,7 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _stopMovementTimer() {
-    _noMovementTimer?.cancel();
+    // Reservado para cuando se reactive el timer de movimiento.
   }
 
   double _calculateDistance(
