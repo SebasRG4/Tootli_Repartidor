@@ -71,8 +71,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if(state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.paused) {
       _timer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      // Reanudar el polling al volver al primer plano si el pedido no ha terminado
+      final orderStatus = Get.find<OrderController>().orderModel?.orderStatus ?? '';
+      final isTerminal = orderStatus == 'delivered' ||
+          orderStatus == 'canceled' ||
+          orderStatus == 'returned' ||
+          orderStatus == 'failed';
+      if (!isTerminal) {
+        _startApiCalling();
+      }
     }
   }
 
@@ -107,12 +117,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
         }),
         body: SafeArea(
           child: GetBuilder<OrderController>(builder: (orderController) {
+            // Cancelar el timer si el pedido llegó a un estado terminal
+            final _terminalStatuses = {'delivered', 'canceled', 'returned', 'failed'};
+            if (_terminalStatuses.contains(orderController.orderModel?.orderStatus)) {
+              _timer?.cancel();
+            }
 
             OrderModel? controllerOrderModel = orderController.orderModel;
 
             bool restConfModel = Get.find<SplashController>().configModel!.orderConfirmationModel != 'deliveryman';
 
-            bool? parcel, pickedUp, cod, wallet, partialPay, offlinePay, digitalyPaid;
+            bool? parcel, pickedUp, cod, wallet, partialPay, offlinePay, digitalyPaid, isDelivered;
 
             bool showDeliveryConfirmImage = false;
 
@@ -174,6 +189,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
               offlinePay = controllerOrderModel.paymentMethod == 'offline_payment';
 
               showDeliveryConfirmImage = pickedUp && Get.find<SplashController>().configModel!.dmPictureUploadStatus! && controllerOrderModel.orderStatus != 'delivered';
+              isDelivered = controllerOrderModel.orderStatus == 'delivered';
             }
 
             return (orderController.orderDetailsModel != null && controllerOrderModel != null) ? Column(children: [
@@ -225,7 +241,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
                   SizedBox(height: parcel && order?.orderStatus == AppConstants.canceled && !(order?.parcelCancellation?.beforePickup == 1) ? Dimensions.paddingSizeLarge : 0),
 
-                  Row(children: [
+                  if (isDelivered != true) Row(children: [
                     Text('${digitalyPaid == true && controllerOrderModel.chargePayer != null ? 'paid_by'.tr : parcel ? 'charge_payer'.tr : 'item'.tr}:', style: robotoRegular),
                     const SizedBox(width: Dimensions.paddingSizeExtraSmall),
                     Text(
@@ -243,7 +259,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     )
                   ]),
 
-                  orderController.orderDetailsModel!.isNotEmpty && orderController.orderDetailsModel![0].itemDetails != null && orderController.orderDetailsModel![0].itemDetails!.moduleType == 'food' ? Column(children: [
+                  if (isDelivered != true) orderController.orderDetailsModel!.isNotEmpty && orderController.orderDetailsModel![0].itemDetails != null && orderController.orderDetailsModel![0].itemDetails!.moduleType == 'food' ? Column(children: [
                     const SizedBox(height: Dimensions.paddingSizeLarge),
                     Row(children: [
                       Text('${'cutlery'.tr} ', style: robotoRegular),
@@ -260,14 +276,14 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                   Divider(thickness: 1, color: Theme.of(context).disabledColor.withValues(alpha: 0.05)),
                   SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
-                  controllerOrderModel.unavailableItemNote != null ?
+                  isDelivered != true && controllerOrderModel.unavailableItemNote != null ?
                     CustomOrderDetailsCard(
                       title: '${'unavailable_item_note'.tr}: ' ,
                       metaValue: controllerOrderModel.unavailableItemNote!,
                     ) : const SizedBox(),
                   SizedBox(height: controllerOrderModel.unavailableItemNote != null ? Dimensions.paddingSizeSmall : 0),
 
-                  controllerOrderModel.deliveryInstruction != null ?
+                  isDelivered != true && controllerOrderModel.deliveryInstruction != null ?
                   CustomOrderDetailsCard(
                     title: '${'delivery_instruction'.tr}: ' ,
                     metaValue: controllerOrderModel.deliveryInstruction!.tr,
@@ -275,7 +291,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
 
                   SizedBox(height: controllerOrderModel.deliveryInstruction != null ? Dimensions.paddingSizeSmall : 0),
 
-                  controllerOrderModel.bringChangeAmount != null && controllerOrderModel.bringChangeAmount! > 0 ?
+                  isDelivered != true && controllerOrderModel.bringChangeAmount != null && controllerOrderModel.bringChangeAmount! > 0 ?
                   Container(
                     width: double.infinity,
                     margin: EdgeInsets.only(top: Dimensions.paddingSizeSmall),
@@ -304,7 +320,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     longitude: parcel ? controllerOrderModel.deliveryAddress!.longitude : controllerOrderModel.storeLng,
                     showButton: (controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
                         && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded'),
-                    isStore: parcel ? false : true, isChatAllow: showChatPermission,
+                    isStore: parcel ? false : true, isChatAllow: showChatPermission && isDelivered != true,
+                    showCallButton: isDelivered != true,
                     messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
                         orderId: controllerOrderModel.id, vendorId: orderController.orderDetailsModel![0].vendorId,
@@ -327,9 +344,11 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                     latitude: parcel ? controllerOrderModel.receiverDetails!.latitude : controllerOrderModel.deliveryAddress!.latitude,
                     longitude: parcel ? controllerOrderModel.receiverDetails!.longitude : controllerOrderModel.deliveryAddress!.longitude,
                     showButton: controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
-                        && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded',
+                        && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded'
+                        && controllerOrderModel.orderStatus != 'returned',
                     isStore: parcel ? false : true,
-                    isChatAllow: showChatPermission || controllerOrderModel.tootliDirectTrackable == true,
+                    isChatAllow: (showChatPermission || controllerOrderModel.tootliDirectTrackable == true) && isDelivered != true,
+                    showCallButton: isDelivered != true,
                     messageOnTap: () {
                       final int? oid = controllerOrderModel.id;
                       final bool useTootliDirectChat =
@@ -374,7 +393,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                   ),
                   const SizedBox(height: Dimensions.paddingSizeLarge),
 
-                  parcel ? Container(
+                  isDelivered != true && parcel ? Container(
                     padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
                     decoration: BoxDecoration(
                       color: Theme.of(context).cardColor,
@@ -625,7 +644,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                   ]) : const SizedBox(),
 
 
-                  Container(
+                  isDelivered == true ? Container(
+                    margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
+                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                      boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
+                    ),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Ganancia Neta por este Viaje'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
+                      SizedBox(height: Dimensions.paddingSizeSmall),
+                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text('Ganancia limpia (Envío + Propina)'.tr, style: robotoRegular),
+                        Text(
+                          PriceConverterHelper.convertPrice((order?.originalDeliveryCharge ?? 0) + (order?.dmTips ?? 0)),
+                          style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor),
+                        ),
+                      ]),
+                    ]),
+                  ) : Container(
                     margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
                     padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
                     decoration: BoxDecoration(

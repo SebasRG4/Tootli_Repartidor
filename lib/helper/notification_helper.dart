@@ -137,14 +137,7 @@ class NotificationHelper {
     );
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("\n╔══════════════════════════════════════════════╗");
-      print("║  🔔 FCM onMessage RECEIVED                   ║");
-      print("╚══════════════════════════════════════════════╝");
-      print("[FCM-DEBUG] Raw data: ${message.data}");
-      print("[FCM-DEBUG] data['type']: ${message.data['type']}");
-      print("[FCM-DEBUG] data['order_id']: ${message.data['order_id']}");
-      print("[FCM-DEBUG] notification title: ${message.notification?.title}");
-      print("[FCM-DEBUG] notification body: ${message.notification?.body}");
+      debugPrint("[FCM] onMessage: type=${message.data['type']} order_id=${message.data['order_id']}");
 
       // Normalizar tipo y orderId para soportar distintas claves desde backend
       final String rawType = (message.data['type'] ??
@@ -218,16 +211,13 @@ class NotificationHelper {
           Get.find<NotificationController>().getNotificationList();
         } catch (_) {}
       } else if (type == 'new_order' || type == 'order_request' || type == 'order_status') {
-        print("[FCM-DEBUG] ✅ MATCHED order type: '$type'");
-        print("[FCM-DEBUG] notifOrderId = $notifOrderId");
-        print("[FCM-DEBUG] OrderNotificationService callback registered: ${OrderNotificationService.instance.hasCallback}");
+        debugPrint("[FCM] ✅ MATCHED order type: '$type' orderId=$notifOrderId");
         if (notifOrderId != null) {
-          print("[FCM-DEBUG] 🚀 CALLING OrderNotificationService.notifyOrderRequest($notifOrderId)");
+          debugPrint("[FCM] 🚀 CALLING OrderNotificationService.notifyOrderRequest($notifOrderId)");
           OrderNotificationService.instance.notifyOrderRequest(notifOrderId);
-          print("[FCM-DEBUG] ✅ notifyOrderRequest CALLED successfully");
         } else {
-          print(
-            "[FCM-DEBUG] ⚠️ new_order/order_request recibido SIN orderId válido. "
+          debugPrint(
+            "[FCM] ⚠️ new_order/order_request recibido SIN orderId válido. "
             "Payload: ${message.data}",
           );
         }
@@ -258,7 +248,7 @@ class NotificationHelper {
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       if (kDebugMode) {
-        print("onOpenApp message type:${message.data['type']}");
+        debugPrint("onOpenApp message type:${message.data['type']}");
       }
       try {
         if (message.data.isNotEmpty) {

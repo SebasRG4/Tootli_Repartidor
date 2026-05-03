@@ -10,4 +10,6 @@ abstract class ProfileRepositoryInterface implements RepositoryInterface {
   Future<void> recordWebSocketLocation(RecordLocationBodyModel recordLocationBody);
   Future<dynamic> recordLocation(RecordLocationBodyModel recordLocationBody);
   Future<dynamic> deleteDriver();
+  Future<dynamic> getOfflinePaymentMethodList();
+  Future<dynamic> makeOfflinePayment(Map<String, String> data);
 }

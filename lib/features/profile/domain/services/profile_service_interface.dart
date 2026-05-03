@@ -14,4 +14,6 @@ abstract class ProfileServiceInterface {
   Future<ResponseModel> deleteDriver();
   void checkPermission(Function callback);
   Future<String> addressPlaceMark(Position locationResult);
+  Future<dynamic> getOfflinePaymentMethodList();
+  Future<dynamic> makeOfflinePayment(Map<String, String> data);
 }

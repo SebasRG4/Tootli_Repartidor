@@ -30,12 +30,12 @@ class OrderNotificationService {
 
   /// DashboardScreen llama esto en initState para registrar el listener.
   set onOrderRequestTapped(void Function(int orderId)? callback) {
-    print("[OrderNotifService] 🔧 onOrderRequestTapped SET (callback is ${callback != null ? 'NOT null' : 'null'})");
+    debugPrint("[OrderNotifService] 🔧 onOrderRequestTapped SET (callback is ${callback != null ? 'NOT null' : 'null'})");
     _onOrderRequestTapped = callback;
     if (callback != null && _pendingOrderId != null) {
       final id = _pendingOrderId!;
       _pendingOrderId = null;
-      print("[OrderNotifService] 📦 Dispatching PENDING order $id to newly registered callback");
+      debugPrint("[OrderNotifService] 📦 Dispatching PENDING order $id to newly registered callback");
       Future.microtask(() => callback(id));
     }
   }
@@ -51,7 +51,7 @@ class OrderNotificationService {
       final session = await AudioSession.instance;
       await session.setActive(true);
     } catch (e) {
-      print("[OrderNotifService] ⚠️ AudioSession setActive: $e");
+      debugPrint("[OrderNotifService] ⚠️ AudioSession setActive: $e");
     }
     if (!kIsWeb && Platform.isAndroid) {
       try {
@@ -66,14 +66,14 @@ class OrderNotificationService {
           ),
         );
       } catch (e) {
-        print("[OrderNotifService] ⚠️ setAudioContext: $e");
+        debugPrint("[OrderNotifService] ⚠️ setAudioContext: $e");
       }
     }
     try {
       await _audioPlayer.stop();
       await _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
     } catch (e) {
-      print("[OrderNotifService] ⚠️ Could not play audio: $e");
+      debugPrint("[OrderNotifService] ⚠️ Could not play audio: $e");
     }
   }
 
@@ -83,7 +83,7 @@ class OrderNotificationService {
     // 🛡️ Deduplicación Híbrida: Si este orderId llegó en los últimos minutos
     // por Websocket o FCM, lo ignoramos para no repetir el Bottom Sheet ni el sonido.
     if (_processedOrderIds.contains(orderId)) {
-      print("[OrderNotifService] 🚫 DUPLICATE orderId $orderId ignored (Híbrido FCM/WS).");
+      debugPrint("[OrderNotifService] 🚫 DUPLICATE orderId $orderId ignored (Híbrido FCM/WS).");
       return;
     }
     
@@ -92,15 +92,15 @@ class OrderNotificationService {
       _processedOrderIds.removeAt(0); // keep memory light
     }
 
-    print("[OrderNotifService] 📨 notifyOrderRequest($orderId) called");
+    debugPrint("[OrderNotifService] 📨 notifyOrderRequest($orderId) called");
     playOrderRequestAlertSound();
 
-    print("[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}");
+    debugPrint("[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}");
     if (_onOrderRequestTapped != null) {
-      print("[OrderNotifService] ✅ Calling _onOrderRequestTapped($orderId)");
+      debugPrint("[OrderNotifService] ✅ Calling _onOrderRequestTapped($orderId)");
       _onOrderRequestTapped!(orderId);
     } else {
-      print("[OrderNotifService] ⚠️ No callback! Saving $orderId as pending");
+      debugPrint("[OrderNotifService] ⚠️ No callback! Saving $orderId as pending");
       _pendingOrderId = orderId;
     }
   }
@@ -110,7 +110,16 @@ class OrderNotificationService {
     try {
       _audioPlayer.stop();
     } catch (e) {
-      print("[OrderNotifService] ⚠️ Could not stop audio: $e");
+      debugPrint("[OrderNotifService] ⚠️ Could not stop audio: $e");
     }
+  }
+
+  /// Sólo para usar en tests unitarios. Limpia el estado interno del singleton.
+  /// NO llamar en código de producción.
+  // ignore: invalid_use_of_visible_for_testing_member
+  void resetForTesting() {
+    _pendingOrderId = null;
+    _processedOrderIds.clear();
+    _onOrderRequestTapped = null;
   }
 }

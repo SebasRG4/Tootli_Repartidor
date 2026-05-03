@@ -4,6 +4,7 @@ import 'package:sixam_mart_delivery/features/profile/controllers/profile_control
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
+import 'package:sixam_mart_delivery/features/my_account/widgets/offline_payment_bottom_sheet_widget.dart';
 
 class CashProgressWidget extends StatefulWidget {
   const CashProgressWidget({super.key});
@@ -144,6 +145,35 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
                   style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).textTheme.bodyLarge!.color),
                   textAlign: TextAlign.center,
                 ),
+                if (profile.showPayNowButton == true) ...[
+                  const SizedBox(height: Dimensions.paddingSizeDefault),
+                  InkWell(
+                    onTap: () {
+                      showModalBottomSheet(
+                        isScrollControlled: true, useRootNavigator: true, context: context,
+                        backgroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.only(topLeft: Radius.circular(Dimensions.radiusExtraLarge), topRight: Radius.circular(Dimensions.radiusExtraLarge)),
+                        ),
+                        builder: (context) {
+                          return ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+                            child: OfflinePaymentBottomSheetWidget(amount: cashInHands),
+                          );
+                        },
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeSmall),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text('pay_the_due'.tr, style: robotoMedium.copyWith(color: Colors.white)),
+                    ),
+                  ),
+                ],
               ],
             ],
           ),

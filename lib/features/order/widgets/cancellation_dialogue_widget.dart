@@ -6,8 +6,6 @@ import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_cancellation_body.dart';
-import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
-import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 
@@ -88,9 +86,9 @@ class _CancellationDialogueWidgetState
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+        borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
       ),
-      insetPadding: const EdgeInsets.all(30),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
       clipBehavior: Clip.antiAliasWithSaveLayer,
       child: GetBuilder<OrderController>(
         builder: (orderController) {
@@ -99,81 +97,90 @@ class _CancellationDialogueWidgetState
           final bool hasCatalog = reasons != null && reasons.isNotEmpty;
           final bool loadingReasons = reasons == null;
 
-          return SizedBox(
+          return Container(
             width: 500,
-            height: MediaQuery.of(context).size.height * 0.72,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                // Premium Header
                 Container(
-                  width: 500,
-                  padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 20,
+                  ),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.05),
-                    border: Border(
-                      bottom: BorderSide(color: Colors.red.withOpacity(0.1)),
+                    gradient: LinearGradient(
+                      colors: [Colors.red.shade700, Colors.red.shade500],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                  child: Row(
+                  child: Column(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.white.withOpacity(0.2),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.red,
-                          size: 24,
+                          Icons.report_problem_rounded,
+                          color: Colors.white,
+                          size: 32,
                         ),
                       ),
-                      const SizedBox(width: Dimensions.paddingSizeSmall),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Solicitar Cancelación',
-                              style: robotoBold.copyWith(
-                                fontSize: Dimensions.fontSizeLarge,
-                                color: Colors.red,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'El equipo de soporte evaluará tu solicitud.',
-                              style: robotoRegular.copyWith(
-                                fontSize: Dimensions.fontSizeSmall,
-                                color: Theme.of(context).disabledColor,
-                              ),
-                            ),
-                          ],
+                      const SizedBox(height: 12),
+                      Text(
+                        'Solicitar Cancelación'.toUpperCase(),
+                        style: robotoBold.copyWith(
+                          fontSize: 20,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'El equipo de soporte evaluará tu solicitud',
+                        style: robotoRegular.copyWith(
+                          fontSize: 13,
+                          color: Colors.white.withOpacity(0.9),
                         ),
                       ),
                     ],
                   ),
                 ),
-                Expanded(
+
+                Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Dimensions.paddingSizeSmall,
-                    ),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Text(
+                          'Selecciona el motivo:',
+                          style: robotoMedium.copyWith(
+                            fontSize: 16,
+                            color: Theme.of(context).textTheme.bodyLarge?.color,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         if (loadingReasons)
                           const Padding(
-                            padding: EdgeInsets.all(24),
+                            padding: EdgeInsets.symmetric(vertical: 40),
                             child: Center(child: CircularProgressIndicator()),
                           )
                         else if (hasCatalog)
-                          ListView.builder(
+                          ListView.separated(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            padding: const EdgeInsets.symmetric(
-                              vertical: Dimensions.paddingSizeSmall,
-                            ),
                             itemCount: reasons.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final r = reasons[index];
                               final bool selected =
@@ -186,32 +193,38 @@ class _CancellationDialogueWidgetState
                                     r.reason,
                                   );
                                 },
-                                borderRadius: BorderRadius.circular(10),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 15,
-                                    vertical: 12,
-                                  ),
-                                  margin: const EdgeInsets.only(bottom: 8),
+                                borderRadius: BorderRadius.circular(15),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
                                     color: selected
                                         ? Theme.of(
                                             context,
-                                          ).primaryColor.withOpacity(0.05)
+                                          ).primaryColor.withOpacity(0.08)
                                         : Theme.of(context).cardColor,
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(15),
                                     border: Border.all(
                                       color: selected
                                           ? Theme.of(context).primaryColor
                                           : Theme.of(
                                               context,
-                                            ).disabledColor.withOpacity(0.2),
-                                      width: selected ? 1.5 : 1,
+                                            ).disabledColor.withOpacity(0.1),
+                                      width: selected ? 2 : 1,
                                     ),
+                                    boxShadow: selected
+                                        ? [
+                                            BoxShadow(
+                                              color: Theme.of(
+                                                context,
+                                              ).primaryColor.withOpacity(0.1),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
                                   child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
                                     children: [
                                       Expanded(
                                         child: Column(
@@ -220,7 +233,7 @@ class _CancellationDialogueWidgetState
                                           children: [
                                             Text(
                                               r.reason ?? '',
-                                              style: robotoRegular.copyWith(
+                                              style: robotoMedium.copyWith(
                                                 color: selected
                                                     ? Theme.of(
                                                         context,
@@ -228,15 +241,9 @@ class _CancellationDialogueWidgetState
                                                     : Theme.of(context)
                                                           .textTheme
                                                           .bodyLarge
-                                                          ?.color
-                                                          ?.withOpacity(0.8),
-                                                fontWeight: selected
-                                                    ? FontWeight.w600
-                                                    : FontWeight.w400,
-                                                fontSize: 14,
+                                                          ?.color,
+                                                fontSize: 15,
                                               ),
-                                              maxLines: 4,
-                                              overflow: TextOverflow.ellipsis,
                                             ),
                                             if (r.exemptStrikeReview)
                                               Padding(
@@ -248,30 +255,27 @@ class _CancellationDialogueWidgetState
                                                       .tr,
                                                   style: robotoRegular.copyWith(
                                                     fontSize: 11,
-                                                    color: Theme.of(
-                                                      context,
-                                                    ).hintColor,
+                                                    color:
+                                                        Colors.green.shade600,
+                                                    fontStyle: FontStyle.italic,
                                                   ),
                                                 ),
                                               ),
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      if (selected)
-                                        Icon(
-                                          Icons.check_circle,
-                                          color: Theme.of(context).primaryColor,
-                                          size: 22,
-                                        )
-                                      else
-                                        Icon(
-                                          Icons.radio_button_unchecked,
-                                          color: Theme.of(
-                                            context,
-                                          ).disabledColor.withOpacity(0.5),
-                                          size: 22,
-                                        ),
+                                      const SizedBox(width: 12),
+                                      Icon(
+                                        selected
+                                            ? Icons.check_circle_rounded
+                                            : Icons.circle_outlined,
+                                        color: selected
+                                            ? Theme.of(context).primaryColor
+                                            : Theme.of(
+                                                context,
+                                              ).disabledColor.withOpacity(0.3),
+                                        size: 24,
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -279,71 +283,96 @@ class _CancellationDialogueWidgetState
                             },
                           )
                         else
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: Dimensions.paddingSizeSmall,
-                            ),
-                            child: TextField(
-                              controller: _legacyReasonController,
-                              maxLines: 3,
-                              decoration: InputDecoration(
-                                labelText:
-                                    'dm_cancel_legacy_reason_required'.tr,
-                                border: const OutlineInputBorder(),
+                          TextField(
+                            controller: _legacyReasonController,
+                            maxLines: 2,
+                            decoration: InputDecoration(
+                              labelText: 'Escribe el motivo aquí...',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
+                              filled: true,
+                              fillColor: Theme.of(
+                                context,
+                              ).disabledColor.withOpacity(0.05),
                             ),
                           ),
-                        const SizedBox(height: Dimensions.paddingSizeDefault),
+
+                        const SizedBox(height: 24),
                         Text(
-                          'Detalles adicionales (opcional)',
-                          style: robotoMedium.copyWith(
-                            fontSize: Dimensions.fontSizeDefault,
-                          ),
+                          'Detalles adicionales (Opcional)',
+                          style: robotoMedium.copyWith(fontSize: 16),
                         ),
-                        const SizedBox(height: Dimensions.paddingSizeSmall),
+                        const SizedBox(height: 12),
                         TextField(
                           controller: _detailController,
                           maxLines: 3,
                           decoration: InputDecoration(
-                            hintText: 'Describe brevemente la situación...',
+                            hintText:
+                                'Ej. Accidente vehicular, llanta ponchada...',
+                            hintStyle: robotoRegular.copyWith(
+                              color: Theme.of(context).hintColor,
+                            ),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(
-                                Dimensions.radiusDefault,
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Theme.of(
+                                  context,
+                                ).disabledColor.withOpacity(0.2),
                               ),
                             ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Theme.of(context).primaryColor,
+                                width: 2,
+                              ),
+                            ),
+                            filled: true,
+                            fillColor: Theme.of(context).cardColor,
                           ),
                         ),
-                        const SizedBox(height: Dimensions.paddingSizeSmall),
                       ],
                     ),
                   ),
                 ),
+
+                // Footer Buttons
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Dimensions.fontSizeDefault,
-                    vertical: Dimensions.paddingSizeSmall,
-                  ),
+                  padding: const EdgeInsets.all(20),
                   child: !orderController.isLoading
                       ? Row(
                           children: [
                             Expanded(
-                              child: TextButton(
+                              child: OutlinedButton(
                                 onPressed: () => Get.back(),
-                                child: Text(
-                                  'continue_delivery'.tr,
-                                  style: robotoMedium.copyWith(
-                                    fontSize: Dimensions.fontSizeLarge,
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 15,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  side: BorderSide(
                                     color: Theme.of(context).primaryColor,
+                                  ),
+                                ),
+                                child: Text(
+                                  'Volver'.tr,
+                                  style: robotoBold.copyWith(
+                                    color: Theme.of(context).primaryColor,
+                                    fontSize: 16,
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(width: Dimensions.paddingSizeSmall),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: CustomButtonWidget(
-                                buttonText: 'Contactar a Soporte',
+                                buttonText: 'Enviar Solicitud',
+                                height: 50,
+                                radius: 12,
 
-                                radius: Dimensions.radiusDefault,
                                 onPressed: loadingReasons
                                     ? null
                                     : () => _submit(orderController),
@@ -351,7 +380,10 @@ class _CancellationDialogueWidgetState
                             ),
                           ],
                         )
-                      : const Center(child: CircularProgressIndicator()),
+                      : const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: CircularProgressIndicator(),
+                        ),
                 ),
               ],
             ),

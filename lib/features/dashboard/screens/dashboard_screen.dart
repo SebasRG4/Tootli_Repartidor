@@ -103,10 +103,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     // centralizadas en NotificationHelper vía OrderNotificationService.
     OrderNotificationService.instance.onOrderRequestTapped = (int orderId) {
       if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
-      print("[Dashboard] \n┌────────────────────────────────────────┐");
-      print("[Dashboard] │  📩 CALLBACK FIRED for order $orderId   │");
-      print("[Dashboard] └────────────────────────────────────────┘");
-      print("[Dashboard] mounted=$mounted, _pageIndex=$_pageIndex");
+      debugPrint("[Dashboard] 📩 CALLBACK FIRED for order $orderId");
       if (!mounted) return;
       if (_pageIndex != 0) _setPage(0);
       _triggerShowOrder(orderId);
@@ -145,15 +142,14 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   /// Busca el [OrderModel] y lo muestra en HomeScreen con la menor latencia posible.
   /// Implementa una estrategia de "Respuesta Instantánea" abriendo el UI inmediatamente.
   void _triggerShowOrder(int orderId) {
-    print("[Dashboard] _triggerShowOrder($orderId) called");
-    print("[Dashboard] _shownOrderIds = $_shownOrderIds");
+    debugPrint("[Dashboard] _triggerShowOrder($orderId)");
     // ── Paso 0: Deduplicación INMEDIATA (antes de cualquier async) ──────────
     if (_shownOrderIds.contains(orderId)) {
-      print("[Dashboard] ⛔ orderId=$orderId BLOCKED by _shownOrderIds dedup");
+      debugPrint("[Dashboard] ⛔ orderId=$orderId BLOCKED by dedup");
       return;
     }
     _shownOrderIds.add(orderId);
-    print("[Dashboard] ✅ orderId=$orderId passed dedup check");
+    debugPrint("[Dashboard] ✅ orderId=$orderId passed dedup check");
 
     // ── Paso 1: Respuesta Instantánea (Shell Loading) ──────────────────────
     debugPrint("[FCM] orderId=$orderId disparando UI instantánea...");
@@ -225,17 +221,17 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     final homeState = _homeScreenKey.currentState;
     
-    print("[Dashboard] _dispatchOrderToHome($id) - homeState is ${homeState != null ? 'NOT null' : 'NULL'}");
+    debugPrint("[Dashboard] _dispatchOrderToHome($id) - homeState=${homeState != null ? 'ok' : 'null'}");
     
     if (homeState == null) {
-      print("[Dashboard] ⚠️ HomeScreenState is null, retrying next frame for order $id");
+      debugPrint("[Dashboard] ⚠️ HomeScreenState es null, reintentando en siguiente frame para order $id");
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _dispatchOrderToHome(order);
       });
       return;
     }
     
-    print("[Dashboard] ✅ DISPATCHING order $id to HomeScreen.showOrderRequest()");
+    debugPrint("[Dashboard] ✅ DISPATCHING order $id a HomeScreen");
     homeState.showOrderRequest(order);
   }
 
@@ -441,6 +437,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     child: Column(
                       children: [
                         // DEBUG: solo UI + polilínea; no es FCM/API ni OrderNotificationService (ver HomeScreenState.simulateOrderRequest).
+                        /*
                         FloatingActionButton.small(
                           heroTag: 'bug_button',
                           onPressed: () {
@@ -453,6 +450,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                           ),
                         ),
                         const SizedBox(height: Dimensions.paddingSizeSmall),
+                        */
 
                         // Location Button
                         FloatingActionButton.small(

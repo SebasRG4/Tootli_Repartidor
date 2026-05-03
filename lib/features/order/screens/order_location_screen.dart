@@ -43,7 +43,8 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
 
           GoogleMap(
             initialCameraPosition: CameraPosition(target: LatLng(
-              double.parse(widget.orderModel.deliveryAddress?.latitude ?? '0'), double.parse(widget.orderModel.deliveryAddress?.longitude ?? '0'),
+              double.parse((widget.orderModel.orderStatus == 'returned' && !parcel) ? widget.orderModel.storeLat ?? '0' : widget.orderModel.deliveryAddress?.latitude ?? '0'),
+              double.parse((widget.orderModel.orderStatus == 'returned' && !parcel) ? widget.orderModel.storeLng ?? '0' : widget.orderModel.deliveryAddress?.longitude ?? '0'),
             ), zoom: 16),
             minMaxZoomPreference: const MinMaxZoomPreference(0, 16),
             zoomControlsEnabled: false,
@@ -131,7 +132,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             markerId: const MarkerId('destination'),
             position: LatLng(deliveryLat, deliveryLng),
             infoWindow: InfoWindow(
-              title: parcel ? 'Sender' : 'Destination',
+              title: parcel ? 'Sender' : orderModel.orderStatus == 'returned' ? 'Return Destination' : 'Destination',
               snippet: orderModel.deliveryAddress?.address,
             ),
             icon: BitmapDescriptor.bytes(destinationImageData, height: 40, width: 40),
@@ -157,7 +158,7 @@ class _OrderLocationScreenState extends State<OrderLocationScreen> {
             markerId: const MarkerId('store'),
             position: LatLng(storeLat, storeLng),
             infoWindow: InfoWindow(
-              title: orderModel.storeName,
+              title: orderModel.orderStatus == 'returned' ? '${'return_to'.tr} ${orderModel.storeName}' : orderModel.storeName,
               snippet: orderModel.storeAddress,
             ),
             icon: BitmapDescriptor.bytes(restaurantImageData, height: 40, width: 40),

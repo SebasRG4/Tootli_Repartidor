@@ -96,6 +96,24 @@ class ProfileRepository implements ProfileRepositoryInterface {
     return responseModel;
   }
 
+  @override
+  Future<Response> getOfflinePaymentMethodList() async {
+    return await apiClient.getData(AppConstants.offlinePaymentMethodListUri);
+  }
+
+  @override
+  Future<ResponseModel> makeOfflinePayment(Map<String, String> data) async {
+    ResponseModel responseModel;
+    data.addAll({'token': _getUserToken()});
+    Response response = await apiClient.postData(AppConstants.makeOfflinePaymentUri, data, handleError: false);
+    if (response.statusCode == 200) {
+      responseModel = ResponseModel(true, response.body['message']);
+    } else {
+      responseModel = ResponseModel(false, response.body['errors'][0]['message']);
+    }
+    return responseModel;
+  }
+
   String _getUserToken() {
     return sharedPreferences.getString(AppConstants.token) ?? "";
   }

@@ -117,4 +117,14 @@ class ProfileService implements ProfileServiceInterface {
       callback();
     }
   }
+  @override
+  Future<dynamic> getOfflinePaymentMethodList() async {
+    return await profileRepositoryInterface.getOfflinePaymentMethodList();
+  }
+
+  @override
+  Future<dynamic> makeOfflinePayment(Map<String, String> data) async {
+    return await profileRepositoryInterface.makeOfflinePayment(data);
+  }
+
 }

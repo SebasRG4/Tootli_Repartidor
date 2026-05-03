@@ -12,6 +12,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/domain/services/profile_service_interface.dart';
 import 'package:sixam_mart_delivery/helper/profile_selfie_composer.dart';
+import 'package:sixam_mart_delivery/features/my_account/domain/models/offline_payment_method_model.dart';
 
 class ProfileController extends GetxController implements GetxService {
   final ProfileServiceInterface profileServiceInterface;
@@ -211,5 +212,29 @@ class ProfileController extends GetxController implements GetxService {
   void setBackgroundNotificationActive(bool isActive) {
     _backgroundNotification = isActive;
     update();
+  }
+
+  List<OfflinePaymentMethodModel>? _offlinePaymentMethods;
+  List<OfflinePaymentMethodModel>? get offlinePaymentMethods => _offlinePaymentMethods;
+
+  Future<void> getOfflinePaymentMethodList() async {
+    Response response = await profileServiceInterface.getOfflinePaymentMethodList();
+    if (response.statusCode == 200) {
+      _offlinePaymentMethods = [];
+      response.body.forEach((method) => _offlinePaymentMethods!.add(OfflinePaymentMethodModel.fromJson(method)));
+    }
+    update();
+  }
+
+  Future<ResponseModel> makeOfflinePayment(Map<String, String> data) async {
+    _isLoading = true;
+    update();
+    ResponseModel responseModel = await profileServiceInterface.makeOfflinePayment(data);
+    if (responseModel.isSuccess) {
+      getProfile();
+    }
+    _isLoading = false;
+    update();
+    return responseModel;
   }
 }

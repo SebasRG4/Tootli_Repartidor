@@ -52,6 +52,9 @@
   "refund_requested": "Reembolso solicitado",
   "refunded": "Reintegrado",
   "returned": "Devuelto",
+  "swipe_to_confirm_return": "Desliza para confirmar retorno",
+  "Invalid_return_otp": "PIN de retorno inválido",
+  "return_to": "Regresar a",
   "failed": "Fallido",
   "canceled": "Cancelado",
   "delivered_at": "Entregado en",
@@ -741,5 +744,11 @@
   "profile_selfie_guide_tip_3": "Busca luz uniforme de frente; evita contraluz fuerte o sombras duras.",
   "profile_selfie_guide_capture": "Capturar foto",
   "profile_selfie_guide_preparing": "Preparando cámara…",
-  "profile_selfie_guide_error": "No se pudo abrir la cámara. Cierra otras apps que la usen e inténtalo de nuevo."
+  "profile_selfie_guide_error": "No se pudo abrir la cámara. Cierra otras apps que la usen e inténtalo de nuevo.",
+  "select_offline_payment_method": "Seleccionar método de pago offline",
+  "no_offline_payment_method_available": "No hay métodos de pago offline disponibles",
+  "payment_amount": "Monto del pago",
+  "payment_instructions": "Instrucciones de pago",
+  "fill_the_form_below": "Complete el siguiente formulario",
+  "is_required": "es obligatorio"
 }

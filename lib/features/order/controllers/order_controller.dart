@@ -318,7 +318,7 @@ class OrderController extends GetxController implements GetxService {
     if (offset == 1) {
       _offsetList = [];
       _offset = 1;
-      _completedOrderList = null;
+      _currentOrderList = null;
       if (willUpdate) {
         update();
       }
@@ -378,13 +378,17 @@ class OrderController extends GetxController implements GetxService {
     _isLoading = true;
     update();
     final bool isParcel = parcel ?? false;
-    final bool isStoreCancel =
-        status == AppConstants.canceled && !isParcel;
+    final bool isStoreCancel = status == AppConstants.canceled && !isParcel;
 
     List<MultipartBody> multiParts = orderServiceInterface
         .prepareOrderProofImages(_pickedPrescriptions);
     if (isStoreCancel) {
-      multiParts = [...multiParts, ...orderServiceInterface.prepareCancelEvidenceImages(_pickedCancelEvidence)];
+      multiParts = [
+        ...multiParts,
+        ...orderServiceInterface.prepareCancelEvidenceImages(
+          _pickedCancelEvidence,
+        ),
+      ];
       if (_cancelAudio != null) {
         multiParts.add(MultipartBody('cancel_audio', _cancelAudio));
       }
@@ -417,11 +421,8 @@ class OrderController extends GetxController implements GetxService {
       cancelLat: isStoreCancel ? cancelLat : null,
       cancelLng: isStoreCancel ? cancelLng : null,
     );
-    final ResponseModel responseModel =
-        await orderServiceInterface.updateOrderStatus(
-      updateStatusBody,
-      multiParts,
-    );
+    final ResponseModel responseModel = await orderServiceInterface
+        .updateOrderStatus(updateStatusBody, multiParts);
 
     if (responseModel.isSuccess) {
       _pickedPrescriptions = [];
@@ -451,7 +452,8 @@ class OrderController extends GetxController implements GetxService {
           _selectedRunningStatus = 'all';
         }
 
-        getRunningOrders(offset);
+        // Siempre recargamos desde página 1 para evitar mostrar página incorrecta
+        getRunningOrders(1);
         getOrderCount('current');
         currentOrder.orderStatus = status;
       }
@@ -475,7 +477,9 @@ class OrderController extends GetxController implements GetxService {
   Future<bool> ignoreOrderApi(int orderId) async {
     _isLoading = true;
     update();
-    ResponseModel responseModel = await orderServiceInterface.ignoreOrderApi(orderId);
+    ResponseModel responseModel = await orderServiceInterface.ignoreOrderApi(
+      orderId,
+    );
     if (responseModel.isSuccess) {
       Get.back(); // close the bottom sheet
       Get.find<ProfileController>().getProfile();
@@ -794,6 +798,7 @@ class OrderController extends GetxController implements GetxService {
       }
     }
     _isLoading = false;
+    update(); // Notificar UI para que pinte los nuevos contadores
   }
 
   void setHistoryOrderStatus(String status) {
@@ -888,8 +893,8 @@ class OrderController extends GetxController implements GetxService {
 
     final String addr = order?.orderType == 'parcel'
         ? (order?.receiverDetails?.address ??
-            order?.deliveryAddress?.address ??
-            '—')
+              order?.deliveryAddress?.address ??
+              '—')
         : (order?.deliveryAddress?.address ?? '—');
     buf.writeln('${'dm_cancel_support_address_label'.tr}: $addr');
 
@@ -903,7 +908,8 @@ class OrderController extends GetxController implements GetxService {
       );
     }
 
-    final bool snapshotForThisOrder = _cancelContactSnapshotOrderId != null &&
+    final bool snapshotForThisOrder =
+        _cancelContactSnapshotOrderId != null &&
         _cancelContactSnapshotOrderId == orderId;
     final bool isParcel = order?.orderType == 'parcel';
 
@@ -981,7 +987,7 @@ class OrderController extends GetxController implements GetxService {
         fName: 'Soporte',
         lName: 'Tootli',
         phone: 'Administración',
-        imageFullUrl: Get.find<SplashController>().configModel?.logoFullUrl ?? '',
+        imageFullUrl: Get.find<SplashController>().configModel?.logo ?? '',
       ),
     );
 

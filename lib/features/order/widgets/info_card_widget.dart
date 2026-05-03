@@ -22,8 +22,9 @@ class InfoCardWidget extends StatelessWidget {
   final Function? messageOnTap;
   final OrderModel order;
   final bool isChatAllow;
+  final bool showCallButton;
   const InfoCardWidget({super.key, required this.title, required this.image, required this.name, required this.address, required this.phone,
-    required this.latitude, required this.longitude, required this.showButton, this.messageOnTap, this.isStore = false, required this.order, required this.isChatAllow});
+    required this.latitude, required this.longitude, required this.showButton, this.messageOnTap, this.isStore = false, required this.order, required this.isChatAllow, this.showCallButton = true});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +53,7 @@ class InfoCardWidget extends StatelessWidget {
                     )
               : const SizedBox(),
           SizedBox(width: Dimensions.paddingSizeSmall),
-          GestureDetector(
+          if (showCallButton) GestureDetector(
             onTap: () async {
               if(await canLaunchUrlString('tel:$phone')) {
                 launchUrlString('tel:$phone', mode: LaunchMode.externalApplication);

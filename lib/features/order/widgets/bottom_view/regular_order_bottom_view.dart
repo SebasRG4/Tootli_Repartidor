@@ -22,7 +22,7 @@ import 'package:get/get.dart';
 
 import '../../../../helper/price_converter_helper.dart';
 
-enum RegularOrderState {waitingToProcess, readyToConfirm, readyToPickup, readyToDeliver, completeDelivery, completed}
+enum RegularOrderState {waitingToProcess, readyToConfirm, readyToPickup, readyToDeliver, completeDelivery, completed, readyToReturn}
 
 class RegularOrderBottomView extends StatelessWidget {
   final OrderController orderController;
@@ -52,6 +52,9 @@ class RegularOrderBottomView extends StatelessWidget {
 
       case RegularOrderState.completeDelivery:
         return _buildCompleteDeliveryButton(orderController, controllerOrderModel);
+
+      case RegularOrderState.readyToReturn:
+        return _buildOrderReturnSlider(orderController, controllerOrderModel);
 
       default:
         return const SizedBox();
@@ -83,6 +86,9 @@ class RegularOrderBottomView extends StatelessWidget {
           return RegularOrderState.completeDelivery;
         }
         return RegularOrderState.readyToDeliver;
+
+      case AppConstants.returned:
+        return RegularOrderState.readyToReturn;
 
       default:
         return RegularOrderState.completed;
@@ -383,6 +389,52 @@ class RegularOrderBottomView extends StatelessWidget {
         isScrollControlled: true,
       );
     }
+  }
+
+  Widget _buildOrderReturnSlider(OrderController orderController, OrderModel controllerOrderModel) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: Theme.of(Get.context!).cardColor,
+        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5, spreadRadius: 1)],
+      ),
+      child: SliderButton(
+        action: () => _handleOrderReturn(orderController, controllerOrderModel),
+        label: Text(
+          'swipe_to_confirm_return'.tr,
+          style: robotoMedium.copyWith(
+            fontSize: Dimensions.fontSizeLarge,
+            color: Theme.of(Get.context!).primaryColor,
+          ),
+        ),
+        dismissThresholds: 0.5,
+        dismissible: false,
+        shimmer: true,
+        width: 1170,
+        height: 60,
+        buttonSize: 50,
+        radius: 10,
+        icon: _buildSliderIcon(),
+        isLtr: Get.find<LocalizationController>().isLtr,
+        boxShadow: const BoxShadow(blurRadius: 0),
+        buttonColor: Theme.of(Get.context!).primaryColor,
+        backgroundColor: const Color(0xffF4F7FC),
+        baseColor: Theme.of(Get.context!).primaryColor,
+      ),
+    );
+  }
+
+  void _handleOrderReturn(OrderController orderController, OrderModel order) {
+    Get.bottomSheet(
+      VerifyDeliverySheetWidget(
+        currentOrderModel: order,
+        verify: true, // Siempre pedir PIN para retorno
+        orderAmount: order.orderAmount,
+        cod: false, // No cobrar efectivo en el retorno (es solo recepción)
+      ),
+      isScrollControlled: true,
+    );
   }
 
   Widget _buildSliderIcon() {
