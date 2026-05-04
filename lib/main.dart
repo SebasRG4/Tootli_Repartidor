@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:audio_session/audio_session.dart';
+import 'package:audioplayers/audioplayers.dart' hide AVAudioSessionCategory;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -37,7 +38,7 @@ Future<void> main() async {
   FlutterForegroundTask.initCommunicationPort();
   if (!kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.iOS ||
-      defaultTargetPlatform == TargetPlatform.android)) {
+          defaultTargetPlatform == TargetPlatform.android)) {
     await NotificationHelper.ensureForegroundTaskInitialized();
   }
 
@@ -47,7 +48,25 @@ Future<void> main() async {
           defaultTargetPlatform == TargetPlatform.android)) {
     try {
       final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
+      await session.configure(
+        AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.duckOthers,
+          avAudioSessionMode: AVAudioSessionMode.defaultMode,
+          avAudioSessionRouteSharingPolicy:
+              AVAudioSessionRouteSharingPolicy.defaultPolicy,
+          avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+          androidAudioAttributes: AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.sonification,
+            flags: AndroidAudioFlags.none,
+            usage: AndroidAudioUsage.notification,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
+          androidWillPauseWhenDucked: true,
+        ),
+      );
     } catch (e) {
       debugPrint('[AudioSession] configure: $e');
     }
@@ -79,8 +98,13 @@ Future<void> main() async {
 
       // IMPORTANTE: Solicitar permisos antes de inicializar para asegurar que el token se genere correctamente.
       await FirebaseMessaging.instance.requestPermission(
-        alert: true, announcement: false, badge: true, carPlay: false,
-        criticalAlert: false, provisional: false, sound: true,
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
       );
 
       await NotificationHelper.initialize(flutterLocalNotificationsPlugin);

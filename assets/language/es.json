@@ -754,5 +754,10 @@
   "total_debt": "Deuda total",
   "pay_all": "Pagar todo",
   "pay_half": "Pagar la mitad",
-  "custom": "Otro monto"
+  "custom": "Otro monto",
+  "ganancia_neta_por_este_viaje": "Ganancia Neta por este Viaje",
+  "ganancia_limpia_envio_propina": "Ganancia limpia (Envío + Propina)",
+  "unpaid_earnings": "Ganancia no pagada",
+  "ganancia_neta": "Ganancia Neta",
+  "propina": "Propina"
 }

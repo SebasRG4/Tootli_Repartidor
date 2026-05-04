@@ -1,7 +1,8 @@
 import 'dart:io';
 
+import 'package:vibration/vibration.dart';
 import 'package:audio_session/audio_session.dart' hide AndroidAudioFocus;
-import 'package:audioplayers/audioplayers.dart';
+import 'package:audioplayers/audioplayers.dart' hide AVAudioSessionCategory;
 import 'package:flutter/foundation.dart';
 
 /// Servicio singleton que permite que NotificationHelper (sin contexto)
@@ -15,11 +16,11 @@ class OrderNotificationService {
   OrderNotificationService._();
   static final OrderNotificationService instance = OrderNotificationService._();
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _audioPlayer = AudioPlayer()..setReleaseMode(ReleaseMode.loop);
 
   /// orderId pendiente cuando el callback aún no estaba registrado
   int? _pendingOrderId;
-  
+
   /// Lista temporal para deduplicar notificaciones concurrentes (WS + FCM)
   final List<int> _processedOrderIds = [];
 
@@ -30,12 +31,16 @@ class OrderNotificationService {
 
   /// DashboardScreen llama esto en initState para registrar el listener.
   set onOrderRequestTapped(void Function(int orderId)? callback) {
-    debugPrint("[OrderNotifService] 🔧 onOrderRequestTapped SET (callback is ${callback != null ? 'NOT null' : 'null'})");
+    debugPrint(
+      "[OrderNotifService] 🔧 onOrderRequestTapped SET (callback is ${callback != null ? 'NOT null' : 'null'})",
+    );
     _onOrderRequestTapped = callback;
     if (callback != null && _pendingOrderId != null) {
       final id = _pendingOrderId!;
       _pendingOrderId = null;
-      debugPrint("[OrderNotifService] 📦 Dispatching PENDING order $id to newly registered callback");
+      debugPrint(
+        "[OrderNotifService] 📦 Dispatching PENDING order $id to newly registered callback",
+      );
       Future.microtask(() => callback(id));
     }
   }
@@ -49,31 +54,37 @@ class OrderNotificationService {
   Future<void> _playOrderRequestAlertSoundAsync() async {
     try {
       final session = await AudioSession.instance;
+      await session.configure(
+        AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.duckOthers,
+          avAudioSessionMode: AVAudioSessionMode.defaultMode,
+          avAudioSessionRouteSharingPolicy:
+              AVAudioSessionRouteSharingPolicy.defaultPolicy,
+          avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+          androidAudioAttributes: AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.music,
+            flags: AndroidAudioFlags.none,
+            usage: AndroidAudioUsage.alarm,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransient,
+          androidWillPauseWhenDucked: true,
+        ),
+      );
       await session.setActive(true);
     } catch (e) {
-      debugPrint("[OrderNotifService] ⚠️ AudioSession setActive: $e");
-    }
-    if (!kIsWeb && Platform.isAndroid) {
-      try {
-        await _audioPlayer.setAudioContext(
-          AudioContext(
-            android: AudioContextAndroid(
-              stayAwake: true,
-              contentType: AndroidContentType.sonification,
-              usageType: AndroidUsageType.notification,
-              audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-            ),
-          ),
-        );
-      } catch (e) {
-        debugPrint("[OrderNotifService] ⚠️ setAudioContext: $e");
-      }
+      debugPrint("[OrderNotifService] ⚠️ AudioSession config error: $e");
     }
     try {
-      await _audioPlayer.stop();
-      await _audioPlayer.play(AssetSource('alert_new_delivery.mp3'));
-    } catch (e) {
-      debugPrint("[OrderNotifService] ⚠️ Could not play audio: $e");
+      await _audioPlayer.setSource(AssetSource('alert_new_delivery.mp3'));
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.resume();
+      debugPrint("[OrderNotifService] 🔊 Play command sent successfully");
+    } catch (e, stack) {
+      debugPrint("[OrderNotifService] ❌ Could not play audio: $e");
+      debugPrint("[OrderNotifService] ❌ Stack: $stack");
     }
   }
 
@@ -83,10 +94,12 @@ class OrderNotificationService {
     // 🛡️ Deduplicación Híbrida: Si este orderId llegó en los últimos minutos
     // por Websocket o FCM, lo ignoramos para no repetir el Bottom Sheet ni el sonido.
     if (_processedOrderIds.contains(orderId)) {
-      debugPrint("[OrderNotifService] 🚫 DUPLICATE orderId $orderId ignored (Híbrido FCM/WS).");
+      debugPrint(
+        "[OrderNotifService] 🚫 DUPLICATE orderId $orderId ignored (Híbrido FCM/WS).",
+      );
       return;
     }
-    
+
     _processedOrderIds.add(orderId);
     if (_processedOrderIds.length > 50) {
       _processedOrderIds.removeAt(0); // keep memory light
@@ -94,13 +107,22 @@ class OrderNotificationService {
 
     debugPrint("[OrderNotifService] 📨 notifyOrderRequest($orderId) called");
     playOrderRequestAlertSound();
+    try {
+      Vibration.vibrate(duration: 1000);
+    } catch (_) {}
 
-    debugPrint("[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}");
+    debugPrint(
+      "[OrderNotifService] callback registered: ${_onOrderRequestTapped != null}",
+    );
     if (_onOrderRequestTapped != null) {
-      debugPrint("[OrderNotifService] ✅ Calling _onOrderRequestTapped($orderId)");
+      debugPrint(
+        "[OrderNotifService] ✅ Calling _onOrderRequestTapped($orderId)",
+      );
       _onOrderRequestTapped!(orderId);
     } else {
-      debugPrint("[OrderNotifService] ⚠️ No callback! Saving $orderId as pending");
+      debugPrint(
+        "[OrderNotifService] ⚠️ No callback! Saving $orderId as pending",
+      );
       _pendingOrderId = orderId;
     }
   }

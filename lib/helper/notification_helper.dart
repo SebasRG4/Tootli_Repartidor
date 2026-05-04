@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:audio_session/audio_session.dart' hide AndroidAudioFocus;
-import 'package:audioplayers/audioplayers.dart';
+import 'package:audioplayers/audioplayers.dart' hide AVAudioSessionCategory;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -94,11 +94,15 @@ class NotificationHelper {
               NotificationType.order_request: () {
                 final orderId = payload.orderId;
                 if (orderId != null) {
-                  // Agregamos un ligero delay para dar tiempo a que DashboardScreen cambie de listener 
+                  // Agregamos un ligero delay para dar tiempo a que DashboardScreen cambie de listener
                   // cuando regresamos a la app desde el tap en la notificación
                   Future.delayed(const Duration(milliseconds: 500), () {
-                    debugPrint("[NotificationHelper] [getInitialMessage] Notificando pedido $orderId a OrderNotificationService tras iniciar");
-                    OrderNotificationService.instance.notifyOrderRequest(orderId);
+                    debugPrint(
+                      "[NotificationHelper] [getInitialMessage] Notificando pedido $orderId a OrderNotificationService tras iniciar",
+                    );
+                    OrderNotificationService.instance.notifyOrderRequest(
+                      orderId,
+                    );
                   });
                 }
               },
@@ -124,7 +128,9 @@ class NotificationHelper {
               NotificationType.tootli_direct_chat: () {
                 final int? oid = payload.orderId;
                 if (oid != null) {
-                  Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid));
+                  Get.toNamed(
+                    RouteHelper.getTootliDirectTrackingChatRoute(oid),
+                  );
                 }
               },
             };
@@ -137,19 +143,23 @@ class NotificationHelper {
     );
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint("[FCM] onMessage: type=${message.data['type']} order_id=${message.data['order_id']}");
+      debugPrint(
+        "[FCM] onMessage: type=${message.data['type']} order_id=${message.data['order_id']}",
+      );
 
       // Normalizar tipo y orderId para soportar distintas claves desde backend
-      final String rawType = (message.data['type'] ??
-              message.data['body_loc_key'] ??
-              message.data['notification_type'] ??
-              '')
-          .toString();
+      final String rawType =
+          (message.data['type'] ??
+                  message.data['body_loc_key'] ??
+                  message.data['notification_type'] ??
+                  '')
+              .toString();
       String? type = rawType.isNotEmpty ? rawType : null;
 
       final int? notifOrderId = _parseOrderId(message.data);
       final String? orderID =
-          message.data['order_id']?.toString() ?? message.data['title_loc_key']?.toString();
+          message.data['order_id']?.toString() ??
+          message.data['title_loc_key']?.toString();
 
       if (type == 'message' &&
           Get.currentRoute.startsWith(RouteHelper.chatScreen)) {
@@ -173,7 +183,10 @@ class NotificationHelper {
               int.parse(message.data['conversation_id'].toString()),
             );
           } else {
-            NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+            NotificationHelper.showNotification(
+              message,
+              flutterLocalNotificationsPlugin,
+            );
           }
         }
       } else if (type == 'message' &&
@@ -181,13 +194,22 @@ class NotificationHelper {
         if (Get.find<AuthController>().isLoggedIn()) {
           Get.find<ChatController>().getConversationList(1);
         }
-        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        NotificationHelper.showNotification(
+          message,
+          flutterLocalNotificationsPlugin,
+        );
       } else if (type == 'otp' || type == 'deliveryman_referral') {
-        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        NotificationHelper.showNotification(
+          message,
+          flutterLocalNotificationsPlugin,
+        );
       } else if (type == 'dm_registration_revision' ||
           type == 'dm_registration_approved' ||
           type == 'dm_registration_denied') {
-        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        NotificationHelper.showNotification(
+          message,
+          flutterLocalNotificationsPlugin,
+        );
         if (Get.isRegistered<ProfileController>()) {
           Get.find<ProfileController>().getProfile();
         }
@@ -204,16 +226,25 @@ class NotificationHelper {
           } catch (_) {}
         }
       } else if (type == 'tootli_direct_chat') {
-        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        NotificationHelper.showNotification(
+          message,
+          flutterLocalNotificationsPlugin,
+        );
         try {
           Get.find<OrderController>().getRunningOrders(1, status: 'all');
-          Get.find<OrderController>().getOrderCount(Get.find<OrderController>().orderType);
+          Get.find<OrderController>().getOrderCount(
+            Get.find<OrderController>().orderType,
+          );
           Get.find<NotificationController>().getNotificationList();
         } catch (_) {}
-      } else if (type == 'new_order' || type == 'order_request' || type == 'order_status') {
+      } else if (type == 'new_order' ||
+          type == 'order_request' ||
+          type == 'order_status') {
         debugPrint("[FCM] ✅ MATCHED order type: '$type' orderId=$notifOrderId");
         if (notifOrderId != null) {
-          debugPrint("[FCM] 🚀 CALLING OrderNotificationService.notifyOrderRequest($notifOrderId)");
+          debugPrint(
+            "[FCM] 🚀 CALLING OrderNotificationService.notifyOrderRequest($notifOrderId)",
+          );
           OrderNotificationService.instance.notifyOrderRequest(notifOrderId);
         } else {
           debugPrint(
@@ -223,11 +254,15 @@ class NotificationHelper {
         }
       } else if (type == 'assign' && orderID != null && orderID.isNotEmpty) {
         Get.find<OrderController>().getRunningOrders(1, status: 'all');
-        Get.find<OrderController>().getOrderCount(Get.find<OrderController>().orderType);
+        Get.find<OrderController>().getOrderCount(
+          Get.find<OrderController>().orderType,
+        );
         Get.find<OrderController>().getLatestOrders();
         final assignId = int.tryParse(orderID);
         if (assignId != null) {
-          Get.offAllNamed(RouteHelper.getOrderDetailsRoute(assignId, fromNotification: true));
+          Get.offAllNamed(
+            RouteHelper.getOrderDetailsRoute(assignId, fromNotification: true),
+          );
         }
       } else if (type == 'block') {
         Get.find<AuthController>().clearSharedData();
@@ -237,14 +272,18 @@ class NotificationHelper {
         Get.to(const DashboardScreen(pageIndex: 1));
       } else {
         // Para cualquier otro tipo, mostrar notificación estándar
-        NotificationHelper.showNotification(message, flutterLocalNotificationsPlugin);
+        NotificationHelper.showNotification(
+          message,
+          flutterLocalNotificationsPlugin,
+        );
         Get.find<OrderController>().getRunningOrders(1, status: 'all');
-        Get.find<OrderController>().getOrderCount(Get.find<OrderController>().orderType);
+        Get.find<OrderController>().getOrderCount(
+          Get.find<OrderController>().orderType,
+        );
         Get.find<OrderController>().getLatestOrders();
         Get.find<NotificationController>().getNotificationList();
       }
     });
-
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       if (kDebugMode) {
@@ -272,17 +311,21 @@ class NotificationHelper {
               ),
             ),
             NotificationType.order_request: () {
-                final orderId = _parseOrderId(message.data);
-                if (orderId != null) {
-                  // Delay extra en iOS/Background tap para asegurar que Home esté montado y registrado el callback
-                  Future.delayed(const Duration(milliseconds: 500), () {
-                    debugPrint("[NotificationHelper] [onMessageOpenedApp] Notificando pedido $orderId a OrderNotificationService");
-                    OrderNotificationService.instance.notifyOrderRequest(orderId);
-                  });
-                } else {
-                  debugPrint("[NotificationHelper] [onMessageOpenedApp] order_request SIN ID válido: ${message.data}");
-                }
-              },
+              final orderId = _parseOrderId(message.data);
+              if (orderId != null) {
+                // Delay extra en iOS/Background tap para asegurar que Home esté montado y registrado el callback
+                Future.delayed(const Duration(milliseconds: 500), () {
+                  debugPrint(
+                    "[NotificationHelper] [onMessageOpenedApp] Notificando pedido $orderId a OrderNotificationService",
+                  );
+                  OrderNotificationService.instance.notifyOrderRequest(orderId);
+                });
+              } else {
+                debugPrint(
+                  "[NotificationHelper] [onMessageOpenedApp] order_request SIN ID válido: ${message.data}",
+                );
+              }
+            },
             NotificationType.block: () =>
                 Get.offAllNamed(RouteHelper.getSignInRoute()),
             NotificationType.unblock: () =>
@@ -424,7 +467,7 @@ class NotificationHelper {
           playSound: true,
           importance: Importance.max,
           priority: Priority.max,
-          sound: RawResourceAndroidNotificationSound('notification'),
+          sound: const RawResourceAndroidNotificationSound('alert_new_delivery'),
         );
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -458,7 +501,7 @@ class NotificationHelper {
           styleInformation: bigTextStyleInformation,
           priority: Priority.max,
           playSound: true,
-          sound: const RawResourceAndroidNotificationSound('notification'),
+          sound: const RawResourceAndroidNotificationSound('alert_new_delivery'),
         );
     NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -504,7 +547,7 @@ class NotificationHelper {
           playSound: true,
           styleInformation: bigPictureStyleInformation,
           importance: Importance.max,
-          sound: const RawResourceAndroidNotificationSound('notification'),
+          sound: const RawResourceAndroidNotificationSound('alert_new_delivery'),
         );
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -547,7 +590,9 @@ class NotificationHelper {
         );
       case 'order_status':
         if (orderId == null) {
-          debugPrint('[NotificationHelper] order_status sin orderId válido, ignorando.');
+          debugPrint(
+            '[NotificationHelper] order_status sin orderId válido, ignorando.',
+          );
           return null;
         }
         return NotificationBodyModel(
@@ -557,7 +602,9 @@ class NotificationHelper {
       case 'new_order':
       case 'order_request':
         if (orderId == null) {
-          debugPrint('[NotificationHelper] new_order/order_request sin orderId válido, ignorando.');
+          debugPrint(
+            '[NotificationHelper] new_order/order_request sin orderId válido, ignorando.',
+          );
           return null;
         }
         return NotificationBodyModel(
@@ -663,7 +710,9 @@ Future<void> myBackgroundMessageHandler(RemoteMessage message) async {
   bool isForeground = prefs.getBool(AppConstants.isForeground) ?? false;
 
   if (isForeground) {
-    debugPrint("[FCM] App en primer plano. Ignorando servicio de background para evitar doble sonido.");
+    debugPrint(
+      "[FCM] App en primer plano. Ignorando servicio de background para evitar doble sonido.",
+    );
     return;
   }
 
@@ -697,7 +746,25 @@ class MyTaskHandler extends TaskHandler {
     if (_alertAudioSessionReady) return;
     try {
       final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
+      await session.configure(
+        AudioSessionConfiguration(
+          avAudioSessionCategory: AVAudioSessionCategory.playback,
+          avAudioSessionCategoryOptions:
+              AVAudioSessionCategoryOptions.duckOthers,
+          avAudioSessionMode: AVAudioSessionMode.defaultMode,
+          avAudioSessionRouteSharingPolicy:
+              AVAudioSessionRouteSharingPolicy.defaultPolicy,
+          avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
+          androidAudioAttributes: AndroidAudioAttributes(
+            contentType: AndroidAudioContentType.sonification,
+            flags: AndroidAudioFlags.none,
+            usage: AndroidAudioUsage.notification,
+          ),
+          androidAudioFocusGainType:
+              AndroidAudioFocusGainType.gainTransientMayDuck,
+          androidWillPauseWhenDucked: true,
+        ),
+      );
       await session.setActive(true);
       _alertAudioSessionReady = true;
     } catch (_) {}
@@ -708,21 +775,16 @@ class MyTaskHandler extends TaskHandler {
     if (p == null) return;
     try {
       await _ensureAlertAudioSession();
-      if (!kIsWeb && Platform.isAndroid) {
-        await p.setAudioContext(
-          AudioContext(
-            android: AudioContextAndroid(
-              stayAwake: true,
-              contentType: AndroidContentType.sonification,
-              usageType: AndroidUsageType.notification,
-              audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-            ),
-          ),
-        );
-      }
       await p.stop();
-      await p.play(AssetSource('alert_new_delivery.mp3'));
-    } catch (_) {}
+      debugPrint(
+        "[NotificationHelper] [ForegroundTask] 🔊 Playing alert_new_delivery.mp3",
+      );
+      await p.play(AssetSource('alert_new_delivery.mp3'), volume: 1.0);
+      debugPrint("[NotificationHelper] [ForegroundTask] 🔊 Play command sent");
+    } catch (e, stack) {
+      debugPrint("[NotificationHelper] [ForegroundTask] ❌ Audio error: $e");
+      debugPrint("[NotificationHelper] [ForegroundTask] ❌ Stack: $stack");
+    }
   }
 
   @override
@@ -832,9 +894,7 @@ class LocationTaskHandler extends TaskHandler {
 
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}${AppConstants.recordLocationUri}'),
-        headers: const {
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
+        headers: const {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode({
           'token': token,
           'latitude': position.latitude,

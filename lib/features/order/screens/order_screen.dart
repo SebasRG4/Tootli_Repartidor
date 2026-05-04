@@ -22,7 +22,7 @@ class _OrderScreenState extends State<OrderScreen>
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 1,
       child: Scaffold(
         backgroundColor: Theme.of(context).cardColor,
         appBar: CustomAppBarWidget(
@@ -31,7 +31,7 @@ class _OrderScreenState extends State<OrderScreen>
           onMenuPressed: widget.onTapMenu,
           bottom: _orderTabBar(context),
         ),
-        body: TabBarView(children: [RunningOrderScreen(), MyOrderScreen()]),
+        body: TabBarView(children: [MyOrderScreen()]),
       ),
     );
   }
@@ -65,12 +65,6 @@ TabBar _orderTabBar(BuildContext context) {
       right: 40,
     ),
     tabs: [
-      Tab(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text('running_orders'.tr),
-        ),
-      ),
       Tab(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

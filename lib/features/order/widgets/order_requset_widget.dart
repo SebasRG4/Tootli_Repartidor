@@ -183,9 +183,15 @@ class OrderRequestWidget extends StatelessWidget {
                 child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
 
                   (Get.find<SplashController>().configModel!.showDmEarning! && Get.find<ProfileController>().profileModel != null
-                      && Get.find<ProfileController>().profileModel!.earnings == 1) ? Text(
-                    PriceConverterHelper.convertPrice(orderModel.originalDeliveryCharge! + orderModel.dmTips!),
-                    style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge),
+                      && Get.find<ProfileController>().profileModel!.earnings == 1) ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('ganancia_neta'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor)),
+                      Text(
+                        PriceConverterHelper.convertPrice(orderModel.deliveryCharge! + orderModel.dmTips!),
+                        style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge),
+                      ),
+                    ],
                   ) : const SizedBox(),
                   const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 

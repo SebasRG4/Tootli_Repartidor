@@ -146,7 +146,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
             bool showChatPermission = true;
             OrderModel? order = controllerOrderModel;
             if(order != null && orderController.orderDetailsModel != null) {
-              deliveryCharge = order.deliveryCharge;
+              deliveryCharge = order.originalDeliveryCharge;
               dmTips = order.dmTips;
               isPrescriptionOrder = order.prescriptionOrder;
               discount = order.storeDiscountAmount! + order.flashAdminDiscountAmount! + order.flashStoreDiscountAmount!;
@@ -644,7 +644,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                   ]) : const SizedBox(),
 
 
-                  isDelivered == true ? Container(
+                  Container(
                     margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
                     padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
                     decoration: BoxDecoration(
@@ -653,17 +653,19 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                       boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
                     ),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Ganancia Neta por este Viaje'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
+                      Text('ganancia_neta_por_este_viaje'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
                       SizedBox(height: Dimensions.paddingSizeSmall),
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text('Ganancia limpia (Envío + Propina)'.tr, style: robotoRegular),
+                        Text('ganancia_limpia_envio_propina'.tr, style: robotoRegular),
                         Text(
-                          PriceConverterHelper.convertPrice((order?.originalDeliveryCharge ?? 0) + (order?.dmTips ?? 0)),
+                          PriceConverterHelper.convertPrice((order?.deliveryCharge ?? 0) + (order?.dmTips ?? 0)),
                           style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor),
                         ),
                       ]),
                     ]),
-                  ) : Container(
+                  ),
+
+                  Container(
                     margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
                     padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
                     decoration: BoxDecoration(
@@ -789,7 +791,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                           child: Column(children: [
 
                             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                              Text('total_amount'.tr, style: robotoMedium.copyWith(
+                              Text(cod! ? 'amount_collect_from_customer'.tr : 'total_amount'.tr, style: robotoMedium.copyWith(
                                 fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor,
                               )),
                               Text(
@@ -821,7 +823,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                       SizedBox(height: partialPay ? 20 : 0),
 
                       !partialPay ? Row(children: [
-                        Text('total_amount'.tr, style: robotoMedium.copyWith(
+                        Text(cod! ? 'amount_collect_from_customer'.tr : 'total_amount'.tr, style: robotoMedium.copyWith(
                           fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor,
                         )),
 

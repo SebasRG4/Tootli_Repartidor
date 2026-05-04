@@ -118,7 +118,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                 else ...[
                   Text(
                     PriceConverterHelper.convertPrice(
-                      (widget.orderModel.originalDeliveryCharge ?? 0) +
+                      (widget.orderModel.deliveryCharge ?? 0) +
                           (widget.orderModel.dmTips ?? 0),
                     ),
                     style: robotoBold.copyWith(
@@ -127,7 +127,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                     ),
                   ),
                   Text(
-                    '${'ganancia_neta'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.originalDeliveryCharge ?? 0)} + ${'propina'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.dmTips ?? 0)}',
+                    '${'ganancia_neta'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.deliveryCharge ?? 0)} + ${'propina'.tr}: ${PriceConverterHelper.convertPrice(widget.orderModel.dmTips ?? 0)}',
                     style: robotoRegular.copyWith(
                       fontSize: 12,
                       color: Colors.grey,
