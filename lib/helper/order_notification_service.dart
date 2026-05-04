@@ -45,45 +45,25 @@ class OrderNotificationService {
     }
   }
 
-  /// Mismo audio que un pedido real (`alert_new_delivery.mp3`), sin deduplicación ni callback.
-  /// Útil para la simulación UI (FAB bug) sin confundir con `notifyOrderRequest`.
   void playOrderRequestAlertSound() {
+    debugPrint("[OrderNotifService] 🔊 playOrderRequestAlertSound() called");
     _playOrderRequestAlertSoundAsync();
   }
 
   Future<void> _playOrderRequestAlertSoundAsync() async {
     try {
-      final session = await AudioSession.instance;
-      await session.configure(
-        AudioSessionConfiguration(
-          avAudioSessionCategory: AVAudioSessionCategory.playback,
-          avAudioSessionCategoryOptions:
-              AVAudioSessionCategoryOptions.duckOthers,
-          avAudioSessionMode: AVAudioSessionMode.defaultMode,
-          avAudioSessionRouteSharingPolicy:
-              AVAudioSessionRouteSharingPolicy.defaultPolicy,
-          avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
-          androidAudioAttributes: AndroidAudioAttributes(
-            contentType: AndroidAudioContentType.music,
-            flags: AndroidAudioFlags.none,
-            usage: AndroidAudioUsage.alarm,
-          ),
-          androidAudioFocusGainType:
-              AndroidAudioFocusGainType.gainTransient,
-          androidWillPauseWhenDucked: true,
-        ),
-      );
-      await session.setActive(true);
-    } catch (e) {
-      debugPrint("[OrderNotifService] ⚠️ AudioSession config error: $e");
-    }
-    try {
-      await _audioPlayer.setSource(AssetSource('alert_new_delivery.mp3'));
+      const String assetPath = 'alert_new_delivery.mp3';
+      debugPrint("[OrderNotifService] 🔊 Attempting to play: $assetPath");
+      // Detener cualquier reproducción previa
+      await _audioPlayer.stop();
+      // Configurar fuente y volumen
+      await _audioPlayer.setSource(AssetSource(assetPath));
       await _audioPlayer.setVolume(1.0);
+      // Iniciar reproducción
       await _audioPlayer.resume();
-      debugPrint("[OrderNotifService] 🔊 Play command sent successfully");
+      debugPrint("[OrderNotifService] ✅ Play command SUCCESS");
     } catch (e, stack) {
-      debugPrint("[OrderNotifService] ❌ Could not play audio: $e");
+      debugPrint("[OrderNotifService] ❌ Play error: $e");
       debugPrint("[OrderNotifService] ❌ Stack: $stack");
     }
   }

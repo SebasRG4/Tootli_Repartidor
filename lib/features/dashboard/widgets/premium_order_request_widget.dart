@@ -33,10 +33,12 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
   AudioPlayer _audioPlayer = AudioPlayer();
   bool _isAccepted = false;  // Guard: evita múltiples llamadas al aceptar
   bool _isRejected = false;  // Guard: evita múltiples llamadas al rechazar/timeout
+  bool _isMounted = false;   // Guard: evita callbacks después de dispose()
 
   @override
   void initState() {
     super.initState();
+    _isMounted = true;
     _playAlertSound();
     _startTimer();
   }
@@ -48,17 +50,31 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Si el widget fue desmontado (ej. usuario navegó a otra pantalla),
+      // cancelar el timer SILENCIOSAMENTE sin llamar onReject/ignoreOrderApi.
+      // El DashboardScreen._setPage ya maneja la limpieza sin API call.
+      if (!_isMounted) {
+        timer.cancel();
+        return;
+      }
+
       if (_secondsRemaining > 0) {
-        setState(() {
-          _secondsRemaining--;
-        });
+        if (_isMounted) {
+          setState(() {
+            _secondsRemaining--;
+          });
+        }
       } else {
-        _timer?.cancel();
+        timer.cancel();
         _audioPlayer.stop();
-        if (!_isRejected && !_isAccepted) {
+        // Solo disparar el rechazo si el widget sigue montado y visible
+        if (_isMounted && !_isRejected && !_isAccepted) {
           _isRejected = true;
           OrderNotificationService.instance.stopAudio();
+          debugPrint('[PremiumOrderRequestWidget] ⏱️ Timer expirado — disparando onReject (mounted=true)');
           widget.onReject();
+        } else if (!_isMounted) {
+          debugPrint('[PremiumOrderRequestWidget] ⏱️ Timer expirado — ignorado (widget desmontado)');
         }
       }
     });
@@ -66,6 +82,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
 
   @override
   void dispose() {
+    _isMounted = false; // Marcar ANTES de cancelar el timer para evitar race conditions
     _timer?.cancel();
     _audioPlayer.stop();
     _audioPlayer.dispose();

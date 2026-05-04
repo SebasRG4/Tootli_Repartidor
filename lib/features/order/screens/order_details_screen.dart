@@ -32,17 +32,24 @@ class OrderDetailsScreen extends StatefulWidget {
   final int? orderIndex;
   final bool fromNotification;
   final bool fromLocationScreen;
-  const OrderDetailsScreen({super.key, required this.orderId, required this.isRunningOrder, required this.orderIndex,
-    this.fromNotification = false, this.fromLocationScreen = false});
+  const OrderDetailsScreen({
+    super.key,
+    required this.orderId,
+    required this.isRunningOrder,
+    required this.orderIndex,
+    this.fromNotification = false,
+    this.fromLocationScreen = false,
+  });
 
   @override
   State<OrderDetailsScreen> createState() => _OrderDetailsScreenState();
 }
 
-class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBindingObserver {
+class _OrderDetailsScreenState extends State<OrderDetailsScreen>
+    with WidgetsBindingObserver {
   Timer? _timer;
 
-  void _startApiCalling(){
+  void _startApiCalling() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
       Get.find<OrderController>().getOrderWithId(widget.orderId!);
@@ -50,11 +57,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   }
 
   Future<void> _loadData() async {
-    Get.find<OrderController>().pickPrescriptionImage(isRemove: true, isCamera: false);
+    Get.find<OrderController>().pickPrescriptionImage(
+      isRemove: true,
+      isCamera: false,
+    );
     await Get.find<OrderController>().getOrderWithId(widget.orderId);
-    Get.find<OrderController>().getOrderDetails(widget.orderId, Get.find<OrderController>().orderModel!.orderType == 'parcel');
+    Get.find<OrderController>().getOrderDetails(
+      widget.orderId,
+      Get.find<OrderController>().orderModel!.orderType == 'parcel',
+    );
     await Get.find<OrderController>().getLatestOrders();
-    if(Get.find<OrderController>().showDeliveryImageField){
+    if (Get.find<OrderController>().showDeliveryImageField) {
       Get.find<OrderController>().changeDeliveryImageStatus(isUpdate: false);
     }
   }
@@ -75,8 +88,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       _timer?.cancel();
     } else if (state == AppLifecycleState.resumed) {
       // Reanudar el polling al volver al primer plano si el pedido no ha terminado
-      final orderStatus = Get.find<OrderController>().orderModel?.orderStatus ?? '';
-      final isTerminal = orderStatus == 'delivered' ||
+      final orderStatus =
+          Get.find<OrderController>().orderModel?.orderStatus ?? '';
+      final isTerminal =
+          orderStatus == 'delivered' ||
           orderStatus == 'canceled' ||
           orderStatus == 'returned' ||
           orderStatus == 'failed';
@@ -97,8 +112,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
   Widget build(BuildContext context) {
     return PopScope(
       canPop: true,
-      onPopInvokedWithResult: (didPop, result) async{
-        if((widget.fromNotification || widget.fromLocationScreen)) {
+      onPopInvokedWithResult: (didPop, result) async {
+        if ((widget.fromNotification || widget.fromLocationScreen)) {
           Future.delayed(const Duration(milliseconds: 0), () async {
             await Get.offAllNamed(RouteHelper.getInitialRoute());
           });
@@ -108,543 +123,1502 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).cardColor,
-        appBar: CustomAppBarWidget(title: 'order_details'.tr, onBackPressed: (){
-        if(widget.fromNotification || widget.fromLocationScreen) {
-            Get.offAllNamed(RouteHelper.getInitialRoute());
-          } else {
-            Get.back();
-          }
-        }),
-        body: SafeArea(
-          child: GetBuilder<OrderController>(builder: (orderController) {
-            // Cancelar el timer si el pedido llegó a un estado terminal
-            final _terminalStatuses = {'delivered', 'canceled', 'returned', 'failed'};
-            if (_terminalStatuses.contains(orderController.orderModel?.orderStatus)) {
-              _timer?.cancel();
+        appBar: CustomAppBarWidget(
+          title: 'order_details'.tr,
+          onBackPressed: () {
+            if (widget.fromNotification || widget.fromLocationScreen) {
+              Get.offAllNamed(RouteHelper.getInitialRoute());
+            } else {
+              Get.back();
             }
+          },
+        ),
+        body: SafeArea(
+          child: GetBuilder<OrderController>(
+            builder: (orderController) {
+              // Cancelar el timer si el pedido llegó a un estado terminal
+              final _terminalStatuses = {
+                'delivered',
+                'canceled',
+                'returned',
+                'failed',
+              };
+              if (_terminalStatuses.contains(
+                orderController.orderModel?.orderStatus,
+              )) {
+                _timer?.cancel();
+              }
 
-            OrderModel? controllerOrderModel = orderController.orderModel;
+              OrderModel? controllerOrderModel = orderController.orderModel;
 
-            bool restConfModel = Get.find<SplashController>().configModel!.orderConfirmationModel != 'deliveryman';
+              bool restConfModel =
+                  Get.find<SplashController>()
+                      .configModel!
+                      .orderConfirmationModel !=
+                  'deliveryman';
 
-            bool? parcel, pickedUp, cod, wallet, partialPay, offlinePay, digitalyPaid, isDelivered;
+              bool? parcel,
+                  pickedUp,
+                  cod,
+                  wallet,
+                  partialPay,
+                  offlinePay,
+                  digitalyPaid,
+                  isDelivered;
 
-            bool showDeliveryConfirmImage = false;
+              bool showDeliveryConfirmImage = false;
 
-            double? deliveryCharge = 0;
-            double itemsPrice = 0;
-            double? discount = 0;
-            double? couponDiscount = 0;
-            double? tax = 0;
-            double addOns = 0;
-            double? dmTips = 0;
-            double additionalCharge = 0;
-            double extraPackagingAmount = 0;
-            double referrerBonusAmount = 0;
-            bool? isPrescriptionOrder = false;
-            bool? taxIncluded = false;
-            bool showChatPermission = true;
-            OrderModel? order = controllerOrderModel;
-            if(order != null && orderController.orderDetailsModel != null) {
-              deliveryCharge = order.originalDeliveryCharge;
-              dmTips = order.dmTips;
-              isPrescriptionOrder = order.prescriptionOrder;
-              discount = order.storeDiscountAmount! + order.flashAdminDiscountAmount! + order.flashStoreDiscountAmount!;
-              tax = order.totalTaxAmount;
-              taxIncluded = order.taxStatus;
-              additionalCharge = order.additionalCharge!;
-              extraPackagingAmount = order.extraPackagingAmount!;
-              referrerBonusAmount = order.referrerBonusAmount!;
-              couponDiscount = order.couponDiscountAmount;
-              if(isPrescriptionOrder!){
-                double orderAmount = order.orderAmount ?? 0;
-                itemsPrice = (orderAmount + discount) - ((taxIncluded! ? 0 : tax!) + deliveryCharge! + additionalCharge) - dmTips!;
-              }else {
-                for (OrderDetailsModel orderDetails in orderController.orderDetailsModel!) {
-                  for (AddOn addOn in orderDetails.addOns!) {
-                    addOns = addOns + (addOn.price! * addOn.quantity!);
+              double? deliveryCharge = 0;
+              double itemsPrice = 0;
+              double? discount = 0;
+              double? couponDiscount = 0;
+              double? tax = 0;
+              double addOns = 0;
+              double? dmTips = 0;
+              double additionalCharge = 0;
+              double extraPackagingAmount = 0;
+              double referrerBonusAmount = 0;
+              bool? isPrescriptionOrder = false;
+              bool? taxIncluded = false;
+              bool showChatPermission = true;
+              OrderModel? order = controllerOrderModel;
+              if (order != null && orderController.orderDetailsModel != null) {
+                deliveryCharge = order.originalDeliveryCharge;
+                dmTips = order.dmTips;
+                isPrescriptionOrder = order.prescriptionOrder;
+                discount =
+                    order.storeDiscountAmount! +
+                    order.flashAdminDiscountAmount! +
+                    order.flashStoreDiscountAmount!;
+                tax = order.totalTaxAmount;
+                taxIncluded = order.taxStatus;
+                additionalCharge = order.additionalCharge!;
+                extraPackagingAmount = order.extraPackagingAmount!;
+                referrerBonusAmount = order.referrerBonusAmount!;
+                couponDiscount = order.couponDiscountAmount;
+                if (isPrescriptionOrder!) {
+                  double orderAmount = order.orderAmount ?? 0;
+                  itemsPrice =
+                      (orderAmount + discount) -
+                      ((taxIncluded! ? 0 : tax!) +
+                          deliveryCharge! +
+                          additionalCharge) -
+                      dmTips!;
+                } else {
+                  for (OrderDetailsModel orderDetails
+                      in orderController.orderDetailsModel!) {
+                    for (AddOn addOn in orderDetails.addOns!) {
+                      addOns = addOns + (addOn.price! * addOn.quantity!);
+                    }
+                    itemsPrice =
+                        itemsPrice +
+                        (orderDetails.price! * orderDetails.quantity!);
                   }
-                  itemsPrice = itemsPrice + (orderDetails.price! * orderDetails.quantity!);
+                }
+
+                if (order.storeBusinessModel == 'commission') {
+                  showChatPermission = true;
+                } else if (order.storeBusinessModel == 'subscription') {
+                  showChatPermission = order.storeChatPermission == 1;
+                } else {
+                  showChatPermission = true;
                 }
               }
+              double subTotal = itemsPrice + addOns;
+              double total =
+                  itemsPrice +
+                  addOns -
+                  discount +
+                  (taxIncluded! ? 0 : tax!) +
+                  deliveryCharge! -
+                  couponDiscount! +
+                  dmTips! +
+                  additionalCharge +
+                  extraPackagingAmount -
+                  referrerBonusAmount;
 
-              if (order.storeBusinessModel == 'commission') {
-                showChatPermission = true;
-              } else if (order.storeBusinessModel == 'subscription') {
-                showChatPermission = order.storeChatPermission == 1;
-              } else {
-                showChatPermission = true;
+              if (controllerOrderModel != null) {
+                parcel = controllerOrderModel.orderType == 'parcel';
+                pickedUp =
+                    controllerOrderModel.orderStatus == AppConstants.pickedUp;
+                cod = controllerOrderModel.paymentMethod == 'cash_on_delivery';
+                wallet = controllerOrderModel.paymentMethod == 'wallet';
+                digitalyPaid =
+                    controllerOrderModel.paymentMethod == 'ssl_commerz';
+                partialPay =
+                    controllerOrderModel.paymentMethod == 'partial_payment';
+                offlinePay =
+                    controllerOrderModel.paymentMethod == 'offline_payment';
+
+                showDeliveryConfirmImage =
+                    pickedUp &&
+                    Get.find<SplashController>()
+                        .configModel!
+                        .dmPictureUploadStatus! &&
+                    controllerOrderModel.orderStatus != 'delivered';
+                isDelivered = controllerOrderModel.orderStatus == 'delivered';
               }
-            }
-            double subTotal = itemsPrice + addOns;
-            double total = itemsPrice + addOns - discount+ (taxIncluded! ? 0 : tax!) + deliveryCharge! - couponDiscount! + dmTips! + additionalCharge + extraPackagingAmount - referrerBonusAmount;
 
-            if(controllerOrderModel != null){
-              parcel = controllerOrderModel.orderType == 'parcel';
-              pickedUp = controllerOrderModel.orderStatus == AppConstants.pickedUp;
-              cod = controllerOrderModel.paymentMethod == 'cash_on_delivery';
-              wallet = controllerOrderModel.paymentMethod == 'wallet';
-              digitalyPaid = controllerOrderModel.paymentMethod == 'ssl_commerz';
-              partialPay = controllerOrderModel.paymentMethod == 'partial_payment';
-              offlinePay = controllerOrderModel.paymentMethod == 'offline_payment';
-
-              showDeliveryConfirmImage = pickedUp && Get.find<SplashController>().configModel!.dmPictureUploadStatus! && controllerOrderModel.orderStatus != 'delivered';
-              isDelivered = controllerOrderModel.orderStatus == 'delivered';
-            }
-
-            return (orderController.orderDetailsModel != null && controllerOrderModel != null) ? Column(children: [
-
-              Expanded(child: SingleChildScrollView(
-                padding: EdgeInsets.all(Dimensions.paddingSizeDefault),
-                physics: const ClampingScrollPhysics(),
-                child: Column(children: [
-
-                  Row(children: [
-                    Text('${parcel! ? 'delivery_id'.tr : 'order_id'.tr}:', style: robotoRegular),
-                    const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                    Text(controllerOrderModel.id.toString(), style: robotoBold),
-                    const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                    const Expanded(child: SizedBox()),
-                    Container(height: 7, width: 7,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: controllerOrderModel.orderStatus?.toLowerCase() == "canceled" ? Colors.red : Colors.green,
-                      ),
-                    ),
-                    const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-
-                    Text(controllerOrderModel.orderStatus!.tr, style: robotoBold),
-                  ]),
-
-                  const SizedBox(height: Dimensions.paddingSizeLarge),
-
-                  parcel && order?.orderStatus == AppConstants.canceled && !(order?.parcelCancellation?.beforePickup == 1) ? Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text('return_date_and_time'.tr, style: robotoRegular),
-
-                    Text(order?.parcelCancellation?.returnDate != null ? DateConverterHelper.dateTimeStringToDateTime(order!.parcelCancellation!.returnDate!) : 'not_set_yet'.tr, style: robotoRegular),
-                  ]) : const SizedBox(),
-
-                  controllerOrderModel.scheduleAt!.isNotEmpty && controllerOrderModel.scheduleAt != null ? Column(children: [
-                    Row(children: [
-                      Text('${'schedule'.tr} ', style: robotoRegular),
-                      const Expanded(child: SizedBox()),
-
-                      Text(
-                        DateConverterHelper.dateTimeStringToDateTime(controllerOrderModel.scheduleAt!),
-                        style: robotoRegular,
-                      ),
-                    ]),
-                    const SizedBox(height: Dimensions.paddingSizeLarge),
-                  ]) : const SizedBox(),
-
-                  SizedBox(height: parcel && order?.orderStatus == AppConstants.canceled && !(order?.parcelCancellation?.beforePickup == 1) ? Dimensions.paddingSizeLarge : 0),
-
-                  if (isDelivered != true) Row(children: [
-                    Text('${digitalyPaid == true && controllerOrderModel.chargePayer != null ? 'paid_by'.tr : parcel ? 'charge_payer'.tr : 'item'.tr}:', style: robotoRegular),
-                    const SizedBox(width: Dimensions.paddingSizeExtraSmall),
-                    Text(
-                      digitalyPaid == true && controllerOrderModel.chargePayer != null ? controllerOrderModel.chargePayer! : parcel ? controllerOrderModel.chargePayer!.tr : orderController.orderDetailsModel!.length.toString(),
-                      style: robotoMedium.copyWith(color: Theme.of(context).primaryColor),
-                    ),
-                    const Expanded(child: SizedBox()),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeExtraSmall),
-                      decoration: BoxDecoration(color: Theme.of(context).primaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5)),
-                      child: Text(
-                        cod! ? 'cod'.tr : wallet! ? 'wallet'.tr : partialPay! ? 'partially_pay'.tr : offlinePay! ? 'offline_payment'.tr : 'digitally_paid'.tr,
-                        style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).primaryColor),
-                      )
-                    )
-                  ]),
-
-                  if (isDelivered != true) orderController.orderDetailsModel!.isNotEmpty && orderController.orderDetailsModel![0].itemDetails != null && orderController.orderDetailsModel![0].itemDetails!.moduleType == 'food' ? Column(children: [
-                    const SizedBox(height: Dimensions.paddingSizeLarge),
-                    Row(children: [
-                      Text('${'cutlery'.tr} ', style: robotoRegular),
-                      const Expanded(child: SizedBox()),
-
-                      Text(
-                        controllerOrderModel.cutlery! ? 'yes'.tr : 'no'.tr,
-                        style: robotoRegular,
-                      ),
-                    ]),
-                  ]) : const SizedBox(),
-
-                  SizedBox(height: Dimensions.paddingSizeSmall),
-                  Divider(thickness: 1, color: Theme.of(context).disabledColor.withValues(alpha: 0.05)),
-                  SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                  isDelivered != true && controllerOrderModel.unavailableItemNote != null ?
-                    CustomOrderDetailsCard(
-                      title: '${'unavailable_item_note'.tr}: ' ,
-                      metaValue: controllerOrderModel.unavailableItemNote!,
-                    ) : const SizedBox(),
-                  SizedBox(height: controllerOrderModel.unavailableItemNote != null ? Dimensions.paddingSizeSmall : 0),
-
-                  isDelivered != true && controllerOrderModel.deliveryInstruction != null ?
-                  CustomOrderDetailsCard(
-                    title: '${'delivery_instruction'.tr}: ' ,
-                    metaValue: controllerOrderModel.deliveryInstruction!.tr,
-                  ) : const SizedBox(),
-
-                  SizedBox(height: controllerOrderModel.deliveryInstruction != null ? Dimensions.paddingSizeSmall : 0),
-
-                  isDelivered != true && controllerOrderModel.bringChangeAmount != null && controllerOrderModel.bringChangeAmount! > 0 ?
-                  Container(
-                    width: double.infinity,
-                    margin: EdgeInsets.only(top: Dimensions.paddingSizeSmall),
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: const Color(0XFF009AF1).withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                    ),
-                    child: RichText(
-                      text: TextSpan(children: [
-                        TextSpan(text: 'please_bring'.tr, style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge?.color)),
-                        TextSpan(text: ' ${PriceConverterHelper.convertPrice(controllerOrderModel.bringChangeAmount)}', style: robotoMedium.copyWith(color: Theme.of(context).textTheme.bodyLarge?.color)),
-                        TextSpan(text: ' ${'in_change_for_the_customer_when_making_the_delivery'.tr}', style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge?.color)),
-                      ]),
-                    ),
-                  ) : const SizedBox(),
-                  const SizedBox(height: Dimensions.paddingSizeSmall),
-
-                  InfoCardWidget(
-                    title: parcel ? 'sender_details'.tr : 'store_details'.tr,
-                    address: parcel ? controllerOrderModel.deliveryAddress : DeliveryAddress(address: controllerOrderModel.storeAddress),
-                    image: parcel ? '' : '${controllerOrderModel.storeLogoFullUrl}',
-                    name: parcel ? controllerOrderModel.deliveryAddress!.contactPersonName : controllerOrderModel.storeName,
-                    phone: parcel ? controllerOrderModel.deliveryAddress!.contactPersonNumber : controllerOrderModel.storePhone,
-                    latitude: parcel ? controllerOrderModel.deliveryAddress!.latitude : controllerOrderModel.storeLat,
-                    longitude: parcel ? controllerOrderModel.deliveryAddress!.longitude : controllerOrderModel.storeLng,
-                    showButton: (controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
-                        && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded'),
-                    isStore: parcel ? false : true, isChatAllow: showChatPermission && isDelivered != true,
-                    showCallButton: isDelivered != true,
-                    messageOnTap: () => Get.toNamed(RouteHelper.getChatRoute(
-                      notificationBody: NotificationBodyModel(
-                        orderId: controllerOrderModel.id, vendorId: orderController.orderDetailsModel![0].vendorId,
-                      ),
-                      user: User(
-                        id: controllerOrderModel.storeId, fName: controllerOrderModel.storeName,
-                        imageFullUrl: controllerOrderModel.storeLogoFullUrl, phone: controllerOrderModel.storePhone
-                      ),
-                    )),
-                    order: order!,
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeLarge),
-
-                  InfoCardWidget(
-                    title: parcel ? 'receiver_details'.tr : 'customer_contact_details'.tr,
-                    address: parcel ? controllerOrderModel.receiverDetails : controllerOrderModel.deliveryAddress,
-                    image: parcel ? '' : controllerOrderModel.customer != null ? '${controllerOrderModel.customer!.imageFullUrl}' : '',
-                    name: parcel ? controllerOrderModel.receiverDetails!.contactPersonName : controllerOrderModel.deliveryAddress!.contactPersonName,
-                    phone: parcel ? controllerOrderModel.receiverDetails!.contactPersonNumber : controllerOrderModel.deliveryAddress!.contactPersonNumber,
-                    latitude: parcel ? controllerOrderModel.receiverDetails!.latitude : controllerOrderModel.deliveryAddress!.latitude,
-                    longitude: parcel ? controllerOrderModel.receiverDetails!.longitude : controllerOrderModel.deliveryAddress!.longitude,
-                    showButton: controllerOrderModel.orderStatus != 'delivered' && controllerOrderModel.orderStatus != 'failed'
-                        && controllerOrderModel.orderStatus != 'canceled' && controllerOrderModel.orderStatus != 'refunded'
-                        && controllerOrderModel.orderStatus != 'returned',
-                    isStore: parcel ? false : true,
-                    isChatAllow: (showChatPermission || controllerOrderModel.tootliDirectTrackable == true) && isDelivered != true,
-                    showCallButton: isDelivered != true,
-                    messageOnTap: () {
-                      final int? oid = controllerOrderModel.id;
-                      final bool useTootliDirectChat =
-                          oid != null &&
-                          (controllerOrderModel.tootliDirectTrackable ==
-                                  true ||
-                              controllerOrderModel
-                                  .hasTootliDirectPublicTrackingUrl);
-                      if (useTootliDirectChat) {
-                        Get.toNamed(
-                          RouteHelper.getTootliDirectTrackingChatRoute(oid!),
-                        );
-                        return;
-                      }
-                      final Customer? c = controllerOrderModel.customer;
-                      if (c == null) {
-                        if (controllerOrderModel.isGuest == true) {
-                          showCustomSnackBar(
-                            'tootli_direct_guest_chat_web_only'.tr,
-                            isError: false,
-                          );
-                        } else {
-                          showCustomSnackBar(
-                            'customer_not_found'.tr,
-                            isError: true,
-                          );
-                        }
-                        return;
-                      }
-                      Get.toNamed(RouteHelper.getChatRoute(
-                        notificationBody: NotificationBodyModel(
-                          orderId: controllerOrderModel.id, customerId: c.id,
-                        ),
-                        user: User(
-                          id: c.id, fName: c.fName,
-                          lName: c.lName, imageFullUrl: c.imageFullUrl,
-                            phone: c.phone,
-                        ),
-                      ));
-                    },
-                    order: order,
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeLarge),
-
-                  isDelivered != true && parcel ? Container(
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                      boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-                    ),
-                    child: controllerOrderModel.parcelCategory != null ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('parcel_category'.tr, style: robotoBold),
-                      const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-                      Row(children: [
-                        ClipRRect(borderRadius: BorderRadius.circular(Dimensions.radiusSmall), child: CustomImageWidget(
-                          image: '${controllerOrderModel.parcelCategory!.imageFullUrl}',
-                          height: 35, width: 35, fit: BoxFit.cover,
-                        )),
-                        const SizedBox(width: Dimensions.paddingSizeSmall),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(
-                            controllerOrderModel.parcelCategory!.name!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall),
-                          ),
-                          Text(
-                            controllerOrderModel.parcelCategory!.description!, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
-                          ),
-                        ])),
-                      ]),
-                    ]) : SizedBox(
-                      width: context.width,
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text('parcel_category'.tr, style: robotoRegular),
-                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                        Text('no_parcel_category_data_found'.tr, style: robotoMedium),
-                      ]),
-                    ),
-                  ) : Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                      boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    child: Column(
-                      spacing: 10, crossAxisAlignment: CrossAxisAlignment.start,
+              return (orderController.orderDetailsModel != null &&
+                      controllerOrderModel != null)
+                  ? Column(
                       children: [
-                        Text('item_info'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
-                        ListView.separated(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: orderController.orderDetailsModel!.length,
-                          itemBuilder: (context, index) {
-                            return OrderItemWidget(order: controllerOrderModel, orderDetails: orderController.orderDetailsModel![index]);
-                          },
-                          separatorBuilder: (context, index){
-                            return Divider(height: 25,);
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: parcel && order.parcelCancellation != null ? Dimensions.paddingSizeLarge : 0),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: EdgeInsets.all(
+                              Dimensions.paddingSizeDefault,
+                            ),
+                            physics: const ClampingScrollPhysics(),
+                            child: Column(
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${parcel! ? 'delivery_id'.tr : 'order_id'.tr}:',
+                                      style: robotoRegular,
+                                    ),
+                                    const SizedBox(
+                                      width: Dimensions.paddingSizeExtraSmall,
+                                    ),
 
-                  parcel && order.parcelCancellation != null ? Container(
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                      boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                    Text(
+                                      controllerOrderModel.id.toString(),
+                                      style: robotoBold,
+                                    ),
+                                    const SizedBox(
+                                      width: Dimensions.paddingSizeExtraSmall,
+                                    ),
 
-                      order.parcelCancellation!.returnFee != null && order.parcelCancellation!.returnFee! > 0 ? Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).disabledColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                        ),
-                        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text(order.orderStatus == AppConstants.returned ? 'collected_return_fee_from_customer'.tr : 'collect_return_fee_from_customer'.tr, style: robotoRegular),
+                                    const Expanded(child: SizedBox()),
+                                    Container(
+                                      height: 7,
+                                      width: 7,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color:
+                                            controllerOrderModel.orderStatus
+                                                    ?.toLowerCase() ==
+                                                "canceled"
+                                            ? Colors.red
+                                            : Colors.green,
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: Dimensions.paddingSizeExtraSmall,
+                                    ),
 
-                          Text(PriceConverterHelper.convertPrice(order.parcelCancellation!.returnFee), style: robotoBold),
-                        ]),
-                      ) : const SizedBox(),
-                      SizedBox(height: order.parcelCancellation!.returnFee != null && order.parcelCancellation!.returnFee! > 0 ? Dimensions.paddingSizeSmall : 0),
+                                    Text(
+                                      controllerOrderModel.orderStatus!.tr,
+                                      style: robotoBold,
+                                    ),
+                                  ],
+                                ),
 
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                        ),
-                        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Text('canceled_by'.tr, style: robotoRegular.copyWith(color: Theme.of(context).colorScheme.error)),
+                                const SizedBox(
+                                  height: Dimensions.paddingSizeLarge,
+                                ),
 
-                          Text(order.parcelCancellation?.cancelBy?.toTitleCase() ?? '', style: robotoRegular),
-                        ]),
-                      ),
-                      const SizedBox(height: Dimensions.paddingSizeSmall),
+                                parcel &&
+                                        order?.orderStatus ==
+                                            AppConstants.canceled &&
+                                        !(order
+                                                ?.parcelCancellation
+                                                ?.beforePickup ==
+                                            1)
+                                    ? Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'return_date_and_time'.tr,
+                                            style: robotoRegular,
+                                          ),
 
-                      order.parcelCancellation?.reason != null && order.parcelCancellation!.reason!.isNotEmpty ? Text('cancellation_reason'.tr, style: robotoSemiBold) : const SizedBox(),
-                      SizedBox(height: order.parcelCancellation?.reason != null && order.parcelCancellation!.reason!.isNotEmpty ? Dimensions.paddingSizeSmall : 0),
+                                          Text(
+                                            order
+                                                        ?.parcelCancellation
+                                                        ?.returnDate !=
+                                                    null
+                                                ? DateConverterHelper.dateTimeStringToDateTime(
+                                                    order!
+                                                        .parcelCancellation!
+                                                        .returnDate!,
+                                                  )
+                                                : 'not_set_yet'.tr,
+                                            style: robotoRegular,
+                                          ),
+                                        ],
+                                      )
+                                    : const SizedBox(),
 
-                      order.parcelCancellation?.reason != null && order.parcelCancellation!.reason!.isNotEmpty ? Container(
-                          padding: const EdgeInsets.all(12),
-                          width: double.maxFinite,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).disabledColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: List.generate(order.parcelCancellation!.reason!.length, (index) {
-                              return Row(children: [
+                                controllerOrderModel.scheduleAt!.isNotEmpty &&
+                                        controllerOrderModel.scheduleAt != null
+                                    ? Column(
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '${'schedule'.tr} ',
+                                                style: robotoRegular,
+                                              ),
+                                              const Expanded(child: SizedBox()),
+
+                                              Text(
+                                                DateConverterHelper.dateTimeStringToDateTime(
+                                                  controllerOrderModel
+                                                      .scheduleAt!,
+                                                ),
+                                                style: robotoRegular,
+                                              ),
+                                            ],
+                                          ),
+                                          const SizedBox(
+                                            height: Dimensions.paddingSizeLarge,
+                                          ),
+                                        ],
+                                      )
+                                    : const SizedBox(),
+
+                                SizedBox(
+                                  height:
+                                      parcel &&
+                                          order?.orderStatus ==
+                                              AppConstants.canceled &&
+                                          !(order
+                                                  ?.parcelCancellation
+                                                  ?.beforePickup ==
+                                              1)
+                                      ? Dimensions.paddingSizeLarge
+                                      : 0,
+                                ),
+
+                                if (isDelivered != true)
+                                  Row(
+                                    children: [
+                                      Text(
+                                        '${digitalyPaid == true && controllerOrderModel.chargePayer != null
+                                            ? 'paid_by'.tr
+                                            : parcel
+                                            ? 'charge_payer'.tr
+                                            : 'item'.tr}:',
+                                        style: robotoRegular,
+                                      ),
+                                      const SizedBox(
+                                        width: Dimensions.paddingSizeExtraSmall,
+                                      ),
+                                      Text(
+                                        digitalyPaid == true &&
+                                                controllerOrderModel
+                                                        .chargePayer !=
+                                                    null
+                                            ? controllerOrderModel.chargePayer!
+                                            : parcel
+                                            ? controllerOrderModel
+                                                  .chargePayer!
+                                                  .tr
+                                            : orderController
+                                                  .orderDetailsModel!
+                                                  .length
+                                                  .toString(),
+                                        style: robotoMedium.copyWith(
+                                          color: Theme.of(context).primaryColor,
+                                        ),
+                                      ),
+                                      const Expanded(child: SizedBox()),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal:
+                                              Dimensions.paddingSizeSmall,
+                                          vertical:
+                                              Dimensions.paddingSizeExtraSmall,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(
+                                            context,
+                                          ).primaryColor.withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            5,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          cod!
+                                              ? 'cod'.tr
+                                              : wallet!
+                                              ? 'wallet'.tr
+                                              : partialPay!
+                                              ? 'partially_pay'.tr
+                                              : offlinePay!
+                                              ? 'offline_payment'.tr
+                                              : 'digitally_paid'.tr,
+                                          style: robotoMedium.copyWith(
+                                            fontSize:
+                                                Dimensions.fontSizeExtraSmall,
+                                            color: Theme.of(
+                                              context,
+                                            ).primaryColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                if (isDelivered != true)
+                                  orderController
+                                              .orderDetailsModel!
+                                              .isNotEmpty &&
+                                          orderController
+                                                  .orderDetailsModel![0]
+                                                  .itemDetails !=
+                                              null &&
+                                          orderController
+                                                  .orderDetailsModel![0]
+                                                  .itemDetails!
+                                                  .moduleType ==
+                                              'food'
+                                      ? Column(
+                                          children: [
+                                            const SizedBox(
+                                              height:
+                                                  Dimensions.paddingSizeLarge,
+                                            ),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  '${'cutlery'.tr} ',
+                                                  style: robotoRegular,
+                                                ),
+                                                const Expanded(
+                                                  child: SizedBox(),
+                                                ),
+
+                                                Text(
+                                                  controllerOrderModel.cutlery!
+                                                      ? 'yes'.tr
+                                                      : 'no'.tr,
+                                                  style: robotoRegular,
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        )
+                                      : const SizedBox(),
+
+                                SizedBox(height: Dimensions.paddingSizeSmall),
+                                Divider(
+                                  thickness: 1,
+                                  color: Theme.of(
+                                    context,
+                                  ).disabledColor.withValues(alpha: 0.05),
+                                ),
+                                SizedBox(
+                                  height: Dimensions.paddingSizeExtraSmall,
+                                ),
+
+                                isDelivered != true &&
+                                        controllerOrderModel
+                                                .unavailableItemNote !=
+                                            null
+                                    ? CustomOrderDetailsCard(
+                                        title:
+                                            '${'unavailable_item_note'.tr}: ',
+                                        metaValue: controllerOrderModel
+                                            .unavailableItemNote!,
+                                      )
+                                    : const SizedBox(),
+                                SizedBox(
+                                  height:
+                                      controllerOrderModel
+                                              .unavailableItemNote !=
+                                          null
+                                      ? Dimensions.paddingSizeSmall
+                                      : 0,
+                                ),
+
+                                isDelivered != true &&
+                                        controllerOrderModel
+                                                .deliveryInstruction !=
+                                            null
+                                    ? CustomOrderDetailsCard(
+                                        title: '${'delivery_instruction'.tr}: ',
+                                        metaValue: controllerOrderModel
+                                            .deliveryInstruction!
+                                            .tr,
+                                      )
+                                    : const SizedBox(),
+
+                                SizedBox(
+                                  height:
+                                      controllerOrderModel
+                                              .deliveryInstruction !=
+                                          null
+                                      ? Dimensions.paddingSizeSmall
+                                      : 0,
+                                ),
+
+                                isDelivered != true &&
+                                        controllerOrderModel
+                                                .bringChangeAmount !=
+                                            null &&
+                                        controllerOrderModel
+                                                .bringChangeAmount! >
+                                            0
+                                    ? Container(
+                                        width: double.infinity,
+                                        margin: EdgeInsets.only(
+                                          top: Dimensions.paddingSizeSmall,
+                                        ),
+                                        padding: const EdgeInsets.all(
+                                          Dimensions.paddingSizeSmall,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: const Color(
+                                            0XFF009AF1,
+                                          ).withValues(alpha: 0.1),
+                                          borderRadius: BorderRadius.circular(
+                                            Dimensions.radiusSmall,
+                                          ),
+                                        ),
+                                        child: RichText(
+                                          text: TextSpan(
+                                            children: [
+                                              TextSpan(
+                                                text: 'please_bring'.tr,
+                                                style: robotoRegular.copyWith(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyLarge?.color,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text:
+                                                    ' ${PriceConverterHelper.convertPrice(controllerOrderModel.bringChangeAmount)}',
+                                                style: robotoMedium.copyWith(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyLarge?.color,
+                                                ),
+                                              ),
+                                              TextSpan(
+                                                text:
+                                                    ' ${'in_change_for_the_customer_when_making_the_delivery'.tr}',
+                                                style: robotoRegular.copyWith(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).textTheme.bodyLarge?.color,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    : const SizedBox(),
+                                const SizedBox(
+                                  height: Dimensions.paddingSizeSmall,
+                                ),
+
+                                InfoCardWidget(
+                                  title: parcel
+                                      ? 'sender_details'.tr
+                                      : 'store_details'.tr,
+                                  address: parcel
+                                      ? controllerOrderModel.deliveryAddress
+                                      : DeliveryAddress(
+                                          address:
+                                              controllerOrderModel.storeAddress,
+                                        ),
+                                  image: parcel
+                                      ? ''
+                                      : '${controllerOrderModel.storeLogoFullUrl}',
+                                  name: parcel
+                                      ? controllerOrderModel
+                                            .deliveryAddress!
+                                            .contactPersonName
+                                      : controllerOrderModel.storeName,
+                                  phone: parcel
+                                      ? controllerOrderModel
+                                            .deliveryAddress!
+                                            .contactPersonNumber
+                                      : controllerOrderModel.storePhone,
+                                  latitude: parcel
+                                      ? controllerOrderModel
+                                            .deliveryAddress!
+                                            .latitude
+                                      : controllerOrderModel.storeLat,
+                                  longitude: parcel
+                                      ? controllerOrderModel
+                                            .deliveryAddress!
+                                            .longitude
+                                      : controllerOrderModel.storeLng,
+                                  showButton:
+                                      (controllerOrderModel.orderStatus !=
+                                          'delivered' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'failed' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'canceled' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'refunded'),
+                                  isStore: parcel ? false : true,
+                                  isChatAllow:
+                                      showChatPermission && isDelivered != true,
+                                  showCallButton: isDelivered != true,
+                                  messageOnTap: () => Get.toNamed(
+                                    RouteHelper.getChatRoute(
+                                      notificationBody: NotificationBodyModel(
+                                        orderId: controllerOrderModel.id,
+                                        vendorId: orderController
+                                            .orderDetailsModel![0]
+                                            .vendorId,
+                                      ),
+                                      user: User(
+                                        id: controllerOrderModel.storeId,
+                                        fName: controllerOrderModel.storeName,
+                                        imageFullUrl: controllerOrderModel
+                                            .storeLogoFullUrl,
+                                        phone: controllerOrderModel.storePhone,
+                                      ),
+                                    ),
+                                  ),
+                                  order: order!,
+                                ),
+                                const SizedBox(
+                                  height: Dimensions.paddingSizeLarge,
+                                ),
+
+                                InfoCardWidget(
+                                  title: parcel
+                                      ? 'receiver_details'.tr
+                                      : 'customer_contact_details'.tr,
+                                  address: parcel
+                                      ? controllerOrderModel.receiverDetails
+                                      : controllerOrderModel.deliveryAddress,
+                                  image: parcel
+                                      ? ''
+                                      : controllerOrderModel.customer != null
+                                      ? '${controllerOrderModel.customer!.imageFullUrl}'
+                                      : '',
+                                  name: parcel
+                                      ? controllerOrderModel
+                                            .receiverDetails!
+                                            .contactPersonName
+                                      : controllerOrderModel
+                                            .deliveryAddress!
+                                            .contactPersonName,
+                                  phone: parcel
+                                      ? controllerOrderModel
+                                            .receiverDetails!
+                                            .contactPersonNumber
+                                      : controllerOrderModel
+                                            .deliveryAddress!
+                                            .contactPersonNumber,
+                                  latitude: parcel
+                                      ? controllerOrderModel
+                                            .receiverDetails!
+                                            .latitude
+                                      : controllerOrderModel
+                                            .deliveryAddress!
+                                            .latitude,
+                                  longitude: parcel
+                                      ? controllerOrderModel
+                                            .receiverDetails!
+                                            .longitude
+                                      : controllerOrderModel
+                                            .deliveryAddress!
+                                            .longitude,
+                                  showButton:
+                                      controllerOrderModel.orderStatus !=
+                                          'delivered' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'failed' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'canceled' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'refunded' &&
+                                      controllerOrderModel.orderStatus !=
+                                          'returned',
+                                  isStore: parcel ? false : true,
+                                  isChatAllow:
+                                      (showChatPermission ||
+                                          controllerOrderModel
+                                                  .tootliDirectTrackable ==
+                                              true) &&
+                                      isDelivered != true,
+                                  showCallButton: isDelivered != true,
+                                  messageOnTap: () {
+                                    final int? oid = controllerOrderModel.id;
+                                    final bool useTootliDirectChat =
+                                        oid != null &&
+                                        (controllerOrderModel
+                                                    .tootliDirectTrackable ==
+                                                true ||
+                                            controllerOrderModel
+                                                .hasTootliDirectPublicTrackingUrl);
+                                    if (useTootliDirectChat) {
+                                      Get.toNamed(
+                                        RouteHelper.getTootliDirectTrackingChatRoute(
+                                          oid!,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    final Customer? c =
+                                        controllerOrderModel.customer;
+                                    if (c == null) {
+                                      if (controllerOrderModel.isGuest ==
+                                          true) {
+                                        showCustomSnackBar(
+                                          'tootli_direct_guest_chat_web_only'
+                                              .tr,
+                                          isError: false,
+                                        );
+                                      } else {
+                                        showCustomSnackBar(
+                                          'customer_not_found'.tr,
+                                          isError: true,
+                                        );
+                                      }
+                                      return;
+                                    }
+                                    Get.toNamed(
+                                      RouteHelper.getChatRoute(
+                                        notificationBody: NotificationBodyModel(
+                                          orderId: controllerOrderModel.id,
+                                          customerId: c.id,
+                                        ),
+                                        user: User(
+                                          id: c.id,
+                                          fName: c.fName,
+                                          lName: c.lName,
+                                          imageFullUrl: c.imageFullUrl,
+                                          phone: c.phone,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  order: order,
+                                ),
+                                const SizedBox(
+                                  height: Dimensions.paddingSizeLarge,
+                                ),
+
+                                isDelivered != true && parcel
+                                    ? Container(
+                                        padding: const EdgeInsets.all(
+                                          Dimensions.paddingSizeSmall,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                          borderRadius: BorderRadius.circular(
+                                            Dimensions.radiusSmall,
+                                          ),
+                                          boxShadow: Get.isDarkMode
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.grey[200]!,
+                                                    spreadRadius: 1,
+                                                    blurRadius: 5,
+                                                  ),
+                                                ],
+                                        ),
+                                        child:
+                                            controllerOrderModel
+                                                    .parcelCategory !=
+                                                null
+                                            ? Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    'parcel_category'.tr,
+                                                    style: robotoBold,
+                                                  ),
+                                                  const SizedBox(
+                                                    height: Dimensions
+                                                        .paddingSizeExtraSmall,
+                                                  ),
+                                                  Row(
+                                                    children: [
+                                                      ClipRRect(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              Dimensions
+                                                                  .radiusSmall,
+                                                            ),
+                                                        child: CustomImageWidget(
+                                                          image:
+                                                              '${controllerOrderModel.parcelCategory!.imageFullUrl}',
+                                                          height: 35,
+                                                          width: 35,
+                                                          fit: BoxFit.cover,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        width: Dimensions
+                                                            .paddingSizeSmall,
+                                                      ),
+                                                      Expanded(
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              controllerOrderModel
+                                                                  .parcelCategory!
+                                                                  .name!,
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: robotoRegular
+                                                                  .copyWith(
+                                                                    fontSize:
+                                                                        Dimensions
+                                                                            .fontSizeSmall,
+                                                                  ),
+                                                            ),
+                                                            Text(
+                                                              controllerOrderModel
+                                                                  .parcelCategory!
+                                                                  .description!,
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .ellipsis,
+                                                              style: robotoRegular.copyWith(
+                                                                fontSize: Dimensions
+                                                                    .fontSizeSmall,
+                                                                color: Theme.of(
+                                                                  context,
+                                                                ).disabledColor,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              )
+                                            : SizedBox(
+                                                width: context.width,
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      'parcel_category'.tr,
+                                                      style: robotoRegular,
+                                                    ),
+                                                    const SizedBox(
+                                                      height: Dimensions
+                                                          .paddingSizeExtraSmall,
+                                                    ),
+
+                                                    Text(
+                                                      'no_parcel_category_data_found'
+                                                          .tr,
+                                                      style: robotoMedium,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                      )
+                                    : Container(
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                          borderRadius: BorderRadius.circular(
+                                            Dimensions.radiusSmall,
+                                          ),
+                                          boxShadow: Get.isDarkMode
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.grey[200]!,
+                                                    spreadRadius: 1,
+                                                    blurRadius: 5,
+                                                  ),
+                                                ],
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 10,
+                                        ),
+                                        child: Column(
+                                          spacing: 10,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'item_info'.tr,
+                                              style: robotoBold.copyWith(
+                                                fontSize:
+                                                    Dimensions.fontSizeDefault,
+                                              ),
+                                            ),
+                                            ListView.separated(
+                                              shrinkWrap: true,
+                                              physics:
+                                                  const NeverScrollableScrollPhysics(),
+                                              itemCount: orderController
+                                                  .orderDetailsModel!
+                                                  .length,
+                                              itemBuilder: (context, index) {
+                                                return OrderItemWidget(
+                                                  order: controllerOrderModel,
+                                                  orderDetails: orderController
+                                                      .orderDetailsModel![index],
+                                                );
+                                              },
+                                              separatorBuilder:
+                                                  (context, index) {
+                                                    return Divider(height: 25);
+                                                  },
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                SizedBox(
+                                  height:
+                                      parcel && order.parcelCancellation != null
+                                      ? Dimensions.paddingSizeLarge
+                                      : 0,
+                                ),
+
+                                parcel && order.parcelCancellation != null
+                                    ? Container(
+                                        padding: const EdgeInsets.all(
+                                          Dimensions.paddingSizeSmall,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                          borderRadius: BorderRadius.circular(
+                                            Dimensions.radiusSmall,
+                                          ),
+                                          boxShadow: Get.isDarkMode
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.grey[200]!,
+                                                    spreadRadius: 1,
+                                                    blurRadius: 5,
+                                                  ),
+                                                ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            order
+                                                            .parcelCancellation!
+                                                            .returnFee !=
+                                                        null &&
+                                                    order
+                                                            .parcelCancellation!
+                                                            .returnFee! >
+                                                        0
+                                                ? Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          12,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Theme.of(context)
+                                                          .disabledColor
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            Dimensions
+                                                                .radiusDefault,
+                                                          ),
+                                                    ),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .spaceBetween,
+                                                      children: [
+                                                        Text(
+                                                          order.orderStatus ==
+                                                                  AppConstants
+                                                                      .returned
+                                                              ? 'collected_return_fee_from_customer'
+                                                                    .tr
+                                                              : 'collect_return_fee_from_customer'
+                                                                    .tr,
+                                                          style: robotoRegular,
+                                                        ),
+
+                                                        Text(
+                                                          PriceConverterHelper.convertPrice(
+                                                            order
+                                                                .parcelCancellation!
+                                                                .returnFee,
+                                                          ),
+                                                          style: robotoBold,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  )
+                                                : const SizedBox(),
+                                            SizedBox(
+                                              height:
+                                                  order
+                                                              .parcelCancellation!
+                                                              .returnFee !=
+                                                          null &&
+                                                      order
+                                                              .parcelCancellation!
+                                                              .returnFee! >
+                                                          0
+                                                  ? Dimensions.paddingSizeSmall
+                                                  : 0,
+                                            ),
+
+                                            Container(
+                                              padding: const EdgeInsets.all(12),
+                                              decoration: BoxDecoration(
+                                                color: Theme.of(context)
+                                                    .colorScheme
+                                                    .error
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(
+                                                      Dimensions.radiusDefault,
+                                                    ),
+                                              ),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Text(
+                                                    'canceled_by'.tr,
+                                                    style: robotoRegular
+                                                        .copyWith(
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).colorScheme.error,
+                                                        ),
+                                                  ),
+
+                                                  Text(
+                                                    order
+                                                            .parcelCancellation
+                                                            ?.cancelBy
+                                                            ?.toTitleCase() ??
+                                                        '',
+                                                    style: robotoRegular,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                              height:
+                                                  Dimensions.paddingSizeSmall,
+                                            ),
+
+                                            order.parcelCancellation?.reason !=
+                                                        null &&
+                                                    order
+                                                        .parcelCancellation!
+                                                        .reason!
+                                                        .isNotEmpty
+                                                ? Text(
+                                                    'cancellation_reason'.tr,
+                                                    style: robotoSemiBold,
+                                                  )
+                                                : const SizedBox(),
+                                            SizedBox(
+                                              height:
+                                                  order
+                                                              .parcelCancellation
+                                                              ?.reason !=
+                                                          null &&
+                                                      order
+                                                          .parcelCancellation!
+                                                          .reason!
+                                                          .isNotEmpty
+                                                  ? Dimensions.paddingSizeSmall
+                                                  : 0,
+                                            ),
+
+                                            order.parcelCancellation?.reason !=
+                                                        null &&
+                                                    order
+                                                        .parcelCancellation!
+                                                        .reason!
+                                                        .isNotEmpty
+                                                ? Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          12,
+                                                        ),
+                                                    width: double.maxFinite,
+                                                    decoration: BoxDecoration(
+                                                      color: Theme.of(context)
+                                                          .disabledColor
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            Dimensions
+                                                                .radiusDefault,
+                                                          ),
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: List.generate(
+                                                        order
+                                                            .parcelCancellation!
+                                                            .reason!
+                                                            .length,
+                                                        (index) {
+                                                          return Row(
+                                                            children: [
+                                                              Container(
+                                                                height: 5,
+                                                                width: 5,
+                                                                decoration: BoxDecoration(
+                                                                  color: Theme.of(context)
+                                                                      .textTheme
+                                                                      .bodyLarge
+                                                                      ?.color
+                                                                      ?.withValues(alpha: 0.7),
+                                                                  shape: BoxShape
+                                                                      .circle,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(
+                                                                width: Dimensions
+                                                                    .paddingSizeSmall,
+                                                              ),
+
+                                                              Expanded(
+                                                                child: Text(
+                                                                  order
+                                                                          .parcelCancellation!
+                                                                          .reason?[index] ??
+                                                                      '',
+                                                                  style: robotoRegular.copyWith(
+                                                                    color: Theme.of(context)
+                                                                        .textTheme
+                                                                        .bodyLarge
+                                                                        ?.color
+                                                                        ?.withValues(alpha: 0.7),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          );
+                                                        },
+                                                      ),
+                                                    ),
+                                                  )
+                                                : const SizedBox(),
+                                            SizedBox(
+                                              height:
+                                                  order
+                                                              .parcelCancellation
+                                                              ?.reason !=
+                                                          null &&
+                                                      order
+                                                          .parcelCancellation!
+                                                          .reason!
+                                                          .isNotEmpty
+                                                  ? Dimensions.paddingSizeSmall
+                                                  : 0,
+                                            ),
+
+                                            order.parcelCancellation?.note !=
+                                                    null
+                                                ? Text(
+                                                    'comments'.tr,
+                                                    style: robotoSemiBold,
+                                                  )
+                                                : const SizedBox(),
+                                            SizedBox(
+                                              height:
+                                                  order
+                                                          .parcelCancellation
+                                                          ?.note !=
+                                                      null
+                                                  ? Dimensions.paddingSizeSmall
+                                                  : 0,
+                                            ),
+
+                                            order.parcelCancellation?.note !=
+                                                    null
+                                                ? Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          12,
+                                                        ),
+                                                    width: double.maxFinite,
+                                                    decoration: BoxDecoration(
+                                                      color: Theme.of(context)
+                                                          .disabledColor
+                                                          .withValues(
+                                                            alpha: 0.1,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            Dimensions
+                                                                .radiusDefault,
+                                                          ),
+                                                    ),
+                                                    child: Text(
+                                                      order
+                                                              .parcelCancellation
+                                                              ?.note ??
+                                                          '',
+                                                      style: robotoRegular
+                                                          .copyWith(
+                                                            color:
+                                                                Theme.of(
+                                                                      context,
+                                                                    )
+                                                                    .textTheme
+                                                                    .bodyLarge
+                                                                    ?.color
+                                                                    ?.withValues(
+                                                                      alpha:
+                                                                          0.7,
+                                                                    ),
+                                                          ),
+                                                    ),
+                                                  )
+                                                : const SizedBox(),
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox(),
+
+                                (controllerOrderModel.orderNote != null &&
+                                        controllerOrderModel
+                                            .orderNote!
+                                            .isNotEmpty)
+                                    ? Container(
+                                        margin: !parcel
+                                            ? EdgeInsets.only(
+                                                top:
+                                                    Dimensions.paddingSizeLarge,
+                                              )
+                                            : null,
+                                        padding: const EdgeInsets.all(
+                                          Dimensions.paddingSizeSmall,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                          borderRadius: BorderRadius.circular(
+                                            Dimensions.radiusSmall,
+                                          ),
+                                          boxShadow: Get.isDarkMode
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.grey[200]!,
+                                                    spreadRadius: 1,
+                                                    blurRadius: 5,
+                                                  ),
+                                                ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'additional_note'.tr,
+                                              style: robotoBold.copyWith(
+                                                fontSize:
+                                                    Dimensions.fontSizeDefault,
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                              height:
+                                                  Dimensions.paddingSizeSmall,
+                                            ),
+                                            Container(
+                                              width: 1170,
+                                              padding: const EdgeInsets.all(
+                                                Dimensions.paddingSizeSmall,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                borderRadius:
+                                                    BorderRadius.circular(5),
+                                                border: Border.all(
+                                                  width: 1,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).disabledColor,
+                                                ),
+                                              ),
+                                              child: Text(
+                                                controllerOrderModel.orderNote!,
+                                                style: robotoRegular.copyWith(
+                                                  fontSize:
+                                                      Dimensions.fontSizeSmall,
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).disabledColor,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox(),
+
+                                // SizedBox(height: (controllerOrderModel.orderNote != null && controllerOrderModel.orderNote!.isNotEmpty) ? Dimensions.paddingSizeLarge : 0),
+                                (Get.find<SplashController>()
+                                            .getModule(
+                                              controllerOrderModel.moduleType,
+                                            )
+                                            .orderAttachment! &&
+                                        controllerOrderModel
+                                                .orderAttachmentFullUrl !=
+                                            null &&
+                                        controllerOrderModel
+                                            .orderAttachmentFullUrl!
+                                            .isNotEmpty)
+                                    ? Container(
+                                        margin: EdgeInsets.only(
+                                          top: Dimensions.paddingSizeLarge,
+                                        ),
+                                        padding: const EdgeInsets.all(
+                                          Dimensions.paddingSizeSmall,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).cardColor,
+                                          borderRadius: BorderRadius.circular(
+                                            Dimensions.radiusSmall,
+                                          ),
+                                          boxShadow: Get.isDarkMode
+                                              ? null
+                                              : [
+                                                  BoxShadow(
+                                                    color: Colors.grey[200]!,
+                                                    spreadRadius: 1,
+                                                    blurRadius: 5,
+                                                  ),
+                                                ],
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'prescription'.tr,
+                                              style: robotoRegular,
+                                            ),
+                                            const SizedBox(
+                                              height:
+                                                  Dimensions.paddingSizeSmall,
+                                            ),
+
+                                            GridView.builder(
+                                              gridDelegate:
+                                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                                    childAspectRatio: 1.5,
+                                                    crossAxisCount:
+                                                        ResponsiveHelper.isTab(
+                                                          context,
+                                                        )
+                                                        ? 5
+                                                        : 3,
+                                                    mainAxisSpacing: 10,
+                                                    crossAxisSpacing: 5,
+                                                  ),
+                                              shrinkWrap: true,
+                                              physics:
+                                                  const NeverScrollableScrollPhysics(),
+                                              itemCount: controllerOrderModel
+                                                  .orderAttachmentFullUrl!
+                                                  .length,
+                                              itemBuilder: (BuildContext context, index) {
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        right: 8,
+                                                      ),
+                                                  child: InkWell(
+                                                    onTap: () => openDialog(
+                                                      context,
+                                                      controllerOrderModel
+                                                          .orderAttachmentFullUrl![index],
+                                                    ),
+                                                    child: Center(
+                                                      child: ClipRRect(
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              Dimensions
+                                                                  .radiusSmall,
+                                                            ),
+                                                        child: CustomImageWidget(
+                                                          image: controllerOrderModel
+                                                              .orderAttachmentFullUrl![index],
+                                                          width: 100,
+                                                          height: 100,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                            const SizedBox(
+                                              height:
+                                                  Dimensions.paddingSizeLarge,
+                                            ),
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox(),
+
+                                (controllerOrderModel.orderStatus ==
+                                            'delivered' &&
+                                        controllerOrderModel
+                                                .orderProofFullUrl !=
+                                            null &&
+                                        controllerOrderModel
+                                            .orderProofFullUrl!
+                                            .isNotEmpty)
+                                    ? Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const SizedBox(
+                                            height: Dimensions.paddingSizeSmall,
+                                          ),
+                                          Text(
+                                            'order_proof'.tr,
+                                            style: robotoRegular,
+                                          ),
+                                          const SizedBox(
+                                            height: Dimensions.paddingSizeSmall,
+                                          ),
+
+                                          GridView.builder(
+                                            gridDelegate:
+                                                SliverGridDelegateWithFixedCrossAxisCount(
+                                                  childAspectRatio: 1.5,
+                                                  crossAxisCount:
+                                                      ResponsiveHelper.isTab(
+                                                        context,
+                                                      )
+                                                      ? 5
+                                                      : 3,
+                                                  mainAxisSpacing: 10,
+                                                  crossAxisSpacing: 5,
+                                                ),
+                                            shrinkWrap: true,
+                                            physics:
+                                                const NeverScrollableScrollPhysics(),
+                                            itemCount: controllerOrderModel
+                                                .orderProofFullUrl!
+                                                .length,
+                                            itemBuilder: (BuildContext context, index) {
+                                              return Padding(
+                                                padding: const EdgeInsets.only(
+                                                  right: 8,
+                                                ),
+                                                child: InkWell(
+                                                  onTap: () => openDialog(
+                                                    context,
+                                                    controllerOrderModel
+                                                        .orderProofFullUrl![index],
+                                                  ),
+                                                  child: Center(
+                                                    child: ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            Dimensions
+                                                                .radiusSmall,
+                                                          ),
+                                                      child: CustomImageWidget(
+                                                        image: controllerOrderModel
+                                                            .orderProofFullUrl![index],
+                                                        width: 100,
+                                                        height: 100,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      )
+                                    : const SizedBox(),
+
                                 Container(
-                                  height: 5, width: 5,
+                                  margin: EdgeInsets.only(
+                                    top: Dimensions.paddingSizeLarge,
+                                  ),
+                                  padding: const EdgeInsets.all(
+                                    Dimensions.paddingSizeSmall,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.7),
-                                    shape: BoxShape.circle,
+                                    color: Theme.of(context).cardColor,
+                                    borderRadius: BorderRadius.circular(
+                                      Dimensions.radiusSmall,
+                                    ),
+                                    boxShadow: Get.isDarkMode
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: Colors.grey[200]!,
+                                              spreadRadius: 1,
+                                              blurRadius: 5,
+                                            ),
+                                          ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'ganancia_neta_por_este_viaje'.tr,
+                                        style: robotoBold.copyWith(
+                                          fontSize: Dimensions.fontSizeDefault,
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        height: Dimensions.paddingSizeSmall,
+                                      ),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            'ganancia_limpia_envio_propina'.tr,
+                                            style: robotoRegular,
+                                          ),
+                                          Text(
+                                            PriceConverterHelper.convertPrice(
+                                              (order?.deliveryCharge ?? 0) +
+                                                  (order?.dmTips ?? 0),
+                                            ),
+                                            style: robotoMedium.copyWith(
+                                              fontSize:
+                                                  Dimensions.fontSizeLarge,
+                                              color: Theme.of(
+                                                context,
+                                              ).primaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(width: Dimensions.paddingSizeSmall),
 
-                                Expanded(child: Text(order.parcelCancellation!.reason?[index] ?? '', style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.7)))),
-                              ]);
-                            },
-                            ),
-                          )) : const SizedBox(),
-                      SizedBox(height: order.parcelCancellation?.reason != null && order.parcelCancellation!.reason!.isNotEmpty ? Dimensions.paddingSizeSmall : 0),
-
-                      order.parcelCancellation?.note != null ? Text('comments'.tr, style: robotoSemiBold) : const SizedBox(),
-                      SizedBox(height: order.parcelCancellation?.note != null ? Dimensions.paddingSizeSmall : 0),
-
-                      order.parcelCancellation?.note != null ? Container(
-                        padding: const EdgeInsets.all(12),
-                        width: double.maxFinite,
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).disabledColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                        ),
-                        child: Text(order.parcelCancellation?.note ?? '', style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge?.color?.withValues(alpha: 0.7))),
-                      ) : const SizedBox(),
-                    ]),
-                  ) : const SizedBox(),
-
-                  (controllerOrderModel.orderNote != null && controllerOrderModel.orderNote!.isNotEmpty) ? Container(
-                    margin: !parcel ? EdgeInsets.only(top: Dimensions.paddingSizeLarge) : null,
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                      boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('additional_note'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
-                      const SizedBox(height: Dimensions.paddingSizeSmall),
-                      Container(
-                        width: 1170,
-                        padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(width: 1, color: Theme.of(context).disabledColor),
-                        ),
-                        child: Text(
-                          controllerOrderModel.orderNote!,
-                          style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
-                        ),
-                      ),
-                    ]),
-                  ) : const SizedBox(),
-                  // SizedBox(height: (controllerOrderModel.orderNote != null && controllerOrderModel.orderNote!.isNotEmpty) ? Dimensions.paddingSizeLarge : 0),
-
-                  (Get.find<SplashController>().getModule(controllerOrderModel.moduleType).orderAttachment!
-                      && controllerOrderModel.orderAttachmentFullUrl != null && controllerOrderModel.orderAttachmentFullUrl!.isNotEmpty)
-                      ? Container(
-                        margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
-                        padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardColor,
-                          borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                          boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-                        ),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text('prescription'.tr, style: robotoRegular),
-                          const SizedBox(height: Dimensions.paddingSizeSmall),
-
-                          GridView.builder(
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              childAspectRatio: 1.5,
-                              crossAxisCount: ResponsiveHelper.isTab(context) ? 5 : 3,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 5,
-                            ),
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: controllerOrderModel.orderAttachmentFullUrl!.length,
-                            itemBuilder: (BuildContext context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: InkWell(
-                                  onTap: () => openDialog(context, controllerOrderModel.orderAttachmentFullUrl![index]),
-                                  child: Center(child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                                    child: CustomImageWidget(
-                                      image: controllerOrderModel.orderAttachmentFullUrl![index],
-                                      width: 100, height: 100,
-                                    ),
-                                  )),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: Dimensions.paddingSizeLarge),
-                        ]),
-                      ) : const SizedBox(),
-
-                  (controllerOrderModel.orderStatus == 'delivered' && controllerOrderModel.orderProofFullUrl != null
-                  && controllerOrderModel.orderProofFullUrl!.isNotEmpty) ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    const SizedBox(height: Dimensions.paddingSizeSmall),
-                    Text('order_proof'.tr, style: robotoRegular),
-                    const SizedBox(height: Dimensions.paddingSizeSmall),
-
-                    GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        childAspectRatio: 1.5,
-                        crossAxisCount: ResponsiveHelper.isTab(context) ? 5 : 3,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 5,
-                      ),
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: controllerOrderModel.orderProofFullUrl!.length,
-                      itemBuilder: (BuildContext context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: InkWell(
-                            onTap: () => openDialog(context, controllerOrderModel.orderProofFullUrl![index]),
-                            child: Center(child: ClipRRect(
-                              borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                              child: CustomImageWidget(
-                                image: controllerOrderModel.orderProofFullUrl![index],
-                                width: 100, height: 100,
-                              ),
-                            )),
-                          ),
-                        );
-                      },
-                    ),
-                  ]) : const SizedBox(),
-
-
-                  Container(
+                                /*Container(
                     margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
                     padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
                     decoration: BoxDecoration(
@@ -652,28 +1626,9 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                       borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
                       boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
                     ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('ganancia_neta_por_este_viaje'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
-                      SizedBox(height: Dimensions.paddingSizeSmall),
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text('ganancia_limpia_envio_propina'.tr, style: robotoRegular),
-                        Text(
-                          PriceConverterHelper.convertPrice((order?.deliveryCharge ?? 0) + (order?.dmTips ?? 0)),
-                          style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).primaryColor),
-                        ),
-                      ]),
-                    ]),
-                  ),
-
-                  Container(
-                    margin: EdgeInsets.only(top: Dimensions.paddingSizeLarge),
-                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).cardColor,
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                      boxShadow: Get.isDarkMode ? null : [BoxShadow(color: Colors.grey[200]!, spreadRadius: 1, blurRadius: 5)],
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    child: 
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text('billing_summary'.tr, style: robotoBold.copyWith(fontSize: Dimensions.fontSizeDefault)),
                       SizedBox(height: Dimensions.paddingSizeSmall),
 
@@ -839,21 +1794,36 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
                         ),
                       ]) : const SizedBox(),
                     ]),
-                  ),
+                  ),*/
+                              ],
+                            ),
+                          ),
+                        ),
 
-                ]),
-              )),
-
-              parcel ? ParcelBottomView(
-                orderController: orderController, controllerOrderModel: controllerOrderModel, orderId: widget.orderId!,
-                fromLocationScreen: widget.fromLocationScreen, showDeliveryConfirmImage: showDeliveryConfirmImage, total: total,
-              ) : RegularOrderBottomView(
-                orderController: orderController, controllerOrderModel: controllerOrderModel, fromLocationScreen: widget.fromLocationScreen,
-                orderId: widget.orderId!, showDeliveryConfirmImage: showDeliveryConfirmImage, total: total,
-              ),
-
-            ]) : const Center(child: CircularProgressIndicator());
-          }),
+                        parcel
+                            ? ParcelBottomView(
+                                orderController: orderController,
+                                controllerOrderModel: controllerOrderModel,
+                                orderId: widget.orderId!,
+                                fromLocationScreen: widget.fromLocationScreen,
+                                showDeliveryConfirmImage:
+                                    showDeliveryConfirmImage,
+                                total: total,
+                              )
+                            : RegularOrderBottomView(
+                                orderController: orderController,
+                                controllerOrderModel: controllerOrderModel,
+                                fromLocationScreen: widget.fromLocationScreen,
+                                orderId: widget.orderId!,
+                                showDeliveryConfirmImage:
+                                    showDeliveryConfirmImage,
+                                total: total,
+                              ),
+                      ],
+                    )
+                  : const Center(child: CircularProgressIndicator());
+            },
+          ),
         ),
       ),
     );
@@ -863,25 +1833,31 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> with WidgetsBin
     context: context,
     builder: (BuildContext context) {
       return Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Dimensions.radiusLarge)),
-        child: Stack(children: [
-
-          ClipRRect(
-            borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
-            child: PhotoView(
-              tightMode: true,
-              imageProvider: NetworkImage(imageUrl),
-              heroAttributes: PhotoViewHeroAttributes(tag: imageUrl),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+        ),
+        child: Stack(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Dimensions.radiusLarge),
+              child: PhotoView(
+                tightMode: true,
+                imageProvider: NetworkImage(imageUrl),
+                heroAttributes: PhotoViewHeroAttributes(tag: imageUrl),
+              ),
             ),
-          ),
 
-          Positioned(top: 0, right: 0, child: IconButton(
-            splashRadius: 5,
-            onPressed: () => Get.back(),
-            icon: const Icon(Icons.cancel, color: Colors.red),
-          )),
-
-        ]),
+            Positioned(
+              top: 0,
+              right: 0,
+              child: IconButton(
+                splashRadius: 5,
+                onPressed: () => Get.back(),
+                icon: const Icon(Icons.cancel, color: Colors.red),
+              ),
+            ),
+          ],
+        ),
       );
     },
   );

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/material.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
@@ -64,11 +65,23 @@ class ProfileController extends GetxController implements GetxService {
     ProfileModel? profileModel = await profileServiceInterface.getProfileInfo();
     if (profileModel != null) {
       _profileModel = profileModel;
+      debugPrint(
+        "[ProfileController] 👤 Profile loaded: ID=${_profileModel!.id}, Name=${_profileModel!.fName}",
+      );
+      debugPrint(
+        "   - Active: ${_profileModel!.active}, Zone ID: ${_profileModel!.zoneId}",
+      );
+      debugPrint(
+        "   - Vehicle ID: ${_profileModel!}, Status: ${_profileModel!.applicationStatus}",
+      );
+
       if (_profileModel!.active == 1) {
         profileServiceInterface.checkPermission(() => startLocationRecord());
       } else {
         stopLocationRecord();
-        profileServiceInterface.checkPermission(() => startMapLocationWhileInactive());
+        profileServiceInterface.checkPermission(
+          () => startMapLocationWhileInactive(),
+        );
       }
     }
     update();
@@ -119,7 +132,9 @@ class ProfileController extends GetxController implements GetxService {
         profileServiceInterface.checkPermission(() => startLocationRecord());
       } else {
         stopLocationRecord();
-        profileServiceInterface.checkPermission(() => startMapLocationWhileInactive());
+        profileServiceInterface.checkPermission(
+          () => startMapLocationWhileInactive(),
+        );
       }
     } else {
       if (isPendingRegistrationDashboard) {
@@ -215,13 +230,19 @@ class ProfileController extends GetxController implements GetxService {
   }
 
   List<OfflinePaymentMethodModel>? _offlinePaymentMethods;
-  List<OfflinePaymentMethodModel>? get offlinePaymentMethods => _offlinePaymentMethods;
+  List<OfflinePaymentMethodModel>? get offlinePaymentMethods =>
+      _offlinePaymentMethods;
 
   Future<void> getOfflinePaymentMethodList() async {
-    Response response = await profileServiceInterface.getOfflinePaymentMethodList();
+    Response response = await profileServiceInterface
+        .getOfflinePaymentMethodList();
     if (response.statusCode == 200) {
       _offlinePaymentMethods = [];
-      response.body.forEach((method) => _offlinePaymentMethods!.add(OfflinePaymentMethodModel.fromJson(method)));
+      response.body.forEach(
+        (method) => _offlinePaymentMethods!.add(
+          OfflinePaymentMethodModel.fromJson(method),
+        ),
+      );
     }
     update();
   }
@@ -229,7 +250,8 @@ class ProfileController extends GetxController implements GetxService {
   Future<ResponseModel> makeOfflinePayment(Map<String, String> data) async {
     _isLoading = true;
     update();
-    ResponseModel responseModel = await profileServiceInterface.makeOfflinePayment(data);
+    ResponseModel responseModel = await profileServiceInterface
+        .makeOfflinePayment(data);
     if (responseModel.isSuccess) {
       getProfile();
     }

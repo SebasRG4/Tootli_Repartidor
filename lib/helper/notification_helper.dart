@@ -65,7 +65,9 @@ class NotificationHelper {
     var androidInitialize = const AndroidInitializationSettings(
       'notification_icon',
     );
-    var iOSInitialize = const DarwinInitializationSettings();
+    var iOSInitialize = const DarwinInitializationSettings(
+      requestAlertPermission: true,
+    );
     var initializationsSettings = InitializationSettings(
       android: androidInitialize,
       iOS: iOSInitialize,
@@ -112,7 +114,7 @@ class NotificationHelper {
                   Get.offAllNamed(RouteHelper.getSignInRoute()),
               NotificationType.otp: () => null,
               NotificationType.unassign: () =>
-                  Get.to(const DashboardScreen(pageIndex: 1)),
+                  Get.offAllNamed(RouteHelper.getMainRoute('order-request')),
               NotificationType.message: () => Get.toNamed(
                 RouteHelper.getChatRoute(
                   notificationBody: payload,
@@ -269,7 +271,7 @@ class NotificationHelper {
         Get.find<ProfileController>().stopLocationRecord();
         Get.offAllNamed(RouteHelper.getSignInRoute());
       } else if (type == 'unassign') {
-        Get.to(const DashboardScreen(pageIndex: 1));
+        Get.offAllNamed(RouteHelper.getMainRoute('order-request'));
       } else {
         // Para cualquier otro tipo, mostrar notificación estándar
         NotificationHelper.showNotification(
@@ -332,7 +334,7 @@ class NotificationHelper {
                 Get.offAllNamed(RouteHelper.getSignInRoute()),
             NotificationType.otp: () => null,
             NotificationType.unassign: () =>
-                Get.to(const DashboardScreen(pageIndex: 1)),
+                Get.offAllNamed(RouteHelper.getMainRoute('order-request')),
             NotificationType.message: () => Get.toNamed(
               RouteHelper.getChatRoute(
                 notificationBody: notificationBody,
@@ -467,7 +469,9 @@ class NotificationHelper {
           playSound: true,
           importance: Importance.max,
           priority: Priority.max,
-          sound: const RawResourceAndroidNotificationSound('alert_new_delivery'),
+          sound: const RawResourceAndroidNotificationSound(
+            'alert_new_delivery',
+          ),
         );
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -501,7 +505,10 @@ class NotificationHelper {
           styleInformation: bigTextStyleInformation,
           priority: Priority.max,
           playSound: true,
-          sound: const RawResourceAndroidNotificationSound('alert_new_delivery'),
+          sound: const RawResourceAndroidNotificationSound(
+            'alert_new_delivery',
+          ),
+          fullScreenIntent: true,
         );
     NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
@@ -547,7 +554,10 @@ class NotificationHelper {
           playSound: true,
           styleInformation: bigPictureStyleInformation,
           importance: Importance.max,
-          sound: const RawResourceAndroidNotificationSound('alert_new_delivery'),
+          sound: const RawResourceAndroidNotificationSound(
+            'alert_new_delivery',
+          ),
+          fullScreenIntent: true,
         );
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,

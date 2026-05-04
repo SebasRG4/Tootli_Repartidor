@@ -58,9 +58,9 @@ Future<void> main() async {
               AVAudioSessionRouteSharingPolicy.defaultPolicy,
           avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
           androidAudioAttributes: AndroidAudioAttributes(
-            contentType: AndroidAudioContentType.sonification,
+            contentType: AndroidAudioContentType.music,
             flags: AndroidAudioFlags.none,
-            usage: AndroidAudioUsage.notification,
+            usage: AndroidAudioUsage.alarm,
           ),
           androidAudioFocusGainType:
               AndroidAudioFocusGainType.gainTransientMayDuck,

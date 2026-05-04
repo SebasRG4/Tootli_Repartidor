@@ -75,7 +75,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       Get.find<OrderController>().getLatestOrders().then((_) {
         if (!mounted) return;
         final latestOrders = Get.find<OrderController>().latestOrderList;
-        if (latestOrders != null && latestOrders.isNotEmpty) {
+        if (latestOrders != null && latestOrders.isNotEmpty && _pageIndex == 0) {
           // Usar _dispatchOrderToHome en vez de showOrderRequest directo.
           // Esto asegura que pase por la deduplicación de _shownOrderIds:
           // si el FCM ya mostró este pedido, el initState no lo mostrará de nuevo.
@@ -103,10 +103,20 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     // centralizadas en NotificationHelper vía OrderNotificationService.
     OrderNotificationService.instance.onOrderRequestTapped = (int orderId) {
       if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
-      debugPrint("[Dashboard] 📩 CALLBACK FIRED for order $orderId");
+      debugPrint("[Dashboard] 📩 CALLBACK FIRED for order $orderId. Current page: $_pageIndex");
       if (!mounted) return;
-      if (_pageIndex != 0) _setPage(0);
-      _triggerShowOrder(orderId);
+      
+      // Si ya está en la pantalla de Centro de Pedidos, solo refrescamos la lista.
+      if (_pageIndex == 1) {
+        debugPrint("[Dashboard] Already in OrderRequestScreen, just refreshing latest orders...");
+        Get.find<OrderController>().getLatestOrders(filterIgnored: false);
+      } else {
+        // Si está en otra pantalla, lo llevamos a Home (página 0) para mostrar el Bottom Sheet
+        // o a OrderRequestScreen (página 1) si así lo prefiriera el usuario.
+        // Por ahora mantenemos el flujo de Home para el Bottom Sheet Premium.
+        _setPage(0);
+        _triggerShowOrder(orderId);
+      }
     };
 
     // 🚀 Start Real-Time WebSocket Connection
@@ -218,6 +228,18 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     
     final id = order.id;
     if (id == null) return;
+
+    debugPrint("[Dashboard] 📨 _dispatchOrderToHome called for order $id (Current page: $_pageIndex)");
+
+    // 🔊 Si es un pedido nuevo detectado por Polling/Init (no por FCM/Pusher), 
+    // forzamos el sonido para que el repartidor no lo pierda.
+    if (!_shownOrderIds.contains(id)) {
+      debugPrint("****************************************************");
+      debugPrint("🔊 [Dashboard] DETECTED NEW ORDER $id - TRIGGERING SOUND");
+      debugPrint("****************************************************");
+      OrderNotificationService.instance.playOrderRequestAlertSound();
+      _shownOrderIds.add(id);
+    }
 
     final homeState = _homeScreenKey.currentState;
     
@@ -525,5 +547,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       _pageController!.jumpToPage(pageIndex);
       _pageIndex = pageIndex;
     });
+
+    if (pageIndex != 0) {
+      _homeScreenKey.currentState?.cancelOrderRequest(callApi: false);
+    }
   }
 }

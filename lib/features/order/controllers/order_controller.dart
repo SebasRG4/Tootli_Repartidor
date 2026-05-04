@@ -310,6 +310,7 @@ class OrderController extends GetxController implements GetxService {
     bool willUpdate = true,
     String? status,
   }) async {
+    debugPrint("[OrderController] 🔄 Fetching running orders (offset: $offset, status: $status)...");
     String orderStatus = status ?? _selectedRunningStatus;
     if (status != null) {
       _selectedRunningStatus = status;
@@ -332,10 +333,15 @@ class OrderController extends GetxController implements GetxService {
           _currentOrderList = [];
         }
         _currentOrderList!.addAll(paginatedOrderModel.orders!);
+        debugPrint("[OrderController] ✅ Received ${paginatedOrderModel.orders!.length} running orders");
+        for (var order in paginatedOrderModel.orders!) {
+          debugPrint("   - Order ID: ${order.id}, Status: ${order.orderStatus}");
+        }
         _pageSize = paginatedOrderModel.totalSize;
         _paginate = false;
         update();
       } else {
+        debugPrint("[OrderController] ❌ API returned NULL for running orders");
         if (_paginate) {
           _paginate = false;
           update();
@@ -344,20 +350,33 @@ class OrderController extends GetxController implements GetxService {
     }
   }
 
-  Future<void> getLatestOrders() async {
+  Future<void> getLatestOrders({bool filterIgnored = true}) async {
+    debugPrint("[OrderController] 🔄 Fetching latest orders (filterIgnored: $filterIgnored)...");
     List<OrderModel>? latestOrderList = await orderServiceInterface
         .getLatestOrders();
     if (latestOrderList != null) {
+      debugPrint("[OrderController] ✅ Received ${latestOrderList.length} orders from API");
+      if (latestOrderList.isEmpty) {
+        debugPrint("[OrderController] ℹ️ API returned an empty list. This usually means no orders in your zone/range.");
+      }
       _latestOrderList = [];
-      List<int?> ignoredIdList = orderServiceInterface.prepareIgnoreIdList(
-        _ignoredRequests,
-      );
-      _latestOrderList!.addAll(
-        orderServiceInterface.processLatestOrders(
-          latestOrderList,
-          ignoredIdList,
-        ),
-      );
+      
+      if (filterIgnored) {
+        List<int?> ignoredIdList = orderServiceInterface.prepareIgnoreIdList(
+          _ignoredRequests,
+        );
+        _latestOrderList!.addAll(
+          orderServiceInterface.processLatestOrders(
+            latestOrderList,
+            ignoredIdList,
+          ),
+        );
+      } else {
+        _latestOrderList!.addAll(latestOrderList);
+      }
+      debugPrint("[OrderController] 📝 After filtering, list has ${_latestOrderList!.length} orders");
+    } else {
+      debugPrint("[OrderController] ❌ API returned NULL latestOrderList");
     }
     update();
   }
@@ -475,6 +494,8 @@ class OrderController extends GetxController implements GetxService {
   }
 
   Future<bool> ignoreOrderApi(int orderId) async {
+    debugPrint("[OrderController] 🚫 ignoreOrderApi called for ID: $orderId");
+    debugPrintStack(label: "Ignore Call Stack");
     _isLoading = true;
     update();
     ResponseModel responseModel = await orderServiceInterface.ignoreOrderApi(

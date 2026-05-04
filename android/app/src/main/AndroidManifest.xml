@@ -29,6 +29,14 @@
     <!-- Rastreo GPS en segundo plano (Android 10+; tipo location obligatorio desde API 34) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
+    <!-- Permisos para superposición y despertar pantalla (Burbuja de pedido) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.DISABLE_KEYGUARD" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />

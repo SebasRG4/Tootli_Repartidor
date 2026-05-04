@@ -214,6 +214,7 @@ class HomeScreenState extends State<HomeScreen> {
   Future<void> checkPermission() async {
     var notificationStatus = await Permission.notification.status;
     var batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+    var overlayStatus = await Permission.systemAlertWindow.status;
 
     if (!mounted) return;
 
@@ -231,6 +232,8 @@ class HomeScreenState extends State<HomeScreen> {
         _isBatteryOptimizationGranted = false;
         _isNotificationPermissionGranted = true;
       });
+    } else if (overlayStatus.isDenied && GetPlatform.isAndroid) {
+       // Opcional: manejar estado de superposición
     } else {
       setState(() {
         _isNotificationPermissionGranted = true;
@@ -448,7 +451,8 @@ class HomeScreenState extends State<HomeScreen> {
                             context.mediaQueryPadding.top +
                             Dimensions.paddingSizeSmall,
                         right: Dimensions.paddingSizeDefault,
-                        child: GetBuilder<NotificationController>(
+                        child: GetBuilder<OrderController>(builder: (orderController) {
+                          return (orderController.latestOrderList != null && orderController.latestOrderList!.isNotEmpty) ? const SizedBox() : GetBuilder<NotificationController>(
                           builder: (notificationController) {
                             return InkWell(
                               onTap: () => Get.toNamed(
@@ -508,7 +512,8 @@ class HomeScreenState extends State<HomeScreen> {
                               ),
                             );
                           },
-                        ),
+                        );
+                        }),
                       ),
 
                       // Earnings Button
@@ -727,7 +732,7 @@ class HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void cancelOrderRequest() {
+  void cancelOrderRequest({bool callApi = true}) {
     if (_orderPhase != 'none') {
       Get.dialog(
         Dialog(
@@ -777,7 +782,7 @@ class HomeScreenState extends State<HomeScreen> {
                         buttonText: 'Confirmar',
                         onPressed: () {
                           Get.back();
-                          _performCancellation();
+                          _performCancellation(callApi: callApi);
                         },
                         height: 40,
                       ),
@@ -790,13 +795,14 @@ class HomeScreenState extends State<HomeScreen> {
         ),
       );
     } else {
-      _performCancellation();
+      _performCancellation(callApi: callApi);
     }
   }
 
-  void _performCancellation() async {
+  void _performCancellation({bool callApi = true}) async {
+    debugPrint("[HomeScreen] ❌ _performCancellation called (callApi: $callApi) for order ${_activeOrderRequest?.id}");
     OrderNotificationService.instance.stopAudio();
-    if (_activeOrderRequest != null && _activeOrderRequest!.id != 999) {
+    if (callApi && _activeOrderRequest != null && _activeOrderRequest!.id != 999) {
       Get.find<OrderController>().ignoreOrderApi(_activeOrderRequest!.id!);
     }
 
