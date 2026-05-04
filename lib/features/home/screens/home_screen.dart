@@ -39,6 +39,7 @@ class HomeScreen extends StatefulWidget {
     this.onTapMenu,
     this.onOrderActiveStatusChanged,
   });
+
   /// Registro con `application_status` pending (revisión inicial o correcciones del admin).
   final bool pendingRegistrationDashboard;
   final Function()? onNavigateToOrders;
@@ -63,8 +64,14 @@ class HomeScreenState extends State<HomeScreen> {
   String _orderPhase = 'none'; // 'none', 'going_to_store', 'going_to_customer'
   String? _estimatedArrivalTime;
   final AudioPlayer _governanceAudioPlayer = AudioPlayer();
+  Timer? _inactivityTimer;
+  int _inactivitySeconds = 0;
+  LatLng? _lastInactivityPosition;
+  bool _isShowingInactivityDialog = false;
+
   /// Último orderId enviado a showOrderRequest para evitar mostrar el mismo pedido dos veces
   int? _lastShownOrderId;
+
   /// Marcadores precargados — se decodifican una sola vez en initState
   Uint8List? _cachedStoreMarker;
   Uint8List? _cachedDestinationMarker;
@@ -92,12 +99,20 @@ class HomeScreenState extends State<HomeScreen> {
     _gridTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _refreshGrids();
     });
+
+    _startInactivityTimer();
   }
 
   Future<void> _preloadMarkers() async {
     try {
-      _cachedStoreMarker = await _convertAssetToUnit8List(Images.store, width: 40);
-      _cachedDestinationMarker = await _convertAssetToUnit8List(Images.homeDelivery, width: 40);
+      _cachedStoreMarker = await _convertAssetToUnit8List(
+        Images.store,
+        width: 40,
+      );
+      _cachedDestinationMarker = await _convertAssetToUnit8List(
+        Images.homeDelivery,
+        width: 40,
+      );
     } catch (e) {
       debugPrint('[HomeScreen] Error precargando marcadores: $e');
     }
@@ -178,14 +193,19 @@ class HomeScreenState extends State<HomeScreen> {
     final int? orderId = _activeOrderRequest!.id;
     if (orderId == null) return;
 
-    debugPrint('[HomeScreen] resumed con pedido activo $orderId — refrescando...');
-    final OrderModel? refreshed =
-        await Get.find<OrderController>().fetchOrderForNotification(orderId);
+    debugPrint(
+      '[HomeScreen] resumed con pedido activo $orderId — refrescando...',
+    );
+    final OrderModel? refreshed = await Get.find<OrderController>()
+        .fetchOrderForNotification(orderId);
     if (!mounted || refreshed == null) return;
 
     final String status = refreshed.orderStatus ?? '';
     // Si el pedido ya terminó, limpiar la pantalla
-    if (status == 'delivered' || status == 'canceled' || status == 'returned' || status == 'failed') {
+    if (status == 'delivered' ||
+        status == 'canceled' ||
+        status == 'returned' ||
+        status == 'failed') {
       setState(() {
         _activeOrderRequest = null;
         _orderPhase = 'none';
@@ -200,7 +220,9 @@ class HomeScreenState extends State<HomeScreen> {
     String newPhase = _orderPhase;
     if (status == 'picked_up') {
       newPhase = 'going_to_customer';
-    } else if (status == 'handover' || status == 'processing' || status == 'confirmed') {
+    } else if (status == 'handover' ||
+        status == 'processing' ||
+        status == 'confirmed') {
       newPhase = 'going_to_store';
     }
 
@@ -233,7 +255,7 @@ class HomeScreenState extends State<HomeScreen> {
         _isNotificationPermissionGranted = true;
       });
     } else if (overlayStatus.isDenied && GetPlatform.isAndroid) {
-       // Opcional: manejar estado de superposición
+      // Opcional: manejar estado de superposición
     } else {
       setState(() {
         _isNotificationPermissionGranted = true;
@@ -272,7 +294,6 @@ class HomeScreenState extends State<HomeScreen> {
     checkPermission();
   }
 
-
   void _getPolygons(List<ZoneModel> zoneList) {
     _polygons.clear();
     int? profileZoneId = Get.find<ProfileController>().profileModel?.zoneId;
@@ -299,6 +320,7 @@ class HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _gridTimer?.cancel();
+    _inactivityTimer?.cancel();
     _governanceAudioPlayer.dispose();
     _listener.dispose();
     super.dispose();
@@ -313,7 +335,6 @@ class HomeScreenState extends State<HomeScreen> {
 
       body: GetBuilder<OrderController>(
         builder: (orderController) {
-
           return GetBuilder<ProfileController>(
             builder: (profileController) {
               // Auto-centro inicial cuando la ubicación llega por primera vez y no hay pedido activo
@@ -446,75 +467,85 @@ class HomeScreenState extends State<HomeScreen> {
 
                       // Notification Button
                       if (!profileController.isPendingRegistrationDashboard)
-                      Positioned(
-                        top:
-                            context.mediaQueryPadding.top +
-                            Dimensions.paddingSizeSmall,
-                        right: Dimensions.paddingSizeDefault,
-                        child: GetBuilder<OrderController>(builder: (orderController) {
-                          return (orderController.latestOrderList != null && orderController.latestOrderList!.isNotEmpty) ? const SizedBox() : GetBuilder<NotificationController>(
-                          builder: (notificationController) {
-                            return InkWell(
-                              onTap: () => Get.toNamed(
-                                RouteHelper.getNotificationRoute(),
-                              ),
-                              child: Container(
-                                height: 40,
-                                width: 40,
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).cardColor,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.1,
-                                      ),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
-                                ),
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Center(
-                                      child: Icon(
-                                        Icons.notifications,
-                                        size: 25,
-                                        color: Theme.of(
-                                          context,
-                                        ).textTheme.bodyLarge!.color,
-                                      ),
-                                    ),
-                                    if (notificationController.hasNotification)
-                                      Positioned(
-                                        top: 5,
-                                        right: 5,
-                                        child: Container(
-                                          height: 10,
-                                          width: 10,
-                                          decoration: BoxDecoration(
-                                            color: Theme.of(
-                                              context,
-                                            ).colorScheme.error,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(
-                                              width: 1,
+                        Positioned(
+                          top:
+                              context.mediaQueryPadding.top +
+                              Dimensions.paddingSizeSmall,
+                          right: Dimensions.paddingSizeDefault,
+                          child: GetBuilder<OrderController>(
+                            builder: (orderController) {
+                              return (orderController.latestOrderList != null &&
+                                      orderController
+                                          .latestOrderList!
+                                          .isNotEmpty)
+                                  ? const SizedBox()
+                                  : GetBuilder<NotificationController>(
+                                      builder: (notificationController) {
+                                        return InkWell(
+                                          onTap: () => Get.toNamed(
+                                            RouteHelper.getNotificationRoute(),
+                                          ),
+                                          child: Container(
+                                            height: 40,
+                                            width: 40,
+                                            decoration: BoxDecoration(
                                               color: Theme.of(
                                                 context,
                                               ).cardColor,
+                                              shape: BoxShape.circle,
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black
+                                                      .withValues(alpha: 0.1),
+                                                  blurRadius: 10,
+                                                  offset: const Offset(0, 5),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                Center(
+                                                  child: Icon(
+                                                    Icons.notifications,
+                                                    size: 25,
+                                                    color: Theme.of(context)
+                                                        .textTheme
+                                                        .bodyLarge!
+                                                        .color,
+                                                  ),
+                                                ),
+                                                if (notificationController
+                                                    .hasNotification)
+                                                  Positioned(
+                                                    top: 5,
+                                                    right: 5,
+                                                    child: Container(
+                                                      height: 10,
+                                                      width: 10,
+                                                      decoration: BoxDecoration(
+                                                        color: Theme.of(
+                                                          context,
+                                                        ).colorScheme.error,
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(
+                                                          width: 1,
+                                                          color: Theme.of(
+                                                            context,
+                                                          ).cardColor,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
                                             ),
                                           ),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                        }),
-                      ),
+                                        );
+                                      },
+                                    );
+                            },
+                          ),
+                        ),
 
                       // Earnings Button
                       Positioned(
@@ -541,7 +572,9 @@ class HomeScreenState extends State<HomeScreen> {
                                     borderRadius: BorderRadius.circular(50),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.3),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.3,
+                                        ),
                                         blurRadius: 10,
                                         offset: const Offset(0, 5),
                                       ),
@@ -552,7 +585,9 @@ class HomeScreenState extends State<HomeScreen> {
                                     children: [
                                       Text(
                                         PriceConverterHelper.convertPrice(
-                                          profileController.profileModel?.balance ??
+                                          profileController
+                                                  .profileModel
+                                                  ?.balance ??
                                               0,
                                         ),
                                         style: robotoMedium.copyWith(
@@ -646,31 +681,34 @@ class HomeScreenState extends State<HomeScreen> {
                         // Guard: si ya se está procesando, no hacer nada
                         if (_orderPhase != 'none') return;
                         setState(() {
-                          _orderPhase = 'going_to_store'; // Bloquear inmediatamente
+                          _orderPhase =
+                              'going_to_store'; // Bloquear inmediatamente
                           _startMovementTimer();
                         });
                         // Llamar al API de aceptación una sola vez
-                        Get.find<OrderController>().acceptOrder(
-                          _activeOrderRequest!.id,
-                          0,
-                          _activeOrderRequest!,
-                        ).then((isSuccess) {
-                          if (isSuccess) {
-                            Get.find<OrderController>().getOrderDetails(
+                        Get.find<OrderController>()
+                            .acceptOrder(
                               _activeOrderRequest!.id,
-                              _activeOrderRequest!.orderType == 'parcel',
-                            );
-                            setPolyline(_activeOrderRequest!);
-                          } else {
-                            // Si falla, revertir el estado
-                            setState(() {
-                              _orderPhase = 'none';
-                              _activeOrderRequest = null;
-                              _stopMovementTimer();
+                              0,
+                              _activeOrderRequest!,
+                            )
+                            .then((isSuccess) {
+                              if (isSuccess) {
+                                Get.find<OrderController>().getOrderDetails(
+                                  _activeOrderRequest!.id,
+                                  _activeOrderRequest!.orderType == 'parcel',
+                                );
+                                setPolyline(_activeOrderRequest!);
+                              } else {
+                                // Si falla, revertir el estado
+                                setState(() {
+                                  _orderPhase = 'none';
+                                  _activeOrderRequest = null;
+                                  _stopMovementTimer();
+                                });
+                                widget.onOrderActiveStatusChanged?.call(false);
+                              }
                             });
-                            widget.onOrderActiveStatusChanged?.call(false);
-                          }
-                        });
                       },
                       onReject: _performCancellation,
                     );
@@ -800,9 +838,13 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _performCancellation({bool callApi = true}) async {
-    debugPrint("[HomeScreen] ❌ _performCancellation called (callApi: $callApi) for order ${_activeOrderRequest?.id}");
+    debugPrint(
+      "[HomeScreen] ❌ _performCancellation called (callApi: $callApi) for order ${_activeOrderRequest?.id}",
+    );
     OrderNotificationService.instance.stopAudio();
-    if (callApi && _activeOrderRequest != null && _activeOrderRequest!.id != 999) {
+    if (callApi &&
+        _activeOrderRequest != null &&
+        _activeOrderRequest!.id != 999) {
       Get.find<OrderController>().ignoreOrderApi(_activeOrderRequest!.id!);
     }
 
@@ -843,10 +885,7 @@ class HomeScreenState extends State<HomeScreen> {
     ))!.buffer.asUint8List();
   }
 
-  Future<List<LatLng>> _getRoutePolyline(
-    LatLng origin,
-    LatLng destination,
-  ) {
+  Future<List<LatLng>> _getRoutePolyline(LatLng origin, LatLng destination) {
     return MapboxDirectionsHelper.getDrivingRoute(origin, destination);
   }
 
@@ -893,7 +932,9 @@ class HomeScreenState extends State<HomeScreen> {
   /// Soporta actualizaciones (ej. de dummy model a modelo real con datos de red).
   void showOrderRequest(OrderModel order) {
     if (widget.pendingRegistrationDashboard) return;
-    debugPrint("[HomeScreen] showOrderRequest(${order.id}) phase=$_orderPhase active=${_activeOrderRequest?.id}");
+    debugPrint(
+      "[HomeScreen] showOrderRequest(${order.id}) phase=$_orderPhase active=${_activeOrderRequest?.id}",
+    );
 
     if (!mounted) {
       debugPrint("[HomeScreen] ⛔ NOT MOUNTED - returning");
@@ -902,11 +943,14 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Si ya tenemos un pedido activo con DIFERENTE ID, ignorar el nuevo
     if (_activeOrderRequest != null && _activeOrderRequest!.id != order.id) {
-       debugPrint("[HomeScreen] ⛔ IGNORED - active order already ${_activeOrderRequest!.id}");
-       return;
+      debugPrint(
+        "[HomeScreen] ⛔ IGNORED - active order already ${_activeOrderRequest!.id}",
+      );
+      return;
     }
 
-    bool isUpdate = _activeOrderRequest != null && _activeOrderRequest!.id == order.id;
+    bool isUpdate =
+        _activeOrderRequest != null && _activeOrderRequest!.id == order.id;
 
     // Deduplicación para pedidos nuevos (no updates)
     if (!isUpdate && order.id != null && order.id == _lastShownOrderId) {
@@ -915,7 +959,9 @@ class HomeScreenState extends State<HomeScreen> {
     }
     _lastShownOrderId = order.id;
 
-    debugPrint("[HomeScreen] ✅ ${isUpdate ? 'UPDATING' : 'SHOWING'} order ${order.id}");
+    debugPrint(
+      "[HomeScreen] ✅ ${isUpdate ? 'UPDATING' : 'SHOWING'} order ${order.id}",
+    );
 
     // Reproducir alerta sonora solo si es un pedido nuevo (no en update)
     if (!isUpdate) {
@@ -930,7 +976,9 @@ class HomeScreenState extends State<HomeScreen> {
       _activeOrderRequest = order;
       if (!isUpdate) _orderPhase = 'none';
     });
-    debugPrint("[HomeScreen] ✅ setState called - order now ${_activeOrderRequest?.id}");
+    debugPrint(
+      "[HomeScreen] ✅ setState called - order now ${_activeOrderRequest?.id}",
+    );
 
     if (!isUpdate) widget.onOrderActiveStatusChanged?.call(true);
 
@@ -939,7 +987,6 @@ class HomeScreenState extends State<HomeScreen> {
       setPolyline(order);
     }
   }
-
 
   void restoreActiveOrder(OrderModel order) async {
     if (_activeOrderRequest != null) return;
@@ -954,8 +1001,8 @@ class HomeScreenState extends State<HomeScreen> {
     widget.onOrderActiveStatusChanged?.call(true);
 
     // Obtener datos frescos del servidor en paralelo
-    final OrderModel? fresh =
-        await Get.find<OrderController>().fetchOrderForNotification(order.id!);
+    final OrderModel? fresh = await Get.find<OrderController>()
+        .fetchOrderForNotification(order.id!);
     if (!mounted) return;
 
     final OrderModel resolved = fresh ?? order;
@@ -984,37 +1031,66 @@ class HomeScreenState extends State<HomeScreen> {
 
     // ── Diagnóstico de coordenadas ──────────────────────────────
     debugPrint('[Polyline] orderType=${order.orderType} parcel=$parcel');
-    debugPrint('[Polyline] storeLat=${order.storeLat} storeLng=${order.storeLng}');
-    debugPrint('[Polyline] deliveryAddress.lat=${order.deliveryAddress?.latitude} deliveryAddress.lng=${order.deliveryAddress?.longitude}');
-    debugPrint('[Polyline] dmLocation: lat=${Get.find<ProfileController>().recordLocationBody?.latitude} lng=${Get.find<ProfileController>().recordLocationBody?.longitude}');
+    debugPrint(
+      '[Polyline] storeLat=${order.storeLat} storeLng=${order.storeLng}',
+    );
+    debugPrint(
+      '[Polyline] deliveryAddress.lat=${order.deliveryAddress?.latitude} deliveryAddress.lng=${order.deliveryAddress?.longitude}',
+    );
+    debugPrint(
+      '[Polyline] dmLocation: lat=${Get.find<ProfileController>().recordLocationBody?.latitude} lng=${Get.find<ProfileController>().recordLocationBody?.longitude}',
+    );
 
     LatLng dmLocation = LatLng(
       Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
       Get.find<ProfileController>().recordLocationBody?.longitude ?? 0,
     );
 
-    final double storeLat = double.tryParse(
-          parcel ? order.deliveryAddress?.latitude ?? '0' : order.storeLat ?? '0',
-        ) ?? 0;
-    final double storeLng = double.tryParse(
-          parcel ? order.deliveryAddress?.longitude ?? '0' : order.storeLng ?? '0',
-        ) ?? 0;
-    final double destLat = double.tryParse(
-          parcel ? order.receiverDetails?.latitude ?? '0' : order.deliveryAddress?.latitude ?? '0',
-        ) ?? 0;
-    final double destLng = double.tryParse(
-          parcel ? order.receiverDetails?.longitude ?? '0' : order.deliveryAddress?.longitude ?? '0',
-        ) ?? 0;
+    final double storeLat =
+        double.tryParse(
+          parcel
+              ? order.deliveryAddress?.latitude ?? '0'
+              : order.storeLat ?? '0',
+        ) ??
+        0;
+    final double storeLng =
+        double.tryParse(
+          parcel
+              ? order.deliveryAddress?.longitude ?? '0'
+              : order.storeLng ?? '0',
+        ) ??
+        0;
+    final double destLat =
+        double.tryParse(
+          parcel
+              ? order.receiverDetails?.latitude ?? '0'
+              : order.deliveryAddress?.latitude ?? '0',
+        ) ??
+        0;
+    final double destLng =
+        double.tryParse(
+          parcel
+              ? order.receiverDetails?.longitude ?? '0'
+              : order.deliveryAddress?.longitude ?? '0',
+        ) ??
+        0;
 
-    debugPrint('[Polyline] storeLocation=($storeLat, $storeLng) destLocation=($destLat, $destLng)');
+    debugPrint(
+      '[Polyline] storeLocation=($storeLat, $storeLng) destLocation=($destLat, $destLng)',
+    );
 
     // Seguridad: si las coordenadas son (0,0), significa que el OrderModel no trajo
     // los datos de ubicación. En ese caso, refrescar el pedido completo y reintentar.
     if (storeLat == 0 && storeLng == 0) {
-      debugPrint('[Polyline] ⚠️ storeLat/storeLng son 0 — recargando pedido completo...');
-      final refreshed = await Get.find<OrderController>().fetchOrderForNotification(order.id!);
+      debugPrint(
+        '[Polyline] ⚠️ storeLat/storeLng son 0 — recargando pedido completo...',
+      );
+      final refreshed = await Get.find<OrderController>()
+          .fetchOrderForNotification(order.id!);
       if (refreshed != null && mounted) {
-        debugPrint('[Polyline] Pedido recargado, storeLat=${refreshed.storeLat}');
+        debugPrint(
+          '[Polyline] Pedido recargado, storeLat=${refreshed.storeLat}',
+        );
         setPolyline(refreshed);
       }
       return;
@@ -1028,9 +1104,11 @@ class HomeScreenState extends State<HomeScreen> {
     List<LatLng> segment2Points = [storeLocation, destinationLocation];
 
     // Usar marcadores precargados (rápido) o cargarlos si aún no están listos
-    Uint8List storeMarker = _cachedStoreMarker ??
+    Uint8List storeMarker =
+        _cachedStoreMarker ??
         await _convertAssetToUnit8List(Images.store, width: 40);
-    Uint8List destinationMarker = _cachedDestinationMarker ??
+    Uint8List destinationMarker =
+        _cachedDestinationMarker ??
         await _convertAssetToUnit8List(Images.homeDelivery, width: 40);
     // Guardar en caché para la próxima vez
     _cachedStoreMarker ??= storeMarker;
@@ -1058,79 +1136,81 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Rutas reales (Mapbox Directions, modo driving) en paralelo
     Future.wait([
-      _getRoutePolyline(dmLocation, storeLocation),
-      _getRoutePolyline(storeLocation, destinationLocation),
-    ]).then((results) {
-      List<LatLng> seg1 = results[0];
-      List<LatLng> seg2 = results[1];
+          _getRoutePolyline(dmLocation, storeLocation),
+          _getRoutePolyline(storeLocation, destinationLocation),
+        ])
+        .then((results) {
+          List<LatLng> seg1 = results[0];
+          List<LatLng> seg2 = results[1];
 
-      if (seg1.isNotEmpty) segment1Points = seg1;
-      if (seg2.isNotEmpty) segment2Points = seg2;
+          if (seg1.isNotEmpty) segment1Points = seg1;
+          if (seg2.isNotEmpty) segment2Points = seg2;
 
-      if (!mounted) return;
+          if (!mounted) return;
 
-      // Recalcular distancia real
-      double totalDistance = 0;
-      List<LatLng> activePoints = _orderPhase == 'going_to_customer'
-          ? segment2Points
-          : segment1Points;
+          // Recalcular distancia real
+          double totalDistance = 0;
+          List<LatLng> activePoints = _orderPhase == 'going_to_customer'
+              ? segment2Points
+              : segment1Points;
 
-      for (int i = 0; i < activePoints.length - 1; i++) {
-        totalDistance += _calculateDistance(
-          activePoints[i].latitude,
-          activePoints[i].longitude,
-          activePoints[i + 1].latitude,
-          activePoints[i + 1].longitude,
-        );
-      }
+          for (int i = 0; i < activePoints.length - 1; i++) {
+            totalDistance += _calculateDistance(
+              activePoints[i].latitude,
+              activePoints[i].longitude,
+              activePoints[i + 1].latitude,
+              activePoints[i + 1].longitude,
+            );
+          }
 
-      setState(() {
-        _drawLinesAndMarkersOnMap(
-          dmLocation,
-          storeLocation,
-          destinationLocation,
-          segment1Points,
-          segment2Points,
-          storeMarker,
-          destinationMarker,
-          totalDistance,
-          drawPolylines: true,
-        );
-      });
-    }).catchError((e) {
-      debugPrint("[HomeScreen] Error parallelizing polylines: $e");
-      if (!mounted) return;
-      double fallbackDist = 0;
-      for (int i = 0; i < segment1Points.length - 1; i++) {
-        fallbackDist += _calculateDistance(
-          segment1Points[i].latitude,
-          segment1Points[i].longitude,
-          segment1Points[i + 1].latitude,
-          segment1Points[i + 1].longitude,
-        );
-      }
-      for (int i = 0; i < segment2Points.length - 1; i++) {
-        fallbackDist += _calculateDistance(
-          segment2Points[i].latitude,
-          segment2Points[i].longitude,
-          segment2Points[i + 1].latitude,
-          segment2Points[i + 1].longitude,
-        );
-      }
-      setState(() {
-        _drawLinesAndMarkersOnMap(
-          dmLocation,
-          storeLocation,
-          destinationLocation,
-          segment1Points,
-          segment2Points,
-          storeMarker,
-          destinationMarker,
-          fallbackDist,
-          drawPolylines: true,
-        );
-      });
-    });
+          setState(() {
+            _drawLinesAndMarkersOnMap(
+              dmLocation,
+              storeLocation,
+              destinationLocation,
+              segment1Points,
+              segment2Points,
+              storeMarker,
+              destinationMarker,
+              totalDistance,
+              drawPolylines: true,
+            );
+          });
+        })
+        .catchError((e) {
+          debugPrint("[HomeScreen] Error parallelizing polylines: $e");
+          if (!mounted) return;
+          double fallbackDist = 0;
+          for (int i = 0; i < segment1Points.length - 1; i++) {
+            fallbackDist += _calculateDistance(
+              segment1Points[i].latitude,
+              segment1Points[i].longitude,
+              segment1Points[i + 1].latitude,
+              segment1Points[i + 1].longitude,
+            );
+          }
+          for (int i = 0; i < segment2Points.length - 1; i++) {
+            fallbackDist += _calculateDistance(
+              segment2Points[i].latitude,
+              segment2Points[i].longitude,
+              segment2Points[i + 1].latitude,
+              segment2Points[i + 1].longitude,
+            );
+          }
+          setState(() {
+            _drawLinesAndMarkersOnMap(
+              dmLocation,
+              storeLocation,
+              destinationLocation,
+              segment1Points,
+              segment2Points,
+              storeMarker,
+              destinationMarker,
+              fallbackDist,
+              drawPolylines: true,
+            );
+          });
+        });
   }
 
   void _drawLinesAndMarkersOnMap(
@@ -1159,75 +1239,79 @@ class HomeScreenState extends State<HomeScreen> {
     _markers.clear();
     _polylines.clear();
     // En la fase de ir a la tienda, mostramos el marcador de la tienda
+    if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('store'),
+          position: storeLocation,
+          icon: BitmapDescriptor.bytes(storeMarker),
+        ),
+      );
+    }
+
+    // En la fase de ir al cliente, mostramos el marcador del destino
+    if (_orderPhase == 'going_to_customer') {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('destination'),
+          position: destinationLocation,
+          icon: BitmapDescriptor.bytes(destinationMarker),
+        ),
+      );
+    }
+
+    if (drawPolylines) {
+      // Segmento 1: Repartidor -> Tienda (Solo si no hemos recogido)
       if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('store'),
-            position: storeLocation,
-            icon: BitmapDescriptor.bytes(storeMarker),
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('delivery_to_store'),
+            points: segment1Points,
+            color: Theme.of(Get.context!).primaryColor,
+            width: 5,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
           ),
         );
       }
 
-      // En la fase de ir al cliente, mostramos el marcador del destino
+      // Segmento 2: Tienda -> Cliente (Solo si ya recogimos el pedido)
       if (_orderPhase == 'going_to_customer') {
-        _markers.add(
-          Marker(
-            markerId: const MarkerId('destination'),
-            position: destinationLocation,
-            icon: BitmapDescriptor.bytes(destinationMarker),
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('store_to_destination'),
+            points: segment2Points,
+            color: Theme.of(Get.context!).primaryColor,
+            width: 5,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+          ),
+        );
+      } else if (_orderPhase == 'none') {
+        // En vista previa mostramos la ruta al cliente punteada (misma geometría que Mapbox cuando aplica)
+        _polylines.add(
+          Polyline(
+            polylineId: const PolylineId('store_to_destination'),
+            points: segment2Points,
+            color: Theme.of(Get.context!).primaryColor.withValues(alpha: 0.6),
+            width: 5,
+            jointType: JointType.round,
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            patterns: [PatternItem.dash(15), PatternItem.gap(10)],
           ),
         );
       }
-
-      if (drawPolylines) {
-        // Segmento 1: Repartidor -> Tienda (Solo si no hemos recogido)
-        if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('delivery_to_store'),
-              points: segment1Points,
-              color: Theme.of(Get.context!).primaryColor,
-              width: 5,
-              jointType: JointType.round,
-              startCap: Cap.roundCap,
-              endCap: Cap.roundCap,
-            ),
-          );
-        }
-
-        // Segmento 2: Tienda -> Cliente (Solo si ya recogimos el pedido)
-        if (_orderPhase == 'going_to_customer') {
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('store_to_destination'),
-              points: segment2Points,
-              color: Theme.of(Get.context!).primaryColor,
-              width: 5,
-              jointType: JointType.round,
-              startCap: Cap.roundCap,
-              endCap: Cap.roundCap,
-            ),
-          );
-        } else if (_orderPhase == 'none') {
-          // En vista previa mostramos la ruta al cliente punteada (misma geometría que Mapbox cuando aplica)
-          _polylines.add(
-            Polyline(
-              polylineId: const PolylineId('store_to_destination'),
-              points: segment2Points,
-              color: Theme.of(Get.context!).primaryColor.withValues(alpha: 0.6),
-              width: 5,
-              jointType: JointType.round,
-              startCap: Cap.roundCap,
-              endCap: Cap.roundCap,
-              patterns: [PatternItem.dash(15), PatternItem.gap(10)],
-            ),
-          );
-        }
-      }
+    }
   }
 
-  void _fitCamera(LatLng dmLocation, LatLng storeLocation, LatLng destinationLocation) {
+  void _fitCamera(
+    LatLng dmLocation,
+    LatLng storeLocation,
+    LatLng destinationLocation,
+  ) {
     List<LatLng> pointsToFit = [];
     if (_orderPhase == 'going_to_store') {
       pointsToFit = [dmLocation, storeLocation];
@@ -1265,8 +1349,116 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _startMovementTimer() {
-    // Timer reservado para la lógica de inactividad (actualmente deshabilitada).
-    // Cuando se reactive, descomentar el bloque interno en esta función.
+    _startInactivityTimer();
+  }
+
+  void _startInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      // Solo monitorear si hay un pedido activo o en fase de entrega
+      if (_activeOrderRequest != null || _orderPhase != 'none') {
+        final profileController = Get.find<ProfileController>();
+        final currentPos = profileController.recordLocationBody;
+
+        if (currentPos != null &&
+            currentPos.latitude != null &&
+            currentPos.longitude != null) {
+          LatLng currentLatLng = LatLng(
+            currentPos.latitude!,
+            currentPos.longitude!,
+          );
+
+          if (_lastInactivityPosition == null) {
+            _lastInactivityPosition = currentLatLng;
+          }
+
+          double distance = _calculateDistance(
+            _lastInactivityPosition!.latitude,
+            _lastInactivityPosition!.longitude,
+            currentLatLng.latitude,
+            currentLatLng.longitude,
+          );
+
+          // Si se movió más de 15 metros, resetear el contador de inactividad
+          if (distance > 15) {
+            _inactivitySeconds = 0;
+            _lastInactivityPosition = currentLatLng;
+
+            if (_isShowingInactivityDialog) {
+              if (Get.isDialogOpen ?? false) {
+                Get.back();
+              }
+              _isShowingInactivityDialog = false;
+              _governanceAudioPlayer.stop();
+            }
+          } else {
+            _inactivitySeconds++;
+          }
+        }
+
+        // 5 minutos (300s) = Alerta de audio y diálogo de advertencia
+        if (_inactivitySeconds == 300) {
+          _showInactivityWarning();
+        }
+      } else {
+        // No hay pedido activo, resetear contadores
+        _inactivitySeconds = 0;
+        _lastInactivityPosition = null;
+      }
+    });
+  }
+
+
+
+  void _showInactivityWarning() {
+    if (_isShowingInactivityDialog) return;
+    _isShowingInactivityDialog = true;
+
+    _governanceAudioPlayer.play(AssetSource('Dms_no_moving.mp3'));
+
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.orange,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.white,
+                size: 60,
+              ),
+              const SizedBox(height: Dimensions.paddingSizeDefault),
+              Text(
+                '¿SIGUES AHÍ?',
+                style: robotoBold.copyWith(color: Colors.white, fontSize: 20),
+              ),
+              const SizedBox(height: Dimensions.paddingSizeSmall),
+              const Text(
+                'No detectamos movimiento. Por favor continúa con la entrega para evitar la reasignación del pedido.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white),
+              ),
+              const SizedBox(height: Dimensions.paddingSizeLarge),
+              CustomButtonWidget(
+                buttonText: 'ESTOY EN CAMINO',
+                onPressed: () {
+                  _inactivitySeconds = 0;
+                  _isShowingInactivityDialog = false;
+                  _governanceAudioPlayer.stop();
+                  Get.back();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
   }
 
   void _showUnassignedDialog() {
@@ -1317,6 +1509,19 @@ class HomeScreenState extends State<HomeScreen> {
       ),
       barrierDismissible: false, // Forzar a que de "Aceptar"
     );
+  }
+
+  void showInactivityWarningFromNotification(int orderId) {
+    if (_activeOrderRequest != null && _activeOrderRequest!.id == orderId) {
+      _showInactivityWarning();
+    }
+  }
+
+  void showUnassignedDialogFromNotification(int orderId) {
+    if (_activeOrderRequest != null && _activeOrderRequest!.id == orderId) {
+      _showUnassignedDialog();
+      cancelOrderRequest(callApi: false);
+    }
   }
 
   void _stopMovementTimer() {

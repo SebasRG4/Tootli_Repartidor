@@ -16,6 +16,7 @@ enum NotificationType{
   /// Chat seguimiento Tootli Direct (cliente web ↔ app repartidor).
   // ignore: constant_identifier_names
   tootli_direct_chat,
+  inactivity_alert,
 }
 
 class NotificationBodyModel {
@@ -69,6 +70,7 @@ class NotificationBodyModel {
       NotificationType.withdraw.toString(): NotificationType.withdraw,
       NotificationType.deliveryman_referral.toString(): NotificationType.deliveryman_referral,
       NotificationType.tootli_direct_chat.toString(): NotificationType.tootli_direct_chat,
+      NotificationType.inactivity_alert.toString(): NotificationType.inactivity_alert,
     };
 
     return enumMap[enumString] ?? NotificationType.general;

@@ -351,16 +351,11 @@ class OrderController extends GetxController implements GetxService {
   }
 
   Future<void> getLatestOrders({bool filterIgnored = true}) async {
-    debugPrint("[OrderController] 🔄 Fetching latest orders (filterIgnored: $filterIgnored)...");
     // Si filterIgnored=false, estamos en el Centro de Pedidos: incluir pedidos ignorados en backend también
     final bool includeRejected = !filterIgnored;
     List<OrderModel>? latestOrderList = await orderServiceInterface
         .getLatestOrders(includeRejected: includeRejected);
     if (latestOrderList != null) {
-      debugPrint("[OrderController] ✅ Received ${latestOrderList.length} orders from API");
-      if (latestOrderList.isEmpty) {
-        debugPrint("[OrderController] ℹ️ API returned an empty list. This usually means no orders in your zone/range.");
-      }
       _latestOrderList = [];
       
       if (filterIgnored) {
@@ -376,7 +371,6 @@ class OrderController extends GetxController implements GetxService {
       } else {
         _latestOrderList!.addAll(latestOrderList);
       }
-      debugPrint("[OrderController] 📝 After filtering, list has ${_latestOrderList!.length} orders");
     } else {
       debugPrint("[OrderController] ❌ API returned NULL latestOrderList");
     }
@@ -496,8 +490,6 @@ class OrderController extends GetxController implements GetxService {
   }
 
   Future<bool> ignoreOrderApi(int orderId) async {
-    debugPrint("[OrderController] 🚫 ignoreOrderApi called for ID: $orderId");
-    debugPrintStack(label: "Ignore Call Stack");
     _isLoading = true;
     update();
     ResponseModel responseModel = await orderServiceInterface.ignoreOrderApi(

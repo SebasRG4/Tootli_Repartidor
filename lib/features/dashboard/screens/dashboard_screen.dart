@@ -119,6 +119,22 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       }
     };
 
+    OrderNotificationService.instance.onInactivityAlert = (int orderId) {
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
+      debugPrint("[Dashboard] 📩 INACTIVITY CALLBACK for order $orderId");
+      if (!mounted) return;
+      _setPage(0);
+      _homeScreenKey.currentState?.showInactivityWarningFromNotification(orderId);
+    };
+
+    OrderNotificationService.instance.onOrderUnassigned = (int orderId) {
+      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
+      debugPrint("[Dashboard] 📩 UNASSIGNED CALLBACK for order $orderId");
+      if (!mounted) return;
+      _setPage(0);
+      _homeScreenKey.currentState?.showUnassignedDialogFromNotification(orderId);
+    };
+
     // 🚀 Start Real-Time WebSocket Connection
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;

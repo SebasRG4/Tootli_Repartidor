@@ -25,6 +25,8 @@ class OrderNotificationService {
   final List<int> _processedOrderIds = [];
 
   void Function(int orderId)? _onOrderRequestTapped;
+  void Function(int orderId)? _onInactivityAlert;
+  void Function(int orderId)? _onOrderUnassigned;
 
   /// Whether the DashboardScreen has registered its callback
   bool get hasCallback => _onOrderRequestTapped != null;
@@ -42,6 +44,23 @@ class OrderNotificationService {
         "[OrderNotifService] 📦 Dispatching PENDING order $id to newly registered callback",
       );
       Future.microtask(() => callback(id));
+    }
+  }
+
+  set onInactivityAlert(void Function(int orderId)? callback) => _onInactivityAlert = callback;
+  set onOrderUnassigned(void Function(int orderId)? callback) => _onOrderUnassigned = callback;
+
+  void notifyInactivityAlert(int orderId) {
+    debugPrint("[OrderNotifService] ⚠️ notifyInactivityAlert($orderId)");
+    if (_onInactivityAlert != null) {
+      _onInactivityAlert!(orderId);
+    }
+  }
+
+  void notifyOrderUnassigned(int orderId) {
+    debugPrint("[OrderNotifService] 🚫 notifyOrderUnassigned($orderId)");
+    if (_onOrderUnassigned != null) {
+      _onOrderUnassigned!(orderId);
     }
   }
 

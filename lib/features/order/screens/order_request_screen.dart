@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:intl/intl.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
@@ -6,7 +7,6 @@ import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_app_bar_widget.dart';
-import 'package:sixam_mart_delivery/common/widgets/title_widget.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/order_requset_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -37,7 +37,8 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
 
     Get.find<OrderController>().getLatestOrders(filterIgnored: false);
     Get.find<OrderController>().getRunningOrders(1);
-    _timer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    
+    _timer = Timer.periodic(const Duration(seconds: 20), (timer) {
       Get.find<OrderController>().getLatestOrders(filterIgnored: false);
       Get.find<OrderController>().getRunningOrders(1);
     });
@@ -46,13 +47,10 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
   }
 
   Future<void> _checkPermission() async {
-    debugPrint("[OrderRequestScreen] Checking permissions...");
     var notificationStatus = await Permission.notification.status;
     var batteryStatus = await Permission.ignoreBatteryOptimizations.status;
     var overlayStatus = await Permission.systemAlertWindow.status;
-    debugPrint(
-      "[OrderRequestScreen] Notif: $notificationStatus, Battery: $batteryStatus, Overlay: $overlayStatus",
-    );
+    
     if (mounted) {
       setState(() {
         _isNotificationPermissionGranted =
@@ -74,13 +72,15 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CustomAppBarWidget(
-        title: 'centro_de_pedidos'.tr, // Antes 'tootli_requests'.tr
+        title: 'centro_de_pedidos'.tr,
         isBackButtonExist: false,
         onMenuPressed: widget.onTapMenu,
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await Get.find<OrderController>().getLatestOrders(filterIgnored: false);
+          await Get.find<OrderController>().getLatestOrders(
+            filterIgnored: false,
+          );
           await Get.find<ProfileController>().getProfile();
           await Get.find<OrderController>().getRunningOrders(1);
         },
@@ -129,32 +129,20 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
               ),
             ),
 
-            GetBuilder<ProfileController>(builder: (profileController) {
-              final profile = profileController.profileModel;
-              if (profile != null) {
-                debugPrint("[OrderRequestScreen] 👤 Profile info: Active=${profile.active}, Zone=${profile.zoneId}, Status=${profile.applicationStatus}");
-              } else {
-                debugPrint("[OrderRequestScreen] 👤 Profile is NULL");
-              }
-              return const SliverToBoxAdapter(child: SizedBox());
-            }),
+            GetBuilder<ProfileController>(
+              builder: (profileController) {
+                return const SliverToBoxAdapter(child: SizedBox());
+              },
+            ),
 
             GetBuilder<OrderController>(
               builder: (orderController) {
-                int latestCount = orderController.latestOrderList?.length ?? 0;
-                int runningCount =
-                    orderController.currentOrderList?.length ?? 0;
-                debugPrint(
-                  "[OrderRequestScreen] 🏗️ Building list. Latest: $latestCount, Running: $runningCount",
-                );
-
                 List<OrderModel> allOrders = [];
+
                 if (orderController.latestOrderList != null) {
                   allOrders.addAll(orderController.latestOrderList!);
                 }
                 if (orderController.currentOrderList != null) {
-                  // Solo agregar órdenes que estén en estado pendiente o confirmado
-                  // para que parezcan "solicitudes" en este centro.
                   for (var order in orderController.currentOrderList!) {
                     if (order.orderStatus == 'pending' ||
                         order.orderStatus == 'confirmed') {

@@ -10,8 +10,6 @@ import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
-import 'package:sixam_mart_delivery/common/widgets/confirmation_dialog_widget.dart';
-import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_image_widget.dart';
 import 'package:sixam_mart_delivery/features/order/screens/order_details_screen.dart';
 import 'package:flutter/material.dart';
@@ -23,251 +21,587 @@ class OrderRequestWidget extends StatelessWidget {
   final int index;
   final bool fromDetailsPage;
   final Function onTap;
-  const OrderRequestWidget({super.key, required this.orderModel, required this.index, required this.onTap, this.fromDetailsPage = false});
+
+  const OrderRequestWidget({
+    super.key,
+    required this.orderModel,
+    required this.index,
+    required this.onTap,
+    this.fromDetailsPage = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    bool parcel = orderModel.orderType == 'parcel';
+    final bool parcel = orderModel.orderType == 'parcel';
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     double distance = Get.find<AddressController>().getRestaurantDistance(
-      LatLng(double.parse(parcel ? orderModel.deliveryAddress?.latitude ?? '0' : orderModel.storeLat ?? '0'), double.parse(parcel ? orderModel.deliveryAddress?.longitude ?? '0' : orderModel.storeLng ?? '0')),
+      LatLng(
+        double.parse(
+          parcel
+              ? orderModel.deliveryAddress?.latitude ?? '0'
+              : orderModel.storeLat ?? '0',
+        ),
+        double.parse(
+          parcel
+              ? orderModel.deliveryAddress?.longitude ?? '0'
+              : orderModel.storeLng ?? '0',
+        ),
+      ),
     );
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10)],
-      ),
-      child: GetBuilder<OrderController>(builder: (orderController) {
-        return Column(children: [
+    final bool isCash = orderModel.paymentMethod == 'cash_on_delivery';
+    final String distanceText = distance > 1000
+        ? '1000+ km'
+        : '${distance.toStringAsFixed(1)} km';
 
-          Padding(
-            padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-            child: Column(children: [
-
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-                Container(
-                  height: 45, width: 45, alignment: Alignment.center,
-                  decoration: parcel ? BoxDecoration(
-                    borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                    color: Theme.of(context).primaryColor.withValues(alpha: 0.2),
-                  ) : null,
-                  child: ClipRRect(borderRadius: BorderRadius.circular(Dimensions.radiusSmall), child: CustomImageWidget(
-                    image: parcel ? '${orderModel.parcelCategory != null ? orderModel.parcelCategory!.imageFullUrl : ''}' : orderModel.storeLogoFullUrl ?? '',
-                    height: parcel ? 30 : 45, width: parcel ? 30 : 45, fit: BoxFit.cover,
-                  )),
-                ),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(
-                    parcel ? orderModel.parcelCategory != null ? orderModel.parcelCategory!.name ?? ''
-                      : '' : orderModel.storeName ?? 'no_store_data_found'.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall),
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                  Text(
-                    parcel ? 'parcel'.tr : '${orderModel.detailsCount} ${orderModel.detailsCount! > 1 ? 'items'.tr : 'item'.tr}',
-                    style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).primaryColor),
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                  Text(
-                    parcel ? orderModel.parcelCategory != null ? orderModel.parcelCategory!.description ?? '' : '' : orderModel.storeAddress ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
-                  ),
-                ])),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-
-                  Text(
-                    DateConverterHelper.beforeTimeFormat(orderModel.createdAt!),
-                    // '${DateConverterHelper.timeDistanceInMin(orderModel.createdAt!)} ${'mins_ago'.tr}',
-                    style: robotoMedium.copyWith(color: Theme.of(context).primaryColor, fontSize: Dimensions.fontSizeSmall),
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeSmall),
-
-                  orderModel.deliveryAddress != null ? Container(
-                    width: 110,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeSmall),
-                    child: Text(
-                      '${distance > 1000 ? '1000+' : distance.toStringAsFixed(2)} ${'km_away_from_you'.tr}',
-                      style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall), textAlign: TextAlign.center,
-                    ),
-                  ) : Container(
-                    height: 20, width: 30,
-                    color: Colors.green,
-                  ),
-                ]),
-              ]),
-
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: 5,
-                  margin: const EdgeInsets.only(left: Dimensions.paddingSizeLarge),
-                  child: ListView.builder(
-                    itemCount: 4,
-                    shrinkWrap: true,
-                    itemBuilder: (context, index) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeExtraSmall),
-                        height: 5, width: 10, color: Colors.blue,
-                      );
-                    },
-                  ),
-                ),
+    return GetBuilder<OrderController>(
+      builder: (orderController) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
               ),
-
-              Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(50),
-                  child: Image.asset(Images.dmAvatar, height: 45, width: 45, fit: BoxFit.contain),
-                ),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-                  Text(
-                    'deliver_to'.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style:  robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall),
-                  ),
-                  const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                  Text(
-                    parcel ? orderModel.receiverDetails?.address ?? '' : orderModel.deliveryAddress?.address ?? '', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
-                  ),
-                ])),
-                const SizedBox(width: Dimensions.paddingSizeSmall),
-
-                InkWell(
-                  onTap: () => Get.to(()=> OrderLocationScreen(orderModel: orderModel, orderController: orderController, index: index, onTap: onTap,)),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeSmall),
-                    decoration: BoxDecoration(
-                      color: Colors.blue, borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                    ),
-                    child: Text(
-                      'view_on_map'.tr,
-                      style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).cardColor),
-                    ),
-                  ),
-                ),
-              ]),
-
-            ]),
+            ],
           ),
-
-          Container(
-            height: 80,
-            decoration: BoxDecoration(
-              color: Theme.of(context).disabledColor.withValues(alpha: 0.05),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(Dimensions.radiusDefault)),
-            ),
-            padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
-            margin: const EdgeInsets.all(0.2),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-
-              Expanded(
-                child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-                  (Get.find<SplashController>().configModel!.showDmEarning! && Get.find<ProfileController>().profileModel != null
-                      && Get.find<ProfileController>().profileModel!.earnings == 1) ? Column(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Column(
+              children: [
+                // ── Header con gradiente ─────────────────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [const Color(0xFF1E2235), const Color(0xFF252A3D)]
+                          : [const Color(0xFFF8F9FF), const Color(0xFFEEF1FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ganancia_neta'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor)),
-                      Text(
-                        PriceConverterHelper.convertPrice(orderModel.deliveryCharge! + orderModel.dmTips!),
-                        style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge),
+                      // Imagen tienda / paquete
+                      Container(
+                        height: 52,
+                        width: 52,
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).primaryColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Theme.of(
+                              context,
+                            ).primaryColor.withValues(alpha: 0.2),
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(13),
+                          child: parcel
+                              ? Icon(
+                                  Icons.inventory_2_rounded,
+                                  color: Theme.of(context).primaryColor,
+                                  size: 28,
+                                )
+                              : CustomImageWidget(
+                                  image: orderModel.storeLogoFullUrl ?? '',
+                                  height: 52,
+                                  width: 52,
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+
+                      // Nombre + artículos + dirección
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              parcel
+                                  ? orderModel.parcelCategory?.name ?? 'Paquete'
+                                  : orderModel.storeName ?? 'Tienda',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: robotoBold.copyWith(fontSize: 15),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).primaryColor.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    parcel
+                                        ? 'parcel'.tr
+                                        : '${orderModel.detailsCount ?? 0} ${(orderModel.detailsCount ?? 0) > 1 ? 'items'.tr : 'item'.tr}',
+                                    style: robotoMedium.copyWith(
+                                      fontSize: 11,
+                                      color: Theme.of(context).primaryColor,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                // Badge efectivo/digital
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isCash
+                                        ? Colors.orange.withValues(alpha: 0.15)
+                                        : Colors.blue.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        isCash
+                                            ? Icons.payments_rounded
+                                            : Icons.credit_card_rounded,
+                                        size: 11,
+                                        color: isCash
+                                            ? Colors.orange[700]
+                                            : Colors.blue[600],
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Text(
+                                        isCash ? 'Efectivo' : 'Digital',
+                                        style: robotoMedium.copyWith(
+                                          fontSize: 10,
+                                          color: isCash
+                                              ? Colors.orange[700]
+                                              : Colors.blue[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              parcel
+                                  ? orderModel.parcelCategory?.description ?? ''
+                                  : orderModel.storeAddress ?? '',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: robotoRegular.copyWith(
+                                fontSize: 11,
+                                color: Theme.of(context).disabledColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Columna derecha: tiempo + distancia
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Hace ${DateConverterHelper.beforeTimeFormat(orderModel.createdAt!).replaceAll('hace', '').replaceAll('ago', '').trim()}',
+                            style: robotoMedium.copyWith(
+                              color: Theme.of(context).primaryColor,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Theme.of(context).primaryColor,
+                                  Theme.of(
+                                    context,
+                                  ).primaryColor.withValues(alpha: 0.75),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Theme.of(
+                                    context,
+                                  ).primaryColor.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  distanceText,
+                                  style: robotoBold.copyWith(
+                                    fontSize: 13,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  'de ti',
+                                  style: robotoRegular.copyWith(
+                                    fontSize: 10,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
-                  ) : const SizedBox(),
-                  const SizedBox(height: Dimensions.paddingSizeExtraSmall),
-
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeExtraSmall),
-                    child: Text(
-                      '${'payment'.tr} - ${orderModel.paymentMethod == 'cash_on_delivery' ? 'cod'.tr : orderModel.paymentMethod == 'wallet' ? 'wallet'.tr : 'digitally_paid'.tr}',
-                      style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor),
-                    ),
                   ),
-                ]),
-              ),
+                ),
 
-              Expanded(
-                child: Row(children: [
-                  Expanded(child: TextButton(
-                    onPressed: () => Get.dialog(ConfirmationDialogWidget(
-                      icon: Images.warning, title: 'are_you_sure_to_ignore'.tr,
-                      description: parcel ? 'you_want_to_ignore_this_delivery'.tr : 'you_want_to_ignore_this_order'.tr,
-                      onYesPressed: ()  {
-                        Get.back();
-                        orderController.ignoreOrder(index);
-                      },
-                    ), barrierDismissible: false),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(1170, 40), padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
-                        side: BorderSide(width: 1, color: Theme.of(context).disabledColor),
+                // ── Ruta visual: tienda → cliente ────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      // Origen
+                      _RoutePin(
+                        icon: Icons.store_rounded,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      // Línea punteada
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: CustomPaint(
+                            painter: _DashedLinePainter(
+                              color: Theme.of(
+                                context,
+                              ).primaryColor.withValues(alpha: 0.35),
+                            ),
+                            child: const SizedBox(height: 2),
+                          ),
+                        ),
+                      ),
+                      // Destino
+                      _RoutePin(
+                        icon: Icons.location_on_rounded,
+                        color: Colors.redAccent,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Dirección destino + mapa ──────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Entregar en',
+                              style: robotoMedium.copyWith(
+                                fontSize: 11,
+                                color: Theme.of(context).disabledColor,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              parcel
+                                  ? orderModel.receiverDetails?.address ?? ''
+                                  : orderModel.deliveryAddress?.address ?? '',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: robotoMedium.copyWith(fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      GestureDetector(
+                        onTap: () => Get.to(
+                          () => OrderLocationScreen(
+                            orderModel: orderModel,
+                            orderController: orderController,
+                            index: index,
+                            onTap: onTap,
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade600,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.map_rounded,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Ver mapa',
+                                style: robotoMedium.copyWith(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ── Footer: ganancias + botones ───────────────────────────
+                Container(
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF1A1D2E)
+                        : const Color(0xFFF4F5FB),
+                    border: Border(
+                      top: BorderSide(
+                        color: Theme.of(
+                          context,
+                        ).dividerColor.withValues(alpha: 0.3),
                       ),
                     ),
-                    child: Text('ignore'.tr, textAlign: TextAlign.center, style: robotoRegular.copyWith(
-                      color: Theme.of(context).textTheme.bodyLarge!.color,
-                      fontSize: Dimensions.fontSizeLarge,
-                    )),
-                  )),
-                  const SizedBox(width: Dimensions.paddingSizeSmall),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
 
-                  Expanded(child: CustomButtonWidget(
-                    height: 40,
-                    radius: Dimensions.radiusDefault,
-                    buttonText: 'accept'.tr,
-                    fontSize: Dimensions.fontSizeDefault,
-                    onPressed: () => Get.dialog(ConfirmationDialogWidget(
-                      icon: Images.warning, title: 'are_you_sure_to_accept'.tr,
-                      description: parcel ? 'you_want_to_accept_this_delivery'.tr : 'you_want_to_accept_this_order'.tr,
-                      onYesPressed: () {
-                        orderController.acceptOrder(orderModel.id, index, orderModel).then((isSuccess) {
-                          if(isSuccess) {
-                            onTap();
-                            orderModel.orderStatus = (orderModel.orderStatus == 'pending' || orderModel.orderStatus == 'confirmed') ? 'accepted' : orderModel.orderStatus;
-                            Get.toNamed(
-                              RouteHelper.getOrderDetailsRoute(orderModel.id),
-                              arguments: OrderDetailsScreen(
-                                orderId: orderModel.id, isRunningOrder: true, orderIndex: orderController.currentOrderList!.length-1,
+                  child: Row(
+                    children: [
+                      // Ganancias
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Ganancia neta',
+                              style: robotoRegular.copyWith(
+                                fontSize: 10,
+                                color: Theme.of(context).disabledColor,
                               ),
-                            );
-                          }else {
-                            Get.find<OrderController>().getLatestOrders();
-                          }
-                        });
-                      },
-                    ), barrierDismissible: false),
-                  )),
-                ]),
-              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              PriceConverterHelper.convertPrice(
+                                (orderModel.deliveryCharge ?? 0) +
+                                    (orderModel.dmTips ?? 0),
+                              ),
+                              style: robotoBold.copyWith(
+                                fontSize: 18,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
 
-            ]),
+                      // Botón Aceptar
+                      Expanded(
+                        flex: 3,
+                        child: _ActionButton(
+                          label: 'Aceptar Pedido',
+                          isPrimary: true,
+                          onPressed: () {
+                            orderController
+                                .acceptOrder(orderModel.id, index, orderModel)
+                                .then((isSuccess) {
+                                  if (isSuccess) {
+                                    onTap();
+                                    orderModel.orderStatus =
+                                        (orderModel.orderStatus == 'pending' ||
+                                            orderModel.orderStatus ==
+                                                'confirmed')
+                                        ? 'accepted'
+                                        : orderModel.orderStatus;
+                                    Get.toNamed(
+                                      RouteHelper.getOrderDetailsRoute(
+                                        orderModel.id,
+                                      ),
+                                      arguments: OrderDetailsScreen(
+                                        orderId: orderModel.id,
+                                        isRunningOrder: true,
+                                        orderIndex:
+                                            orderController
+                                                .currentOrderList!
+                                                .length -
+                                            1,
+                                      ),
+                                    );
+                                  } else {
+                                    Get.find<OrderController>().getLatestOrders(
+                                      filterIgnored: false,
+                                    );
+                                  }
+                                });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-
-        ]);
-      }),
+        );
+      },
     );
   }
+}
+
+// ── Widgets auxiliares ────────────────────────────────────────────────────────
+
+class _RoutePin extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  const _RoutePin({required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Icon(icon, size: 14, color: color),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final bool isPrimary;
+  final VoidCallback onPressed;
+  const _ActionButton({
+    required this.label,
+    required this.isPrimary,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (isPrimary) {
+      return GestureDetector(
+        onTap: onPressed,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Theme.of(context).primaryColor,
+                Theme.of(context).primaryColor.withValues(alpha: 0.8),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: Theme.of(context).primaryColor.withValues(alpha: 0.35),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: robotoBold.copyWith(color: Colors.white, fontSize: 14),
+            ),
+          ),
+        ),
+      );
+    }
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: Theme.of(context).disabledColor.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Text(
+          label,
+          style: robotoMedium.copyWith(
+            fontSize: 14,
+            color: Theme.of(context).textTheme.bodyLarge!.color,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  const _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    const dashWidth = 5.0;
+    const dashSpace = 4.0;
+    double startX = 0;
+    while (startX < size.width) {
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedLinePainter oldDelegate) =>
+      oldDelegate.color != color;
 }

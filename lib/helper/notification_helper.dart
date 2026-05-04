@@ -113,8 +113,23 @@ class NotificationHelper {
               NotificationType.unblock: () =>
                   Get.offAllNamed(RouteHelper.getSignInRoute()),
               NotificationType.otp: () => null,
-              NotificationType.unassign: () =>
-                  Get.offAllNamed(RouteHelper.getMainRoute('order-request')),
+              NotificationType.unassign: () {
+                final orderId = payload.orderId;
+                if (orderId != null) {
+                  OrderNotificationService.instance.notifyOrderUnassigned(
+                    orderId,
+                  );
+                }
+                Get.offAllNamed(RouteHelper.getMainRoute('order-request'));
+              },
+              NotificationType.inactivity_alert: () {
+                final orderId = payload.orderId;
+                if (orderId != null) {
+                  OrderNotificationService.instance.notifyInactivityAlert(
+                    orderId,
+                  );
+                }
+              },
               NotificationType.message: () => Get.toNamed(
                 RouteHelper.getChatRoute(
                   notificationBody: payload,
@@ -270,8 +285,15 @@ class NotificationHelper {
         Get.find<AuthController>().clearSharedData();
         Get.find<ProfileController>().stopLocationRecord();
         Get.offAllNamed(RouteHelper.getSignInRoute());
-      } else if (type == 'unassign') {
+      } else if (type == 'unassign' || type == 'order_unassigned') {
+        if (notifOrderId != null) {
+          OrderNotificationService.instance.notifyOrderUnassigned(notifOrderId);
+        }
         Get.offAllNamed(RouteHelper.getMainRoute('order-request'));
+      } else if (type == 'inactivity_alert') {
+        if (notifOrderId != null) {
+          OrderNotificationService.instance.notifyInactivityAlert(notifOrderId);
+        }
       } else {
         // Para cualquier otro tipo, mostrar notificación estándar
         NotificationHelper.showNotification(
@@ -595,8 +617,14 @@ class NotificationHelper {
           notificationType: NotificationType.general,
         );
       case 'unassign':
+      case 'order_unassigned':
         return NotificationBodyModel(
           notificationType: NotificationType.unassign,
+        );
+      case 'inactivity_alert':
+        return NotificationBodyModel(
+          orderId: orderId,
+          notificationType: NotificationType.inactivity_alert,
         );
       case 'order_status':
         if (orderId == null) {
