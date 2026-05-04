@@ -79,10 +79,11 @@ class OrderRepository implements OrderRepositoryInterface {
   // }
 
   @override
-  Future<List<OrderModel>?> getLatestOrders() async {
+  Future<List<OrderModel>?> getLatestOrders({bool includeRejected = false}) async {
     List<OrderModel>? latestOrderList;
+    final String extra = includeRejected ? '&include_rejected=1' : '';
     Response response = await apiClient.getData(
-      AppConstants.latestOrdersUri + _getUserToken(),
+      '${AppConstants.latestOrdersUri}${_getUserToken()}$extra',
     );
     if (response.statusCode == 200) {
       latestOrderList = [];

@@ -352,8 +352,10 @@ class OrderController extends GetxController implements GetxService {
 
   Future<void> getLatestOrders({bool filterIgnored = true}) async {
     debugPrint("[OrderController] 🔄 Fetching latest orders (filterIgnored: $filterIgnored)...");
+    // Si filterIgnored=false, estamos en el Centro de Pedidos: incluir pedidos ignorados en backend también
+    final bool includeRejected = !filterIgnored;
     List<OrderModel>? latestOrderList = await orderServiceInterface
-        .getLatestOrders();
+        .getLatestOrders(includeRejected: includeRejected);
     if (latestOrderList != null) {
       debugPrint("[OrderController] ✅ Received ${latestOrderList.length} orders from API");
       if (latestOrderList.isEmpty) {

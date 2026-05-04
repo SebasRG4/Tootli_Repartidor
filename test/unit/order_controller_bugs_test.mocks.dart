@@ -113,9 +113,15 @@ class MockOrderServiceInterface extends _i1.Mock
           as _i5.Future<_i7.PaginatedOrderModel?>);
 
   @override
-  _i5.Future<List<_i7.OrderModel>?> getLatestOrders() =>
+  _i5.Future<List<_i7.OrderModel>?> getLatestOrders({
+    bool includeRejected = false,
+  }) =>
       (super.noSuchMethod(
-            Invocation.method(#getLatestOrders, []),
+            Invocation.method(
+              #getLatestOrders,
+              [],
+              {#includeRejected: includeRejected},
+            ),
             returnValue: _i5.Future<List<_i7.OrderModel>?>.value(),
           )
           as _i5.Future<List<_i7.OrderModel>?>);

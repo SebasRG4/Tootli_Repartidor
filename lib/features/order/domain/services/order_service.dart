@@ -37,8 +37,8 @@ class OrderService implements OrderServiceInterface {
   }
 
   @override
-  Future<List<OrderModel>?> getLatestOrders() async {
-    return await orderRepositoryInterface.getLatestOrders();
+  Future<List<OrderModel>?> getLatestOrders({bool includeRejected = false}) async {
+    return await orderRepositoryInterface.getLatestOrders(includeRejected: includeRejected);
   }
 
   @override
