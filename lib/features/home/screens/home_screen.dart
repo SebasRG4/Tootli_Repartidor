@@ -424,45 +424,60 @@ class HomeScreenState extends State<HomeScreen> {
                       ),
 
                       // Menu Button
-                      Positioned(
-                        top:
-                            context.mediaQueryPadding.top +
-                            Dimensions.paddingSizeSmall,
-                        left: Dimensions.paddingSizeDefault,
-                        child: Container(
-                          height: 40,
-                          width: 40,
-                          decoration: BoxDecoration(
-                            color: _activeOrderRequest != null
-                                ? Colors.red
-                                : Theme.of(context).cardColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.1),
-                                blurRadius: 10,
-                                offset: const Offset(0, 5),
+                      GetBuilder<OrderController>(
+                        builder: (orderController) {
+                          bool hasActiveOrder = (orderController.currentOrderList !=
+                                      null &&
+                                  orderController.currentOrderList!.isNotEmpty) ||
+                              (orderController.latestOrderList != null &&
+                                  orderController.latestOrderList!.isNotEmpty);
+
+                          return Positioned(
+                            top:
+                                context.mediaQueryPadding.top +
+                                Dimensions.paddingSizeSmall,
+                            left: Dimensions.paddingSizeDefault,
+                            child: Container(
+                              height: 40,
+                              width: 40,
+                              decoration: BoxDecoration(
+                                color: _activeOrderRequest != null
+                                    ? Colors.red
+                                    : Theme.of(context).cardColor,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: Icon(
-                              _activeOrderRequest != null
-                                  ? Icons.close
-                                  : Icons.menu,
-                              size: 25,
-                              color: _activeOrderRequest != null
-                                  ? Colors.white
-                                  : Theme.of(
-                                      context,
-                                    ).textTheme.bodyLarge!.color,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                icon: Icon(
+                                  _activeOrderRequest != null
+                                      ? Icons.close
+                                      : Icons.menu,
+                                  size: 25,
+                                  color: _activeOrderRequest != null
+                                      ? Colors.white
+                                      : Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge!.color,
+                                ),
+                                onPressed: () {
+                                  if (_activeOrderRequest != null) {
+                                    cancelOrderRequest();
+                                  } else if (!hasActiveOrder) {
+                                    widget.onTapMenu?.call();
+                                  }
+                                  // Si hasActiveOrder es true, no hace nada (bloqueado)
+                                },
+                              ),
                             ),
-                            onPressed: _activeOrderRequest != null
-                                ? cancelOrderRequest
-                                : widget.onTapMenu,
-                          ),
-                        ),
+                          );
+                        },
                       ),
 
                       // Notification Button
@@ -547,63 +562,78 @@ class HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
 
-                      // Earnings Button
-                      Positioned(
-                        top:
-                            context.mediaQueryPadding.top +
-                            Dimensions.paddingSizeSmall,
-                        left: 0,
-                        right: 0,
-                        child: Column(
-                          children: [
-                            Center(
-                              child: GestureDetector(
-                                onTap: () => _showEarningsBottomSheet(
-                                  context,
-                                  profileController,
-                                ),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: Dimensions.paddingSizeLarge,
-                                    vertical: Dimensions.paddingSizeSmall,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black,
-                                    borderRadius: BorderRadius.circular(50),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.3,
-                                        ),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 5),
+                      // Earnings and Cash Button (Hidden if there is an active order)
+                      GetBuilder<OrderController>(
+                        builder: (orderController) {
+                          bool hasActiveOrder = (orderController.currentOrderList != null &&
+                                  orderController.currentOrderList!.isNotEmpty) ||
+                              (orderController.latestOrderList != null &&
+                                  orderController.latestOrderList!.isNotEmpty);
+
+                          if (hasActiveOrder) {
+                            return const SizedBox();
+                          }
+                          return Positioned(
+                            top:
+                                context.mediaQueryPadding.top +
+                                Dimensions.paddingSizeSmall,
+                            left: 0,
+                            right: 0,
+                            child: Column(
+                              children: [
+                                Center(
+                                  child: GestureDetector(
+                                    onTap: () => _showEarningsBottomSheet(
+                                      context,
+                                      profileController,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: Dimensions.paddingSizeLarge,
+                                        vertical: Dimensions.paddingSizeSmall,
                                       ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        PriceConverterHelper.convertPrice(
-                                          profileController
-                                                  .profileModel
-                                                  ?.balance ??
-                                              0,
-                                        ),
-                                        style: robotoMedium.copyWith(
-                                          color: Colors.white,
-                                          fontSize: Dimensions.fontSizeSmall,
-                                        ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black,
+                                        borderRadius: BorderRadius.circular(50),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 5),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            PriceConverterHelper.convertPrice(
+                                              profileController
+                                                      .profileModel
+                                                      ?.balance ??
+                                                  0,
+                                            ),
+                                            style: robotoMedium.copyWith(
+                                              color: Colors.white,
+                                              fontSize:
+                                                  Dimensions.fontSizeSmall,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                const SizedBox(
+                                  height: Dimensions.paddingSizeSmall,
+                                ),
+                                const CashProgressWidget(),
+                              ],
                             ),
-                            const SizedBox(height: Dimensions.paddingSizeSmall),
-                            const CashProgressWidget(),
-                          ],
-                        ),
+                          );
+                        },
                       ),
 
                       if (!_isNotificationPermissionGranted)

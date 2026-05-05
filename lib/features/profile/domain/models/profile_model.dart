@@ -46,6 +46,7 @@ class ProfileModel {
   bool? pendingRegistrationBrowse;
   double? cashLimitForOnlyPaid;
   double? cashLimitForTotalBlock;
+  int? userInfoId;
 
   ProfileModel({
     this.id,
@@ -94,6 +95,7 @@ class ProfileModel {
     this.pendingRegistrationBrowse,
     this.cashLimitForOnlyPaid,
     this.cashLimitForTotalBlock,
+    this.userInfoId,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -150,6 +152,7 @@ class ProfileModel {
     pendingRegistrationBrowse = json['pending_registration_browse'] == true;
     cashLimitForOnlyPaid = json['cash_limit_for_only_paid']?.toDouble();
     cashLimitForTotalBlock = json['cash_limit_for_total_block']?.toDouble();
+    userInfoId = json['userinfo'] != null ? json['userinfo']['id'] : null;
   }
 
   Map<String, dynamic> toJson() {
@@ -200,6 +203,9 @@ class ProfileModel {
     data['pending_registration_browse'] = pendingRegistrationBrowse;
     data['cash_limit_for_only_paid'] = cashLimitForOnlyPaid;
     data['cash_limit_for_total_block'] = cashLimitForTotalBlock;
+    if (userInfoId != null) {
+      data['userinfo'] = {'id': userInfoId};
+    }
     return data;
   }
 }

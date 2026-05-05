@@ -26,12 +26,15 @@ class MessageBubbleWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     ChatController chatController = Get.find<ChatController>();
-    bool isReply = message.senderId == user!.id;
+    int? myId = Get.find<ProfileController>().profileModel?.userInfoId ?? Get.find<ProfileController>().profileModel?.id;
+    bool isReply = message.senderId != myId;
     bool isLTR = Get.find<LocalizationController>().isLtr;
     String chatTime = chatController.getChatTime(message.createdAt!, nextMessage?.createdAt);
     String previousMessageHasChatTime = previousMessage != null ? chatController.getChatTime(previousMessage!.createdAt!, message.createdAt) : "";
     bool isSameUserWithPreviousMessage = _isSameUserWithPreviousMessage(previousMessage, message);
     bool isSameUserWithNextMessage = _isSameUserWithNextMessage(message, nextMessage);
+
+    User? otherUser = (sender?.id == myId) ? user : sender;
 
     return (isReply) ? Container(
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(Dimensions.paddingSizeSmall)),
@@ -55,7 +58,7 @@ class MessageBubbleWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(20.0),
             child: CustomImageWidget(
               fit: BoxFit.cover, width: 40, height: 40,
-              image: user!.imageFullUrl ?? '',
+              image: otherUser?.imageFullUrl ?? user?.imageFullUrl ?? '',
             ),
           ) : isReply ? const SizedBox(width: Dimensions.paddingSizeExtraLarge + 15) : const SizedBox()  ,
           const SizedBox(width: 10),

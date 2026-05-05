@@ -147,6 +147,14 @@ class _ChatScreenState extends State<ChatScreen> {
       //   baseUrl = ImageType.store_image_url.name;
       // }
 
+      int? myId = Get.find<ProfileController>().profileModel?.userInfoId ?? Get.find<ProfileController>().profileModel?.id;
+      User? otherUser;
+      if (chatController.messageModel != null && chatController.messageModel!.conversation != null) {
+        otherUser = (chatController.messageModel!.conversation!.sender?.id == myId)
+            ? chatController.messageModel!.conversation!.receiver
+            : chatController.messageModel!.conversation!.sender;
+      }
+
       return PopScope(
         canPop: true,
         onPopInvokedWithResult: (didPop, result) async{
@@ -175,18 +183,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   color: Theme.of(context).cardColor,
                 ),
                 child: ClipOval(child: CustomImageWidget(
-                  image: '${chatController.messageModel != null ? chatController.messageModel!.conversation!.receiver!.imageFullUrl : ''}',
+                  image: '${otherUser != null ? otherUser.imageFullUrl : chatController.messageModel?.conversation?.receiver?.imageFullUrl ?? ''}',
                   fit: BoxFit.cover, height: 40, width: 40,
                 )),
               ),
+              const SizedBox(width: Dimensions.paddingSizeSmall),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(
-                  chatController.messageModel != null ? '${chatController.messageModel!.conversation!.receiver!.fName ?? ''}'
-                      ' ${chatController.messageModel!.conversation!.receiver!.lName ?? ''}' : 'receiver_name'.tr,
+                  otherUser != null ? '${otherUser.fName ?? ''} ${otherUser.lName ?? ''}' : chatController.messageModel?.conversation?.receiver?.fName ?? 'receiver_name'.tr,
                   style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeLarge),
                 ),
                 Text(
-                  chatController.messageModel != null ? '${chatController.messageModel!.conversation!.receiver!.phone ?? widget.user?.phone}' : '',
+                  otherUser != null ? '${otherUser.phone ?? widget.user?.phone ?? ''}' : '',
                   style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
                 ),
               ]),
