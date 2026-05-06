@@ -79,12 +79,14 @@ class HomeScreenState extends State<HomeScreen> {
   /// Marcadores precargados — se decodifican una sola vez en initState
   Uint8List? _cachedStoreMarker;
   Uint8List? _cachedDestinationMarker;
+  StreamSubscription? _notificationSubscription;
 
   @override
   void initState() {
     super.initState();
 
     _checkSystemNotification();
+    _initNotificationService();
 
     _listener = AppLifecycleListener(onStateChange: _onStateChanged);
 
@@ -188,6 +190,26 @@ class HomeScreenState extends State<HomeScreen> {
       case AppLifecycleState.paused:
         break;
     }
+  }
+
+  void _initNotificationService() {
+    _notificationSubscription = OrderNotificationService.instance.notificationStream.listen((data) {
+      if (!mounted) return;
+      final int? orderId = data['orderId'];
+      final String? type = data['type'];
+
+      if (type == 'order_request' && orderId != null) {
+        Get.find<OrderController>().fetchOrderForNotification(orderId).then((order) {
+          if (order != null) {
+            showOrderRequest(order);
+          }
+        });
+      } else if (type == 'inactivity' && orderId != null) {
+        showInactivityWarningFromNotification(orderId);
+      } else if (type == 'unassigned' && orderId != null) {
+        showUnassignedDialogFromNotification(orderId);
+      }
+    });
   }
 
   /// Al volver al primer plano con un pedido activo, refresca el estado real
@@ -325,6 +347,7 @@ class HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _notificationSubscription?.cancel();
     _gridTimer?.cancel();
     _inactivityTimer?.cancel();
     _governanceAudioPlayer.dispose();

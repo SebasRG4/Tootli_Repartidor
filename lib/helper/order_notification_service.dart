@@ -4,6 +4,7 @@ import 'package:vibration/vibration.dart';
 import 'package:audio_session/audio_session.dart' hide AndroidAudioFocus;
 import 'package:audioplayers/audioplayers.dart' hide AVAudioSessionCategory;
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 /// Servicio singleton que permite que NotificationHelper (sin contexto)
 /// comunique un tap en notificación de pedido al DashboardScreen activo.
@@ -27,6 +28,9 @@ class OrderNotificationService {
   void Function(int orderId)? _onOrderRequestTapped;
   void Function(int orderId)? _onInactivityAlert;
   void Function(int orderId)? _onOrderUnassigned;
+  
+  final _notificationStreamController = StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get notificationStream => _notificationStreamController.stream;
 
   /// Whether the DashboardScreen has registered its callback
   bool get hasCallback => _onOrderRequestTapped != null;
@@ -55,6 +59,7 @@ class OrderNotificationService {
     if (_onInactivityAlert != null) {
       _onInactivityAlert!(orderId);
     }
+    _notificationStreamController.add({'type': 'inactivity', 'orderId': orderId});
   }
 
   void notifyOrderUnassigned(int orderId) {
@@ -62,6 +67,7 @@ class OrderNotificationService {
     if (_onOrderUnassigned != null) {
       _onOrderUnassigned!(orderId);
     }
+    _notificationStreamController.add({'type': 'unassigned', 'orderId': orderId});
   }
 
   void playOrderRequestAlertSound() {
@@ -124,6 +130,7 @@ class OrderNotificationService {
       );
       _pendingOrderId = orderId;
     }
+    _notificationStreamController.add({'type': 'order_request', 'orderId': orderId});
   }
 
   /// Detener el sonido de notificación (llamado al aceptar o rechazar un pedido)

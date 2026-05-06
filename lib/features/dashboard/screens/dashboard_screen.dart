@@ -137,11 +137,17 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     // Escuchar cambios en OrderController para auto-restaurar pedidos activos si aparecen (ej. por FCM)
     Get.find<OrderController>().addListener(() {
-      if (!mounted || _pageIndex != 0 || _isOrderActive) return;
+      if (!mounted || _pageIndex != 0) return;
+      
       final runningOrders = Get.find<OrderController>().currentOrderList;
       if (runningOrders != null && runningOrders.isNotEmpty) {
-        debugPrint("[Dashboard] OrderController updated - restoring active order ${runningOrders.first.id}");
+        // Restaurar el primer pedido si HomeScreen no tiene nada
         _homeScreenKey.currentState?.restoreActiveOrder(runningOrders.first);
+        
+        // Si hay un segundo pedido en la lista, también intentar restaurarlo
+        if (runningOrders.length > 1) {
+          _homeScreenKey.currentState?.restoreActiveOrder(runningOrders[1]);
+        }
       }
     });
 

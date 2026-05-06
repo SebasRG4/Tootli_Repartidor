@@ -159,20 +159,30 @@ class NotificationHelper {
       },
     );
 
+    FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint(
-        "[FCM] onMessage: type=${message.data['type']} order_id=${message.data['order_id']}",
+      debugPrint("[FCM] 📨 onMessage received: ${message.data}");
+
+      // EXTREME DEBUG: Mostrar TODO el payload en pantalla para ver qué manda el servidor
+      showCustomSnackBar(
+        "FCM DATA: ${message.data.toString().substring(0, (message.data.toString().length > 100 ? 100 : message.data.toString().length))}...",
+        isError: false,
+        getXSnackBar: true,
       );
 
-      // Normalizar tipo y orderId para soportar distintas claves desde backend
-      final String rawType =
-          (message.data['type'] ??
-                  message.data['body_loc_key'] ??
-                  message.data['notification_type'] ??
-                  '')
-              .toString();
-      String? type = rawType.isNotEmpty ? rawType : null;
+      // Normalizar tipo (soportar múltiples variantes de nombres de campos)
+      final dynamic rawType =
+          message.data['type'] ??
+          message.data['body_loc_key'] ??
+          message.data['notification_type'];
+      final String type = (rawType ?? '').toString();
 
+      // Normalizar orderId
       final int? notifOrderId = _parseOrderId(message.data);
       final String? orderID =
           message.data['order_id']?.toString() ??
@@ -277,12 +287,12 @@ class NotificationHelper {
         Get.find<OrderController>().getLatestOrders();
         final assignId = int.tryParse(orderID);
         if (assignId != null) {
-          debugPrint("[FCM] Pedido asignado ($assignId). Refrescando datos sin navegar...");
+          debugPrint(
+            "[FCM] Pedido asignado ($assignId). Refrescando datos sin navegar...",
+          );
           Get.find<OrderController>().getRunningOrders(1, status: 'all');
           Get.find<OrderController>().getLatestOrders();
         }
-
-
       } else if (type == 'block') {
         Get.find<AuthController>().clearSharedData();
         Get.find<ProfileController>().stopLocationRecord();
@@ -491,9 +501,7 @@ class NotificationHelper {
           playSound: true,
           importance: Importance.max,
           priority: Priority.max,
-          sound: RawResourceAndroidNotificationSound(
-            'alert_new_delivery',
-          ),
+          sound: RawResourceAndroidNotificationSound('alert_new_delivery'),
         );
     const DarwinNotificationDetails iosPlatformChannelSpecifics =
         DarwinNotificationDetails(
@@ -532,11 +540,11 @@ class NotificationHelper {
           importance: Importance.max,
           styleInformation: bigTextStyleInformation,
           priority: Priority.max,
-      sound: const RawResourceAndroidNotificationSound(
-        'alert_new_delivery',
-      ),
-      fullScreenIntent: true,
-    );
+          sound: const RawResourceAndroidNotificationSound(
+            'alert_new_delivery',
+          ),
+          fullScreenIntent: true,
+        );
     const DarwinNotificationDetails iosPlatformChannelSpecifics =
         DarwinNotificationDetails(
           presentSound: true,

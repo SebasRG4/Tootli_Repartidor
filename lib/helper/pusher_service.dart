@@ -27,8 +27,8 @@ class PusherService {
         final host = config.webSocketUri!.replaceFirst(RegExp(r'^https?://'), '').split('/').first;
         final port = config.webSocketPort!;
         final key = config.webSocketKey!;
-        final url = 'ws://$host:$port/app/$key?protocol=7&client=js&version=8.4.0-rc2&flash=false';
-        debugPrint("[PusherService] Using config WebSocket: ws://$host:$port");
+        final url = 'ws://$host:$port/app/$key?protocol=7&client=js&version=7.0.6&flash=false';
+        debugPrint("[PusherService] Using config WebSocket: $url");
         return url;
       }
     } catch (_) {}
@@ -46,14 +46,15 @@ class PusherService {
 
       _channel!.stream.listen(
         (message) {
+          debugPrint("[PusherService] 📥 Raw message: $message");
           _handleMessage(message.toString(), deliverymanId);
         },
         onDone: () {
-          debugPrint("[PusherService] WebSocket closed.");
+          debugPrint("[PusherService] ⚠️ WebSocket CLOSED (onDone called).");
           _isInitialized = false;
         },
         onError: (error) {
-          debugPrint("[PusherService] WebSocket ERROR: $error");
+          debugPrint("[PusherService] ❌ WebSocket ERROR: $error");
           _isInitialized = false;
         },
       );
@@ -115,9 +116,10 @@ class PusherService {
 
   Future<void> disconnect() async {
     try {
+      debugPrint("[PusherService] 🔌 Manual disconnect requested.");
       await _channel?.sink.close();
       _isInitialized = false;
-      debugPrint("[PusherService] Disconnected.");
+      debugPrint("[PusherService] ✅ Disconnected.");
     } catch (e) {
       debugPrint("[PusherService] Disconnect ERROR: $e");
     }
