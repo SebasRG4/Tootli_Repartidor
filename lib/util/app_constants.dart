@@ -111,6 +111,7 @@ class AppConstants {
   static const String missionUri = '/api/v1/delivery-man/missions';
   static const String offlinePaymentMethodListUri = '/api/v1/offline_payment_method_list';
   static const String makeOfflinePaymentUri = '/api/v1/delivery-man/make-offline-payment';
+  static const String optimizedRouteUri = 'http://15.235.73.88:8080/api/v1/delivery-man/optimized-route';
 
   /// Chat seguimiento Tootli Direct (mismo hilo que la web del enlace).
   static const String tootliDirectTrackingChatUri =

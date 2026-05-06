@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
@@ -60,8 +61,10 @@ class HomeScreenState extends State<HomeScreen> {
   final Set<Polygon> _polygons = {};
   final Set<Marker> _markers = {};
   final Set<Polyline> _polylines = {};
+  Timer? _routeOptimizationTimer;
   List<OrderModel> _activeOrders = [];
-  OrderModel? _pendingRequest; // Para mostrar la ventana de aceptación sobre un pedido activo
+  OrderModel?
+  _pendingRequest; // Para mostrar la ventana de aceptación sobre un pedido activo
   String _orderPhase = 'none'; // 'none', 'going_to_store', 'going_to_customer'
   String? _estimatedArrivalTime;
   final AudioPlayer _governanceAudioPlayer = AudioPlayer();
@@ -87,6 +90,7 @@ class HomeScreenState extends State<HomeScreen> {
 
     _checkSystemNotification();
     _initNotificationService();
+    _startRouteOptimizationTimer();
 
     _listener = AppLifecycleListener(onStateChange: _onStateChanged);
 
@@ -107,6 +111,29 @@ class HomeScreenState extends State<HomeScreen> {
     });
 
     _startInactivityTimer();
+    _startRouteOptimizationTimer();
+  }
+
+  void _startRouteOptimizationTimer() {
+    _routeOptimizationTimer?.cancel();
+    _routeOptimizationTimer = Timer.periodic(const Duration(seconds: 30), (
+      timer,
+    ) {
+      if (_activeOrders.length > 1 && mounted) {
+        _refreshOptimizedRoute();
+      }
+    });
+  }
+
+  Future<void> _refreshOptimizedRoute() async {
+    Position pos = await Geolocator.getCurrentPosition();
+    await Get.find<OrderController>().getOptimizedRoute(
+      pos.latitude,
+      pos.longitude,
+    );
+    if (mounted) {
+      setMultiOrderPolyline();
+    }
   }
 
   Future<void> _preloadMarkers() async {
@@ -193,23 +220,28 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _initNotificationService() {
-    _notificationSubscription = OrderNotificationService.instance.notificationStream.listen((data) {
-      if (!mounted) return;
-      final int? orderId = data['orderId'];
-      final String? type = data['type'];
+    _notificationSubscription = OrderNotificationService
+        .instance
+        .notificationStream
+        .listen((data) {
+          if (!mounted) return;
+          final int? orderId = data['orderId'];
+          final String? type = data['type'];
 
-      if (type == 'order_request' && orderId != null) {
-        Get.find<OrderController>().fetchOrderForNotification(orderId).then((order) {
-          if (order != null) {
-            showOrderRequest(order);
+          if (type == 'order_request' && orderId != null) {
+            Get.find<OrderController>().fetchOrderForNotification(orderId).then(
+              (order) {
+                if (order != null) {
+                  showOrderRequest(order);
+                }
+              },
+            );
+          } else if (type == 'inactivity' && orderId != null) {
+            showInactivityWarningFromNotification(orderId);
+          } else if (type == 'unassigned' && orderId != null) {
+            showUnassignedDialogFromNotification(orderId);
           }
         });
-      } else if (type == 'inactivity' && orderId != null) {
-        showInactivityWarningFromNotification(orderId);
-      } else if (type == 'unassigned' && orderId != null) {
-        showUnassignedDialogFromNotification(orderId);
-      }
-    });
   }
 
   /// Al volver al primer plano con un pedido activo, refresca el estado real
@@ -352,6 +384,7 @@ class HomeScreenState extends State<HomeScreen> {
     _inactivityTimer?.cancel();
     _governanceAudioPlayer.dispose();
     _listener.dispose();
+    _routeOptimizationTimer?.cancel();
     super.dispose();
   }
 
@@ -365,9 +398,13 @@ class HomeScreenState extends State<HomeScreen> {
       body: GetBuilder<OrderController>(
         builder: (orderController) {
           // Lógica para detectar si el pedido que se está solicitando fue tomado por otro repartidor o expiró
-          if (_pendingRequest != null && _orderPhase == 'none' && !_isOrderTakenByOther) {
+          if (_pendingRequest != null &&
+              _orderPhase == 'none' &&
+              !_isOrderTakenByOther) {
             if (orderController.latestOrderList != null) {
-              bool exists = orderController.latestOrderList!.any((o) => o.id == _pendingRequest!.id);
+              bool exists = orderController.latestOrderList!.any(
+                (o) => o.id == _pendingRequest!.id,
+              );
               if (!exists) {
                 // El pedido ya no está en la lista de disponibles (tomado por otro o expirado)
                 _isOrderTakenByOther = true;
@@ -392,7 +429,8 @@ class HomeScreenState extends State<HomeScreen> {
               if (!_hasCenteredOnLaunch &&
                   profileController.recordLocationBody != null &&
                   _mapController != null &&
-                  _activeOrders.isEmpty && _pendingRequest == null) {
+                  _activeOrders.isEmpty &&
+                  _pendingRequest == null) {
                 _hasCenteredOnLaunch = true;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   animateToMyLocation();
@@ -439,7 +477,11 @@ class HomeScreenState extends State<HomeScreen> {
                         },
                         polylines: _polylines,
                         padding: EdgeInsets.only(
-                          bottom: (_activeOrders.isNotEmpty || _pendingRequest != null) ? 350 : 0,
+                          bottom:
+                              (_activeOrders.isNotEmpty ||
+                                  _pendingRequest != null)
+                              ? 350
+                              : 0,
                         ),
 
                         onCameraMove: (position) {
@@ -478,9 +520,11 @@ class HomeScreenState extends State<HomeScreen> {
                       // Menu Button
                       GetBuilder<OrderController>(
                         builder: (orderController) {
-                          bool hasActiveOrder = (orderController.currentOrderList !=
-                                      null &&
-                                  orderController.currentOrderList!.isNotEmpty) ||
+                          bool hasActiveOrder =
+                              (orderController.currentOrderList != null &&
+                                  orderController
+                                      .currentOrderList!
+                                      .isNotEmpty) ||
                               (orderController.latestOrderList != null &&
                                   orderController.latestOrderList!.isNotEmpty);
 
@@ -493,7 +537,9 @@ class HomeScreenState extends State<HomeScreen> {
                               height: 40,
                               width: 40,
                               decoration: BoxDecoration(
-                                color: (_activeOrders.isNotEmpty || _pendingRequest != null)
+                                color:
+                                    (_activeOrders.isNotEmpty ||
+                                        _pendingRequest != null)
                                     ? Colors.red
                                     : Theme.of(context).cardColor,
                                 shape: BoxShape.circle,
@@ -508,11 +554,14 @@ class HomeScreenState extends State<HomeScreen> {
                               child: IconButton(
                                 padding: EdgeInsets.zero,
                                 icon: Icon(
-                                  (_activeOrders.isNotEmpty || _pendingRequest != null)
+                                  (_activeOrders.isNotEmpty ||
+                                          _pendingRequest != null)
                                       ? Icons.close
                                       : Icons.menu,
                                   size: 25,
-                                  color: (_activeOrders.isNotEmpty || _pendingRequest != null)
+                                  color:
+                                      (_activeOrders.isNotEmpty ||
+                                          _pendingRequest != null)
                                       ? Colors.white
                                       : Theme.of(
                                           context,
@@ -520,7 +569,9 @@ class HomeScreenState extends State<HomeScreen> {
                                 ),
                                 onPressed: () {
                                   if (_pendingRequest != null) {
-                                    _performCancellation(order: _pendingRequest);
+                                    _performCancellation(
+                                      order: _pendingRequest,
+                                    );
                                   } else if (_activeOrders.isNotEmpty) {
                                     cancelOrderRequest();
                                   } else if (!hasActiveOrder) {
@@ -529,7 +580,6 @@ class HomeScreenState extends State<HomeScreen> {
                                 },
                               ),
                             ),
-
                           );
                         },
                       ),
@@ -619,8 +669,11 @@ class HomeScreenState extends State<HomeScreen> {
                       // Earnings and Cash Button (Hidden if there is an active order)
                       GetBuilder<OrderController>(
                         builder: (orderController) {
-                          bool hasActiveOrder = (orderController.currentOrderList != null &&
-                                  orderController.currentOrderList!.isNotEmpty) ||
+                          bool hasActiveOrder =
+                              (orderController.currentOrderList != null &&
+                                  orderController
+                                      .currentOrderList!
+                                      .isNotEmpty) ||
                               (orderController.latestOrderList != null &&
                                   orderController.latestOrderList!.isNotEmpty);
 
@@ -736,13 +789,26 @@ class HomeScreenState extends State<HomeScreen> {
       bottomSheet: (_pendingRequest != null || _activeOrders.isNotEmpty)
           ? (_pendingRequest != null
                 ? () {
-                    double? storeLat = double.tryParse(_pendingRequest!.storeLat ?? '');
-                    double? storeLng = double.tryParse(_pendingRequest!.storeLng ?? '');
-                    double? dmLat = Get.find<ProfileController>().recordLocationBody?.latitude;
-                    double? dmLng = Get.find<ProfileController>().recordLocationBody?.longitude;
+                    double? storeLat = double.tryParse(
+                      _pendingRequest!.storeLat ?? '',
+                    );
+                    double? storeLng = double.tryParse(
+                      _pendingRequest!.storeLng ?? '',
+                    );
+                    double? dmLat = Get.find<ProfileController>()
+                        .recordLocationBody
+                        ?.latitude;
+                    double? dmLng = Get.find<ProfileController>()
+                        .recordLocationBody
+                        ?.longitude;
                     double? distance;
-                    if (storeLat != null && storeLng != null && dmLat != null && dmLng != null) {
-                      distance = _calculateDistance(dmLat, dmLng, storeLat, storeLng) / 1000;
+                    if (storeLat != null &&
+                        storeLng != null &&
+                        dmLat != null &&
+                        dmLng != null) {
+                      distance =
+                          _calculateDistance(dmLat, dmLng, storeLat, storeLng) /
+                          1000;
                     }
 
                     return PremiumOrderRequestWidget(
@@ -759,30 +825,31 @@ class HomeScreenState extends State<HomeScreen> {
                             _startMovementTimer();
                           }
                         });
-                        
-                        Get.find<OrderController>().acceptOrder(
-                          orderToAccept.id,
-                          0,
-                          orderToAccept,
-                        ).then((isSuccess) {
-                          if (isSuccess) {
-                            Get.find<OrderController>().getOrderDetails(
-                              orderToAccept.id,
-                              orderToAccept.orderType == 'parcel',
-                            );
-                            _updateMultiOrderRoute();
-                          } else {
-                            setState(() {
-                              _activeOrders.removeWhere((o) => o.id == orderToAccept.id);
-                              if (_activeOrders.isEmpty) {
-                                _orderPhase = 'none';
-                                _stopMovementTimer();
+
+                        Get.find<OrderController>()
+                            .acceptOrder(orderToAccept.id, 0, orderToAccept)
+                            .then((isSuccess) {
+                              if (isSuccess) {
+                                Get.find<OrderController>().getOrderDetails(
+                                  orderToAccept.id,
+                                  orderToAccept.orderType == 'parcel',
+                                );
+                                _updateMultiOrderRoute();
+                              } else {
+                                setState(() {
+                                  _activeOrders.removeWhere(
+                                    (o) => o.id == orderToAccept.id,
+                                  );
+                                  if (_activeOrders.isEmpty) {
+                                    _orderPhase = 'none';
+                                    _stopMovementTimer();
+                                  }
+                                });
                               }
                             });
-                          }
-                        });
                       },
-                      onReject: () => _performCancellation(order: _pendingRequest),
+                      onReject: () =>
+                          _performCancellation(order: _pendingRequest),
                     );
                   }()
                 : AcceptedOrderWidget(
@@ -791,7 +858,8 @@ class HomeScreenState extends State<HomeScreen> {
                     phase: _orderPhase,
                     estimatedArrivalTime: _estimatedArrivalTime,
                     onHandover: (order) async {
-                      bool success = await Get.find<OrderController>().updateOrderStatus(order, 'handover');
+                      bool success = await Get.find<OrderController>()
+                          .updateOrderStatus(order, 'handover');
                       if (success) {
                         setState(() {
                           _orderPhase = 'at_store';
@@ -799,7 +867,8 @@ class HomeScreenState extends State<HomeScreen> {
                       }
                     },
                     onPickedUp: (order) async {
-                      bool success = await Get.find<OrderController>().updateOrderStatus(order, 'picked_up');
+                      bool success = await Get.find<OrderController>()
+                          .updateOrderStatus(order, 'picked_up');
                       if (success) {
                         setState(() {
                           _orderPhase = 'going_to_customer';
@@ -808,7 +877,8 @@ class HomeScreenState extends State<HomeScreen> {
                       }
                     },
                     onDelivered: (order) async {
-                      bool success = await Get.find<OrderController>().updateOrderStatus(order, 'delivered');
+                      bool success = await Get.find<OrderController>()
+                          .updateOrderStatus(order, 'delivered');
                       if (success) {
                         _performCancellation(order: order, callApi: false);
                       }
@@ -819,7 +889,8 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void cancelOrderRequest({OrderModel? order, bool callApi = true}) {
-    final targetOrder = order ?? (_activeOrders.isNotEmpty ? _activeOrders.first : null);
+    final targetOrder =
+        order ?? (_activeOrders.isNotEmpty ? _activeOrders.first : null);
     if (targetOrder == null) return;
 
     if (_orderPhase != 'none') {
@@ -889,13 +960,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _performCancellation({OrderModel? order, bool callApi = true}) async {
-    final targetOrder = order ?? (_activeOrders.isNotEmpty ? _activeOrders.first : null);
+    final targetOrder =
+        order ?? (_activeOrders.isNotEmpty ? _activeOrders.first : null);
     if (targetOrder == null) return;
 
     debugPrint(
       "[HomeScreen] ❌ _performCancellation called (callApi: $callApi) for order ${targetOrder.id}",
     );
-    
+
     OrderNotificationService.instance.stopAudio();
     if (callApi && targetOrder.id != null && targetOrder.id != 999) {
       Get.find<OrderController>().ignoreOrderApi(targetOrder.id!);
@@ -906,7 +978,7 @@ class HomeScreenState extends State<HomeScreen> {
         _pendingRequest = null;
       }
       _activeOrders.removeWhere((o) => o.id == targetOrder.id);
-      
+
       if (_activeOrders.isEmpty) {
         _orderPhase = 'none';
         _polylines.clear();
@@ -919,7 +991,7 @@ class HomeScreenState extends State<HomeScreen> {
         _updateMultiOrderRoute();
       }
     });
-    
+
     if (_activeOrders.isEmpty) {
       animateToMyLocation();
     }
@@ -1001,7 +1073,7 @@ class HomeScreenState extends State<HomeScreen> {
       debugPrint("[HomeScreen] ⛔ IGNORED - max 2 orders already reached");
       return;
     }
-    
+
     if (_activeOrders.any((o) => o.id == order.id)) {
       debugPrint("[HomeScreen] ⛔ IGNORED - order ${order.id} already active");
       return;
@@ -1063,6 +1135,75 @@ class HomeScreenState extends State<HomeScreen> {
   void _updateMultiOrderRoute() {
     if (_activeOrders.isNotEmpty) {
       setPolyline(_activeOrders.first);
+    }
+  }
+
+  void setMultiOrderPolyline() async {
+    final route = Get.find<OrderController>().optimizedRoute;
+    if (route == null || route.sequence == null || route.sequence!.isEmpty) {
+      if (_activeOrders.isNotEmpty) {
+        setPolyline(_activeOrders.first);
+      }
+      return;
+    }
+
+    _polylines.clear();
+    _markers.clear();
+
+    LatLng lastPoint = LatLng(
+      Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
+      Get.find<ProfileController>().recordLocationBody?.longitude ?? 0,
+    );
+
+    int polylineIndex = 0;
+    for (var point in route.sequence!) {
+      LatLng currentPoint = LatLng(point.latitude!, point.longitude!);
+
+      // Get route between segments
+      List<LatLng> segmentPoints = await _getRoutePolyline(
+        lastPoint,
+        currentPoint,
+      );
+      if (segmentPoints.isEmpty) {
+        segmentPoints = [lastPoint, currentPoint];
+      }
+
+      setState(() {
+        _polylines.add(
+          Polyline(
+            polylineId: PolylineId('segment_$polylineIndex'),
+            points: segmentPoints,
+            color: polylineIndex == 0
+                ? Colors.blue
+                : Colors.blue.withOpacity(0.5),
+            width: 5,
+          ),
+        );
+
+        // Add Marker
+        _markers.add(
+          Marker(
+            markerId: MarkerId(point.id!),
+            position: currentPoint,
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              point.type == 'pickup'
+                  ? BitmapDescriptor.hueOrange
+                  : BitmapDescriptor.hueGreen,
+            ),
+            infoWindow: InfoWindow(
+              title: point.type == 'pickup'
+                  ? 'Recoger pedido ${point.orderId}'
+                  : 'Entregar pedido ${point.orderId}',
+              snippet: point.waitTime != null && point.waitTime! > 0
+                  ? 'Espera aprox: ${point.waitTime!.toStringAsFixed(0)} min'
+                  : null,
+            ),
+          ),
+        );
+      });
+
+      lastPoint = currentPoint;
+      polylineIndex++;
     }
   }
 
@@ -1450,8 +1591,6 @@ class HomeScreenState extends State<HomeScreen> {
       }
     });
   }
-
-
 
   void _showInactivityWarning() {
     if (_isShowingInactivityDialog) return;

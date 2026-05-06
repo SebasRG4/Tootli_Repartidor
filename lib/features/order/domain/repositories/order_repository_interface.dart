@@ -1,3 +1,4 @@
+import 'package:get/get_utils/get_utils.dart';
 import 'package:sixam_mart_delivery/api/api_client.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/ignore_model.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_count_model.dart';
@@ -25,4 +26,5 @@ abstract class OrderRepositoryInterface implements RepositoryInterface {
     required int attemptNumber,
     required int confirmedAtMs,
   });
+  Future<dynamic> getOptimizedRoute(double lat, double lng);
 }

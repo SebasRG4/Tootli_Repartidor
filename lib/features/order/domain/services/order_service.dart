@@ -153,4 +153,9 @@ class OrderService implements OrderServiceInterface {
       confirmedAtMs: confirmedAtMs,
     );
   }
+
+  @override
+  Future<Response> getOptimizedRoute(double lat, double lng) async {
+    return await orderRepositoryInterface.getOptimizedRoute(lat, lng);
+  }
 }

@@ -390,4 +390,11 @@ class OrderRepository implements OrderRepositoryInterface {
       handleError: false,
     );
   }
+
+  @override
+  Future<Response> getOptimizedRoute(double lat, double lng) async {
+    return await apiClient.getData(
+      '${AppConstants.optimizedRouteUri}?token=${_getUserToken()}&latitude=$lat&longitude=$lng',
+    );
+  }
 }

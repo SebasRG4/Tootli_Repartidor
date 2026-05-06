@@ -23,6 +23,7 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/features/order/domain/services/order_service_interface.dart';
+import 'package:sixam_mart_delivery/features/order/domain/models/optimized_route_model.dart';
 
 class OrderController extends GetxController implements GetxService {
   final OrderServiceInterface orderServiceInterface;
@@ -98,6 +99,9 @@ class OrderController extends GetxController implements GetxService {
   DateTime? get selectedDate => _selectedDate;
 
   int _selectedHour = 11;
+
+  OptimizedRouteModel? _optimizedRoute;
+  OptimizedRouteModel? get optimizedRoute => _optimizedRoute;
   int get selectedHour => _selectedHour;
 
   int _selectedMinute = 59;
@@ -127,6 +131,14 @@ class OrderController extends GetxController implements GetxService {
   void changeDeliveryImageStatus({bool isUpdate = true}) {
     _showDeliveryImageField = !_showDeliveryImageField;
     if (isUpdate) {
+      update();
+    }
+  }
+
+  Future<void> getOptimizedRoute(double lat, double lng) async {
+    Response response = await orderServiceInterface.getOptimizedRoute(lat, lng);
+    if (response.statusCode == 200) {
+      _optimizedRoute = OptimizedRouteModel.fromJson(response.body);
       update();
     }
   }
@@ -310,7 +322,9 @@ class OrderController extends GetxController implements GetxService {
     bool willUpdate = true,
     String? status,
   }) async {
-    debugPrint("[OrderController] 🔄 Fetching running orders (offset: $offset, status: $status)...");
+    debugPrint(
+      "[OrderController] 🔄 Fetching running orders (offset: $offset, status: $status)...",
+    );
     String orderStatus = status ?? _selectedRunningStatus;
     if (status != null) {
       _selectedRunningStatus = status;
@@ -333,9 +347,13 @@ class OrderController extends GetxController implements GetxService {
           _currentOrderList = [];
         }
         _currentOrderList!.addAll(paginatedOrderModel.orders!);
-        debugPrint("[OrderController] ✅ Received ${paginatedOrderModel.orders!.length} running orders");
+        debugPrint(
+          "[OrderController] ✅ Received ${paginatedOrderModel.orders!.length} running orders",
+        );
         for (var order in paginatedOrderModel.orders!) {
-          debugPrint("   - Order ID: ${order.id}, Status: ${order.orderStatus}");
+          debugPrint(
+            "   - Order ID: ${order.id}, Status: ${order.orderStatus}",
+          );
         }
         _pageSize = paginatedOrderModel.totalSize;
         _paginate = false;
@@ -357,7 +375,7 @@ class OrderController extends GetxController implements GetxService {
         .getLatestOrders(includeRejected: includeRejected);
     if (latestOrderList != null) {
       _latestOrderList = [];
-      
+
       if (filterIgnored) {
         List<int?> ignoredIdList = orderServiceInterface.prepareIgnoreIdList(
           _ignoredRequests,
@@ -549,8 +567,8 @@ class OrderController extends GetxController implements GetxService {
       _currentOrderList!.add(orderModel);
     } else {
       String errorMessage = responseModel.message ?? 'error'.tr;
-      if (errorMessage.toLowerCase().contains('already') || 
-          errorMessage.toLowerCase().contains('taken') || 
+      if (errorMessage.toLowerCase().contains('already') ||
+          errorMessage.toLowerCase().contains('taken') ||
           errorMessage.toLowerCase().contains('assigned')) {
         errorMessage = 'Este pedido ya fue tomado por otro repartidor';
       }
@@ -1022,6 +1040,20 @@ class OrderController extends GetxController implements GetxService {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         afterReturn();
       });
+    }
+    Future<void> getOptimizedRoute(double lat, double lng) async {
+      Response response = await orderServiceInterface.getOptimizedRoute(
+        lat,
+        lng,
+      );
+      if (response.statusCode == 200) {
+        _optimizedRoute = OptimizedRouteModel.fromJson(response.body);
+      } else {
+        debugPrint(
+          "[OrderController] Error getting optimized route: ${response.statusText}",
+        );
+      }
+      update();
     }
   }
 }

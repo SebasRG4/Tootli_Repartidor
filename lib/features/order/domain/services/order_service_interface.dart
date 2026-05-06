@@ -37,4 +37,5 @@ abstract class OrderServiceInterface{
     required int attemptNumber,
     required int confirmedAtMs,
   });
+  Future<Response> getOptimizedRoute(double lat, double lng);
 }
