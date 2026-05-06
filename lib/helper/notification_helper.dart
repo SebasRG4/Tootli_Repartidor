@@ -277,10 +277,12 @@ class NotificationHelper {
         Get.find<OrderController>().getLatestOrders();
         final assignId = int.tryParse(orderID);
         if (assignId != null) {
-          Get.offAllNamed(
-            RouteHelper.getOrderDetailsRoute(assignId, fromNotification: true),
-          );
+          debugPrint("[FCM] Pedido asignado ($assignId). Refrescando datos sin navegar...");
+          Get.find<OrderController>().getRunningOrders(1, status: 'all');
+          Get.find<OrderController>().getLatestOrders();
         }
+
+
       } else if (type == 'block') {
         Get.find<AuthController>().clearSharedData();
         Get.find<ProfileController>().stopLocationRecord();
@@ -417,12 +419,10 @@ class NotificationHelper {
     } else {
       return FlutterForegroundTask.startService(
         serviceId: 256,
-        notificationTitle: notificationType == NotificationType.order_request
-            ? 'Order Notification'
-            : 'Has sido asignado a un nuevo pedido ($orderId)',
+        notificationTitle: 'Nueva solicitud de pedido',
         notificationText: notificationType == NotificationType.order_request
-            ? 'Nueva solicitud de pedido.'
-            : 'Abre la app para ver los detalles.',
+            ? 'Tienes una nueva solicitud de entrega.'
+            : 'Has sido asignado a un nuevo pedido ($orderId)',
         callback: startCallback,
       );
     }
@@ -491,12 +491,18 @@ class NotificationHelper {
           playSound: true,
           importance: Importance.max,
           priority: Priority.max,
-          sound: const RawResourceAndroidNotificationSound(
+          sound: RawResourceAndroidNotificationSound(
             'alert_new_delivery',
           ),
         );
+    const DarwinNotificationDetails iosPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+          presentSound: true,
+          sound: 'alert_new_delivery.mp3',
+        );
     const NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
+      iOS: iosPlatformChannelSpecifics,
     );
     await fln.show(
       0,
@@ -526,14 +532,19 @@ class NotificationHelper {
           importance: Importance.max,
           styleInformation: bigTextStyleInformation,
           priority: Priority.max,
-          playSound: true,
-          sound: const RawResourceAndroidNotificationSound(
-            'alert_new_delivery',
-          ),
-          fullScreenIntent: true,
+      sound: const RawResourceAndroidNotificationSound(
+        'alert_new_delivery',
+      ),
+      fullScreenIntent: true,
+    );
+    const DarwinNotificationDetails iosPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+          presentSound: true,
+          sound: 'alert_new_delivery.mp3',
         );
     NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
+      iOS: iosPlatformChannelSpecifics,
     );
     await fln.show(
       0,
@@ -581,9 +592,16 @@ class NotificationHelper {
           ),
           fullScreenIntent: true,
         );
+    const DarwinNotificationDetails iosPlatformChannelSpecifics =
+        DarwinNotificationDetails(
+          presentSound: true,
+          sound: 'alert_new_delivery.mp3',
+        );
     final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
+      iOS: iosPlatformChannelSpecifics,
     );
+
     await fln.show(
       0,
       title,

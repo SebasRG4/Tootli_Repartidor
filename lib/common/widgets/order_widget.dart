@@ -24,10 +24,14 @@ class OrderWidget extends StatelessWidget {
 
     return InkWell(
       onTap: () {
-        Get.toNamed(
-          RouteHelper.getOrderDetailsRoute(orderModel.id),
-          arguments: OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunningOrder, orderIndex: orderIndex),
-        );
+        if (isRunningOrder) {
+          Get.offAllNamed(RouteHelper.getInitialRoute());
+        } else {
+          Get.toNamed(
+            RouteHelper.getOrderDetailsRoute(orderModel.id),
+            arguments: OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunningOrder, orderIndex: orderIndex),
+          );
+        }
       },
       child: CustomCard(
         isBorder: true,
@@ -124,10 +128,14 @@ class OrderWidget extends StatelessWidget {
             child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
               TextButton(
                 onPressed: () {
-                  Get.toNamed(
-                    RouteHelper.getOrderDetailsRoute(orderModel.id),
-                    arguments: OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunningOrder, orderIndex: orderIndex),
-                  );
+                  if (isRunningOrder) {
+                    Get.offAllNamed(RouteHelper.getInitialRoute());
+                  } else {
+                    Get.toNamed(
+                      RouteHelper.getOrderDetailsRoute(orderModel.id),
+                      arguments: OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunningOrder, orderIndex: orderIndex),
+                    );
+                  }
                 },
                 style: TextButton.styleFrom(
                   backgroundColor: Theme.of(context).cardColor,

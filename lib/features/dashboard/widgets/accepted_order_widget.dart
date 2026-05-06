@@ -40,15 +40,17 @@ const int _kCustomerContactMinCalls = 3;
 const int _kCustomerContactCountdownSeconds = 600;
 
 class AcceptedOrderWidget extends StatefulWidget {
-  final OrderModel orderModel;
+  final List<OrderModel> activeOrders;
   final String phase;
-  final Function onHandover;
-  final Function onPickedUp;
-  final Function onDelivered;
+  final Function(OrderModel) onHandover;
+  final Function(OrderModel) onPickedUp;
+  final Function(OrderModel) onDelivered;
   final String? estimatedArrivalTime;
+
   const AcceptedOrderWidget({
     super.key,
-    required this.orderModel,
+    required this.activeOrders,
+
     required this.phase,
     required this.onHandover,
     required this.onPickedUp,
@@ -63,6 +65,7 @@ class AcceptedOrderWidget extends StatefulWidget {
 class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
     with WidgetsBindingObserver {
   double _sliderValue = 0.0;
+  int _currentIndex = 0;
   bool _isCheckingProximity = false;
 
   Timer? _customerProximityPollTimer;
@@ -84,7 +87,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   int? _countdownDeadlineMs;
   int? _countdownStartMs;
 
-  int? get _oid => widget.orderModel.id;
+  int? get _oid => widget.activeOrders.isNotEmpty && _currentIndex < widget.activeOrders.length 
+      ? widget.activeOrders[_currentIndex].id 
+      : null;
+
+  OrderModel get _currentOrder => widget.activeOrders[_currentIndex];
 
   @override
   void initState() {
@@ -131,7 +138,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   @override
   void didUpdateWidget(AcceptedOrderWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final idChanged = oldWidget.orderModel.id != widget.orderModel.id;
+    if (widget.activeOrders.length <= _currentIndex) {
+      _currentIndex = 0;
+    }
+    final idChanged = oldWidget.activeOrders.isNotEmpty && widget.activeOrders.isNotEmpty && 
+        oldWidget.activeOrders[0].id != widget.activeOrders[0].id;
     final wasCustomer = oldWidget.phase == 'going_to_customer';
     final isCustomer = widget.phase == 'going_to_customer';
 
@@ -172,7 +183,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   }
 
   void _syncCancelContactSnapshotToOrderController() {
-    final int? oid = widget.orderModel.id;
+    final int? oid = _oid;
     if (oid == null || !Get.isRegistered<OrderController>()) return;
     Get.find<OrderController>().reportDeliveryCancelContactSnapshot(
       orderId: oid,
@@ -333,8 +344,8 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
       return;
     }
     final String? target =
-        widget.orderModel.deliveryAddress?.contactPersonNumber ??
-            widget.orderModel.customer?.phone;
+        _currentOrder.deliveryAddress?.contactPersonNumber ??
+            _currentOrder.customer?.phone;
 
     if (DmCallLogVerificationHelper.isAndroid) {
       final bool granted = await DmCallLogVerificationHelper.ensureCallLogAccess();
@@ -379,9 +390,9 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
     await _persistCallCount();
     if (nextAttempt > 0 && nextAttempt <= 3) {
       await _appendAndPersistCallAttempt(nextAttempt, at);
-      if (Get.isRegistered<OrderController>() && widget.orderModel.id != null) {
+      if (Get.isRegistered<OrderController>() && _currentOrder.id != null) {
         Get.find<OrderController>().logCustomerCallAttemptToServer(
-          widget.orderModel.id!,
+          _currentOrder.id!,
           nextAttempt,
           at,
         );
@@ -465,10 +476,10 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
     }
 
     final double lat =
-        double.tryParse(widget.orderModel.deliveryAddress?.latitude ?? '') ??
+        double.tryParse(_currentOrder.deliveryAddress?.latitude ?? '') ??
             0;
     final double lng =
-        double.tryParse(widget.orderModel.deliveryAddress?.longitude ?? '') ??
+        double.tryParse(_currentOrder.deliveryAddress?.longitude ?? '') ??
             0;
     if (lat == 0 && lng == 0) return;
 
@@ -751,11 +762,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
     String lng = '';
 
     if (widget.phase == 'going_to_store') {
-      lat = widget.orderModel.storeLat ?? '0';
-      lng = widget.orderModel.storeLng ?? '0';
+      lat = _currentOrder.storeLat ?? '0';
+      lng = _currentOrder.storeLng ?? '0';
     } else {
-      lat = widget.orderModel.deliveryAddress?.latitude ?? '0';
-      lng = widget.orderModel.deliveryAddress?.longitude ?? '0';
+      lat = _currentOrder.deliveryAddress?.latitude ?? '0';
+      lng = _currentOrder.deliveryAddress?.longitude ?? '0';
     }
 
     String url = '';
@@ -774,7 +785,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   }
 
   void _callStore() async {
-    String? phone = widget.orderModel.storePhone;
+    String? phone = _currentOrder.storePhone;
     if (phone != null && phone.isNotEmpty) {
       if (await canLaunchUrlString('tel:$phone')) {
         await launchUrlString(
@@ -790,7 +801,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   }
 
   void _callCustomer() async {
-    String? phone = widget.orderModel.deliveryAddress?.contactPersonNumber ?? widget.orderModel.customer?.phone;
+    String? phone = _currentOrder.deliveryAddress?.contactPersonNumber ?? _currentOrder.customer?.phone;
     if (phone != null && phone.isNotEmpty) {
       if (await canLaunchUrlString('tel:$phone')) {
         if (mounted && widget.phase == 'going_to_customer') {
@@ -817,48 +828,48 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
     Get.toNamed(
       RouteHelper.getChatRoute(
         notificationBody: NotificationBodyModel(
-          orderId: widget.orderModel.id,
-          vendorId: widget.orderModel.storeId,
+          orderId: _currentOrder.id,
+          vendorId: _currentOrder.storeId,
         ),
         user: User(
-          id: widget.orderModel.storeId,
-          fName: widget.orderModel.storeName,
-          imageFullUrl: widget.orderModel.storeLogoFullUrl,
-          phone: widget.orderModel.storePhone,
+          id: _currentOrder.storeId,
+          fName: _currentOrder.storeName,
+          imageFullUrl: _currentOrder.storeLogoFullUrl,
+          phone: _currentOrder.storePhone,
         ),
       ),
     );
   }
 
   void _chatWithCustomer() {
-    final int? oid = widget.orderModel.id;
+    final int? oid = _currentOrder.id;
     final bool useTootliDirectChat =
         oid != null &&
-        (widget.orderModel.tootliDirectTrackable == true ||
-            widget.orderModel.hasTootliDirectPublicTrackingUrl);
+        (_currentOrder.tootliDirectTrackable == true ||
+            _currentOrder.hasTootliDirectPublicTrackingUrl);
     if (useTootliDirectChat) {
       Get.toNamed(RouteHelper.getTootliDirectTrackingChatRoute(oid));
       return;
     }
-    if (widget.orderModel.customer != null) {
+    if (_currentOrder.customer != null) {
       Get.toNamed(
         RouteHelper.getChatRoute(
           notificationBody: NotificationBodyModel(
-            orderId: widget.orderModel.id,
-            customerId: widget.orderModel.customer!.id,
+            orderId: _currentOrder.id,
+            customerId: _currentOrder.customer!.id,
           ),
           user: User(
-            id: widget.orderModel.customer!.id,
-            fName: widget.orderModel.customer!.fName,
-            lName: widget.orderModel.customer!.lName,
-            imageFullUrl: widget.orderModel.customer!.imageFullUrl,
-            phone: widget.orderModel.customer!.phone,
+            id: _currentOrder.customer!.id,
+            fName: _currentOrder.customer!.fName,
+            lName: _currentOrder.customer!.lName,
+            imageFullUrl: _currentOrder.customer!.imageFullUrl,
+            phone: _currentOrder.customer!.phone,
           ),
         ),
       );
       return;
     }
-    if (widget.orderModel.isGuest == true) {
+    if (_currentOrder.isGuest == true) {
       showCustomSnackBar(
         'tootli_direct_guest_chat_web_only'.tr,
         isError: false,
@@ -866,9 +877,9 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
       return;
     }
     final int? fallbackCustomerId =
-        widget.orderModel.userId ?? widget.orderModel.deliveryAddress?.userId;
+        _currentOrder.userId ?? _currentOrder.deliveryAddress?.userId;
     if (fallbackCustomerId != null) {
-      final addr = widget.orderModel.deliveryAddress;
+      final addr = _currentOrder.deliveryAddress;
       final String rawName = (addr?.contactPersonName ?? '').trim();
       String fName = 'Cliente';
       String lName = '';
@@ -882,7 +893,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
       Get.toNamed(
         RouteHelper.getChatRoute(
           notificationBody: NotificationBodyModel(
-            orderId: widget.orderModel.id,
+            orderId: _currentOrder.id,
             customerId: fallbackCustomerId,
           ),
           user: User(
@@ -900,7 +911,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   }
 
   bool _parcelIsBeforePickup() {
-    final String? s = widget.orderModel.orderStatus;
+    final String? s = _currentOrder.orderStatus;
     return s == AppConstants.processing ||
         s == AppConstants.accepted ||
         s == AppConstants.confirmed ||
@@ -909,11 +920,11 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
 
   void _showSupportBottomSheet() {
     final OrderController orderController = Get.find<OrderController>();
-    final int? oid = widget.orderModel.id;
+    final int? oid = _currentOrder.id;
     if (oid == null) {
       return;
     }
-    final bool isParcel = widget.orderModel.orderType == 'parcel';
+    final bool isParcel = _currentOrder.orderType == 'parcel';
     final double bottomPad = MediaQuery.of(context).viewPadding.bottom;
     
     final bool isTimerFinished = widget.phase == 'going_to_customer' &&
@@ -988,7 +999,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
               () {
                 orderController.openAdminSupportChatForCancelRequest(
                   orderId: oid,
-                  order: widget.orderModel,
+                  order: _currentOrder,
                   cancellationReason: 'Accidente o emergencia (repartidor)',
                 );
               },
@@ -1004,7 +1015,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                   RouteHelper.getChatRoute(
                     notificationBody: NotificationBodyModel(
                       type: AppConstants.admin,
-                      orderId: widget.orderModel.id,
+                      orderId: _currentOrder.id,
                     ),
                     user: User(
                       id: 0,
@@ -1117,15 +1128,44 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-          // Order ID and Header
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Pedido #${widget.orderModel.id}',
+            if (widget.activeOrders.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(bottom: Dimensions.paddingSizeSmall),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.activeOrders.length, (index) {
+                    bool isSelected = _currentIndex == index;
+                    return GestureDetector(
+                      onTap: () => setState(() => _currentIndex = index),
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? Theme.of(context).primaryColor : Theme.of(context).disabledColor.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Pedido ${index + 1}',
+                          style: robotoMedium.copyWith(
+                            color: isSelected ? Colors.white : Theme.of(context).textTheme.bodyLarge?.color,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            // Order ID and Header
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Pedido #${_currentOrder.id}',
+
                       style: robotoBold.copyWith(fontSize: 24),
                     ),
                     Text(
@@ -1206,13 +1246,13 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.orderModel.storeName ?? '',
+                          _currentOrder.storeName ?? '',
                           style: robotoMedium.copyWith(fontSize: 16),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          widget.orderModel.storeAddress ?? '',
+                          _currentOrder.storeAddress ?? '',
                           style: robotoRegular.copyWith(
                             fontSize: 12,
                             color: Theme.of(context).disabledColor,
@@ -1260,7 +1300,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${widget.orderModel.customer?.fName ?? ''} ${widget.orderModel.customer?.lName ?? ''}',
+                        '${_currentOrder.customer?.fName ?? ''} ${_currentOrder.customer?.lName ?? ''}',
                         style: robotoBold.copyWith(
                           fontSize: 18,
                           color: Colors.white,
@@ -1269,7 +1309,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        widget.orderModel.deliveryAddress?.address ?? 'Dirección de entrega',
+                        _currentOrder.deliveryAddress?.address ?? 'Dirección de entrega',
                         style: robotoMedium.copyWith(
                           fontSize: 14,
                           color: Colors.white70,
@@ -1551,20 +1591,20 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                       if (value > 0.9) {
                         if (widget.phase == 'going_to_store') {
                           _checkProximityAndProceed(
-                            targetLat: double.tryParse(widget.orderModel.storeLat ?? '') ?? 0,
-                            targetLng: double.tryParse(widget.orderModel.storeLng ?? '') ?? 0,
+                            targetLat: double.tryParse(_currentOrder.storeLat ?? '') ?? 0,
+                            targetLng: double.tryParse(_currentOrder.storeLng ?? '') ?? 0,
                             maxDistance: 100,
-                            onSuccess: () => widget.onHandover(),
+                            onSuccess: () => widget.onHandover(_currentOrder),
                             errorMessage: 'Debes estar a menos de 100m del restaurante para recoger el pedido.',
                           );
                         } else if (widget.phase == 'at_store') {
-                          widget.onPickedUp();
+                          widget.onPickedUp(_currentOrder);
                         } else {
                           _checkProximityAndProceed(
-                            targetLat: double.tryParse(widget.orderModel.deliveryAddress?.latitude ?? '') ?? 0,
-                            targetLng: double.tryParse(widget.orderModel.deliveryAddress?.longitude ?? '') ?? 0,
+                            targetLat: double.tryParse(_currentOrder.deliveryAddress?.latitude ?? '') ?? 0,
+                            targetLng: double.tryParse(_currentOrder.deliveryAddress?.longitude ?? '') ?? 0,
                             maxDistance: 500,
-                            onSuccess: () => widget.onDelivered(),
+                            onSuccess: () => widget.onDelivered(_currentOrder),
                             errorMessage: 'Debes estar a menos de 500m del cliente para entregar el pedido.',
                           );
                         }

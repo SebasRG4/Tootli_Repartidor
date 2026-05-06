@@ -45,18 +45,19 @@ post_install do |installer|
       config.build_settings['CODE_SIGNING_REQUIRED'] = "NO"
       config.build_settings['CODE_SIGNING_ALLOWED'] = "NO"
 
-      # You can remove unused permissions here
-      # for more infomation: https://github.com/BaseflowIT/flutter-permission-handler/blob/master/permission_handler/ios/Classes/PermissionHandlerEnums.h
-      # e.g. when you don't need camera permission, just add 'PERMISSION_CAMERA=0'
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
         '$(inherited)',
-
-        ## dart: PermissionGroup.notification
         'PERMISSION_NOTIFICATIONS=1',
-
-        ## dart: PermissionGroup.camera (registro / selfie perfil con permission_handler)
         'PERMISSION_CAMERA=1',
       ]
     end
+  end
+
+  # Solución permanente para el error "source: unbound variable"
+  file_path = 'Pods/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh'
+  if File.exist?(file_path)
+    contents = File.read(file_path)
+    contents.gsub!(/set -u/, 'set +u')
+    File.open(file_path, 'w') { |file| file.puts contents }
   end
 end

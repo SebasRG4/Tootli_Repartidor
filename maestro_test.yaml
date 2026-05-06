@@ -1,0 +1,13 @@
+appId: com.Tootli.repartidor
+---
+- launchApp
+- tapOn: "Centro de Pedidos"
+- stopApp: com.Tootli.repartidor
+- launchApp
+- tapOn: "Centro de Pedidos"
+- extendedWaitUntil:
+    visible: "Aceptar"
+    timeout: 300000 # 5 min
+- assertVisible:
+    text: ".*\\$.*"
+- tapOn: "Aceptar"

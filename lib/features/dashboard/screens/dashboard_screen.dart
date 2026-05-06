@@ -135,6 +135,16 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       _homeScreenKey.currentState?.showUnassignedDialogFromNotification(orderId);
     };
 
+    // Escuchar cambios en OrderController para auto-restaurar pedidos activos si aparecen (ej. por FCM)
+    Get.find<OrderController>().addListener(() {
+      if (!mounted || _pageIndex != 0 || _isOrderActive) return;
+      final runningOrders = Get.find<OrderController>().currentOrderList;
+      if (runningOrders != null && runningOrders.isNotEmpty) {
+        debugPrint("[Dashboard] OrderController updated - restoring active order ${runningOrders.first.id}");
+        _homeScreenKey.currentState?.restoreActiveOrder(runningOrders.first);
+      }
+    });
+
     // 🚀 Start Real-Time WebSocket Connection
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
@@ -412,6 +422,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
           return Scaffold(
             key: _scaffoldKey,
+            drawerEnableOpenDragGesture: !_isOrderActive,
             drawer: DashboardDrawerWidget(
               profileController: profileController,
               pageIndex: _pageIndex,

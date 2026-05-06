@@ -3,7 +3,7 @@ import 'package:sixam_mart_delivery/util/images.dart';
 
 class AppConstants {
   static const String appName = 'Tootli Repartidor';
-  static const double appVersion = 3.7;
+  static const double appVersion = 1.1;
 
   ///Flutter sdk 3.41.1
   static const String fontFamily = 'Roboto';

@@ -529,7 +529,9 @@ class OrderController extends GetxController implements GetxService {
     int index,
     OrderModel orderModel,
   ) async {
+    if (_isLoading) return false;
     _isLoading = true;
+
     update();
     ResponseModel responseModel = await orderServiceInterface.acceptOrder(
       orderID,
@@ -546,8 +548,15 @@ class OrderController extends GetxController implements GetxService {
       _currentOrderList ??= [];
       _currentOrderList!.add(orderModel);
     } else {
-      showCustomSnackBar(responseModel.message, isError: true);
+      String errorMessage = responseModel.message ?? 'error'.tr;
+      if (errorMessage.toLowerCase().contains('already') || 
+          errorMessage.toLowerCase().contains('taken') || 
+          errorMessage.toLowerCase().contains('assigned')) {
+        errorMessage = 'Este pedido ya fue tomado por otro repartidor';
+      }
+      showCustomSnackBar(errorMessage, isError: true);
     }
+
     _isLoading = false;
     update();
     return responseModel.isSuccess;

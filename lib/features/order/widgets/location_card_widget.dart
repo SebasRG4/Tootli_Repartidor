@@ -166,12 +166,10 @@ class LocationCardWidget extends StatelessWidget {
                           onTap();
                           orderModel.orderStatus = (orderModel.orderStatus == 'pending' || orderModel.orderStatus == 'confirmed')
                               ? 'accepted' : orderModel.orderStatus;
-                          Get.toNamed(
-                            RouteHelper.getOrderDetailsRoute(orderModel.id),
-                            arguments: OrderDetailsScreen(
-                              orderId: orderModel.id, isRunningOrder: true, orderIndex: orderController.currentOrderList!.length-1, fromLocationScreen: true,
-                            ),
-                          );
+                          // Redirigimos al Home para que el Dashboard detecte el pedido activo
+                          // y muestre el flujo Premium (mapa + ruta).
+                          Get.offAllNamed(RouteHelper.getInitialRoute());
+
                         }else {
                           Get.find<OrderController>().getLatestOrders();
                         }

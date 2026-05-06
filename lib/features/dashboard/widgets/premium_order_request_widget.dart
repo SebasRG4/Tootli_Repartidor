@@ -13,12 +13,15 @@ class PremiumOrderRequestWidget extends StatefulWidget {
   final double? distance;
   final Function onAccept;
   final Function onReject;
+  final bool isTaken;
+
   const PremiumOrderRequestWidget({
     super.key,
     required this.orderModel,
     this.distance,
     required this.onAccept,
     required this.onReject,
+    this.isTaken = false,
   });
 
   @override
@@ -199,7 +202,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                       height: 65,
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: isLoading ? Colors.grey : Colors.green,
+                        color: (isLoading || widget.isTaken) ? Colors.grey : Colors.green,
                         borderRadius: BorderRadius.circular(15),
                       ),
                       child: Center(
@@ -207,20 +210,22 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Aceptar pedido'.tr,
+                              widget.isTaken ? 'Pedido tomado'.tr : 'Aceptar pedido'.tr,
                               style: robotoBold.copyWith(
                                 color: Colors.white,
                                 fontSize: 22,
                               ),
                             ),
-                            const SizedBox(width: 40),
-                            Text(
-                              '${_secondsRemaining}s',
-                              style: robotoMedium.copyWith(
-                                color: Colors.white,
-                                fontSize: 20,
+                            if (!widget.isTaken) ...[
+                              const SizedBox(width: 40),
+                              Text(
+                                '${_secondsRemaining}s',
+                                style: robotoMedium.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                ),
                               ),
-                            ),
+                            ],
                           ],
                         ),
                       ),
@@ -240,7 +245,7 @@ class _PremiumOrderRequestWidgetState extends State<PremiumOrderRequestWidget> {
                           ),
                           child: Slider(
                             value: _sliderValue,
-                            onChanged: (value) {
+                            onChanged: widget.isTaken ? null : (value) {
                               setState(() {
                                 _sliderValue = value;
                               });

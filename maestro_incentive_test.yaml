@@ -1,0 +1,25 @@
+appId: com.Tootli.repartidor
+---
+- launchApp
+- tapOn: "Centro de Pedidos"
+- assertVisible: "Pedidos Disponibles"
+
+# --- Escenario: Esperar aumento de precio ---
+# El test se quedará aquí viendo la pantalla. 
+# Tú puedes correr 'php artisan order:incentivize' manualmente en la terminal
+# para ver cómo el precio cambia en tiempo real en el simulador.
+
+- log: "Esperando a que el precio suba (5 minutos)..."
+- extendedWaitUntil:
+    visible: "Aceptar"
+    timeout: 360000 # 6 minutos de espera máxima
+
+- log: "Verificando que el precio sea visible"
+- assertVisible:
+    text: ".*\\$.*"
+
+- log: "Aceptando el pedido con el nuevo precio"
+- tapOn: "Aceptar"
+
+# Verificar que el pedido pasó a 'En Curso' o similar
+- assertVisible: "Pedido Aceptado"

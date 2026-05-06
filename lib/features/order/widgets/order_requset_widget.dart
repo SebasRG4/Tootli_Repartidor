@@ -461,20 +461,10 @@ class OrderRequestWidget extends StatelessWidget {
                                                 'confirmed')
                                         ? 'accepted'
                                         : orderModel.orderStatus;
-                                    Get.toNamed(
-                                      RouteHelper.getOrderDetailsRoute(
-                                        orderModel.id,
-                                      ),
-                                      arguments: OrderDetailsScreen(
-                                        orderId: orderModel.id,
-                                        isRunningOrder: true,
-                                        orderIndex:
-                                            orderController
-                                                .currentOrderList!
-                                                .length -
-                                            1,
-                                      ),
-                                    );
+                                    // Redirigimos al Home para que el Dashboard detecte el pedido activo
+                                    // y muestre el flujo Premium (mapa + ruta).
+                                    Get.offAllNamed(RouteHelper.getInitialRoute());
+
                                   } else {
                                     Get.find<OrderController>().getLatestOrders(
                                       filterIgnored: false,
