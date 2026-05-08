@@ -26,9 +26,9 @@ class RoutePoint {
   RoutePoint.fromJson(Map<String, dynamic> json) {
     id = json['id'];
     type = json['type'];
-    orderId = json['orderId'];
+    orderId = json['order_id'];
     latitude = json['latitude']?.toDouble();
     longitude = json['longitude']?.toDouble();
-    waitTime = json['waitTime']?.toDouble();
+    waitTime = json['wait_time']?.toDouble();
   }
 }

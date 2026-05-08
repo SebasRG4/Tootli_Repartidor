@@ -136,10 +136,15 @@ class OrderController extends GetxController implements GetxService {
   }
 
   Future<void> getOptimizedRoute(double lat, double lng) async {
+    debugPrint('[Routing] Llamando a la API de optimización: lat=$lat, lng=$lng');
     Response response = await orderServiceInterface.getOptimizedRoute(lat, lng);
+    debugPrint('[Routing] Respuesta API: ${response.statusCode} - ${response.statusText}');
     if (response.statusCode == 200) {
+      debugPrint('[Routing] Datos recibidos: ${response.body}');
       _optimizedRoute = OptimizedRouteModel.fromJson(response.body);
       update();
+    } else {
+      debugPrint('[Routing] Error en la API de optimización: ${response.body}');
     }
   }
 
@@ -526,20 +531,23 @@ class OrderController extends GetxController implements GetxService {
   }
 
   Future<void> getOrderDetails(int? orderID, bool parcel) async {
+    debugPrint('[OrderDetails] Fetching details for order ID: $orderID, isParcel: $parcel');
     if (parcel) {
       _orderDetailsModel = [];
     } else {
       _orderDetailsModel = null;
-      List<OrderDetailsModel>? orderDetailsModel = await orderServiceInterface
-          .getOrderDetails(orderID);
+      update(); // Show loading
+      List<OrderDetailsModel>? orderDetailsModel = await orderServiceInterface.getOrderDetails(orderID);
       if (orderDetailsModel != null) {
         _orderDetailsModel = [];
         _orderDetailsModel!.addAll(orderDetailsModel);
+        debugPrint('[OrderDetails] Successfully fetched ${orderDetailsModel.length} items');
       } else {
         _orderDetailsModel = [];
+        debugPrint('[OrderDetails] Failed to fetch details or empty list');
       }
-      update();
     }
+    update();
   }
 
   Future<bool> acceptOrder(

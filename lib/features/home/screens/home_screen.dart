@@ -65,6 +65,7 @@ class HomeScreenState extends State<HomeScreen> {
   List<OrderModel> _activeOrders = [];
   OrderModel?
   _pendingRequest; // Para mostrar la ventana de aceptación sobre un pedido activo
+  int _selectedOrderIndex = 0;
   String _orderPhase = 'none'; // 'none', 'going_to_store', 'going_to_customer'
   String? _estimatedArrivalTime;
   final AudioPlayer _governanceAudioPlayer = AudioPlayer();
@@ -126,12 +127,14 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshOptimizedRoute() async {
+    debugPrint('[Routing] Intentando refrescar ruta optimizada... Pedidos activos: ${_activeOrders.length}');
     Position pos = await Geolocator.getCurrentPosition();
     await Get.find<OrderController>().getOptimizedRoute(
       pos.latitude,
       pos.longitude,
     );
     if (mounted) {
+      debugPrint('[Routing] Aplicando polilínea multi-pedido...');
       setMultiOrderPolyline();
     }
   }
@@ -573,6 +576,7 @@ class HomeScreenState extends State<HomeScreen> {
                                       order: _pendingRequest,
                                     );
                                   } else if (_activeOrders.isNotEmpty) {
+                                    // Cancelar el pedido que se está viendo actualmente en el widget
                                     cancelOrderRequest();
                                   } else if (!hasActiveOrder) {
                                     widget.onTapMenu?.call();
@@ -857,6 +861,9 @@ class HomeScreenState extends State<HomeScreen> {
 
                     phase: _orderPhase,
                     estimatedArrivalTime: _estimatedArrivalTime,
+                    onOrderSelected: (index) {
+                      _selectedOrderIndex = index;
+                    },
                     onHandover: (order) async {
                       bool success = await Get.find<OrderController>()
                           .updateOrderStatus(order, 'handover');
@@ -889,8 +896,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void cancelOrderRequest({OrderModel? order, bool callApi = true}) {
-    final targetOrder =
-        order ?? (_activeOrders.isNotEmpty ? _activeOrders.first : null);
+    final targetOrder = order ??
+        (_activeOrders.isNotEmpty
+            ? (_selectedOrderIndex < _activeOrders.length
+                ? _activeOrders[_selectedOrderIndex]
+                : _activeOrders.first)
+            : null);
     if (targetOrder == null) return;
 
     if (_orderPhase != 'none') {
@@ -1005,6 +1016,60 @@ class HomeScreenState extends State<HomeScreen> {
     if (dmLocation.latitude != 0) {
       _mapController?.animateCamera(CameraUpdate.newLatLngZoom(dmLocation, 16));
     }
+  }
+
+  Future<Uint8List> _createNumberedMarkerBitmap(
+    int number,
+    Color color, {
+    int size = 120, // Aumentado para mejor visibilidad
+  }) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    final double radius = size / 2.0;
+
+    // Draw shadow
+    final Paint shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.4)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    canvas.drawCircle(Offset(radius + 2, radius + 2), radius - 4, shadowPaint);
+
+    // Draw background circle
+    final Paint paint = Paint()..color = color;
+    canvas.drawCircle(Offset(radius, radius), radius - 4, paint);
+
+    // Draw border
+    final Paint borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size * 0.08;
+    canvas.drawCircle(Offset(radius, radius), radius - 4, borderPaint);
+
+    // Draw text (number)
+    TextPainter painter = TextPainter(textDirection: ui.TextDirection.ltr);
+    painter.text = TextSpan(
+      text: number.toString(),
+      style: TextStyle(
+        fontSize: size * 0.5,
+        fontWeight: FontWeight.bold,
+        color: Colors.white,
+        shadows: [
+          const Shadow(
+            blurRadius: 2.0,
+            color: Colors.black,
+            offset: Offset(1.0, 1.0),
+          ),
+        ],
+      ),
+    );
+    painter.layout();
+    painter.paint(
+      canvas,
+      Offset(radius - painter.width / 2, radius - painter.height / 2),
+    );
+
+    final img = await pictureRecorder.endRecording().toImage(size, size);
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return data!.buffer.asUint8List();
   }
 
   Future<Uint8List> _convertAssetToUnit8List(
@@ -1168,6 +1233,24 @@ class HomeScreenState extends State<HomeScreen> {
         segmentPoints = [lastPoint, currentPoint];
       }
 
+      // Mapear Order ID a su número de pedido (1, 2, ...) para mostrar en el círculo
+      int displayNumber = 1;
+      for (int i = 0; i < _activeOrders.length; i++) {
+        if (_activeOrders[i].id == point.orderId) {
+          displayNumber = i + 1;
+          break;
+        }
+      }
+
+      Color markerColor = point.type == 'pickup' 
+          ? const Color(0xFFF39C12) 
+          : const Color(0xFF2ECC71);
+
+      Uint8List customMarker = await _createNumberedMarkerBitmap(
+        displayNumber,
+        markerColor,
+      );
+
       setState(() {
         _polylines.add(
           Polyline(
@@ -1180,16 +1263,11 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         );
 
-        // Add Marker
         _markers.add(
           Marker(
             markerId: MarkerId(point.id!),
             position: currentPoint,
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              point.type == 'pickup'
-                  ? BitmapDescriptor.hueOrange
-                  : BitmapDescriptor.hueGreen,
-            ),
+            icon: BitmapDescriptor.fromBytes(customMarker),
             infoWindow: InfoWindow(
               title: point.type == 'pickup'
                   ? 'Recoger pedido ${point.orderId}'
@@ -1407,88 +1485,162 @@ class HomeScreenState extends State<HomeScreen> {
     Uint8List destinationMarker,
     double totalDistance, {
     bool drawPolylines = true,
-  }) {
+  }) async {
     int minutes = (totalDistance / 333).ceil();
     if (minutes == 0 && totalDistance > 0) minutes = 1;
 
     if (totalDistance > 0) {
-      DateTime arrivalTime = DateTime.parse(
-        DateTime.now().add(Duration(minutes: minutes)).toString(),
-      );
+      DateTime arrivalTime = DateTime.now().add(Duration(minutes: minutes));
       _estimatedArrivalTime = DateFormat('HH:mm').format(arrivalTime);
     } else {
       _estimatedArrivalTime = null;
     }
 
-    _markers.clear();
-    _polylines.clear();
-    // En la fase de ir a la tienda, mostramos el marcador de la tienda
-    if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('store'),
-          position: storeLocation,
-          icon: BitmapDescriptor.bytes(storeMarker),
-        ),
-      );
-    }
+    final route = Get.find<OrderController>().optimizedRoute;
 
-    // En la fase de ir al cliente, mostramos el marcador del destino
-    if (_orderPhase == 'going_to_customer') {
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('destination'),
-          position: destinationLocation,
-          icon: BitmapDescriptor.bytes(destinationMarker),
-        ),
-      );
-    }
+    // Si es multi-pedido y tenemos secuencia, dibujamos los marcadores numerados
+    if (route != null && route.sequence != null && route.sequence!.isNotEmpty) {
+      _markers.clear();
+      _polylines.clear();
 
-    if (drawPolylines) {
-      // Segmento 1: Repartidor -> Tienda (Solo si no hemos recogido)
+      LatLng lastPoint = dmLocation;
+      int stopIndex = 1;
+      double multiRouteTotalDistance = 0;
+      double totalWaitTime = 0;
+
+      // Mapear Order ID a su número de pedido (1, 2, ...) para mostrar en el círculo
+      Map<int, int> orderIdToDisplayNumber = {};
+      int nextDisplayNumber = 1;
+
+      for (var point in route.sequence!) {
+        LatLng currentPoint = LatLng(point.latitude!, point.longitude!);
+        
+        // Asignar número de pedido (1 para el primer pedido encontrado, 2 para el segundo, etc)
+        if (!orderIdToDisplayNumber.containsKey(point.orderId)) {
+          orderIdToDisplayNumber[point.orderId!] = nextDisplayNumber++;
+        }
+        int displayNumber = orderIdToDisplayNumber[point.orderId!]!;
+
+        Color markerColor =
+            point.type == 'pickup' ? const Color(0xFFF39C12) : const Color(0xFF2ECC71);
+
+        Uint8List customMarker = await _createNumberedMarkerBitmap(
+          displayNumber,
+          markerColor,
+        );
+
+        _markers.add(
+          Marker(
+            markerId: MarkerId(point.id!),
+            position: currentPoint,
+            icon: BitmapDescriptor.fromBytes(customMarker),
+            infoWindow: InfoWindow(
+              title:
+                  '${point.type == 'pickup' ? 'Tienda' : 'Entrega'} #${point.orderId}',
+              snippet: 'Parada #$stopIndex (Pedido $displayNumber)',
+            ),
+          ),
+        );
+
+        if (drawPolylines) {
+          List<LatLng> segment = await _getRoutePolyline(
+            lastPoint,
+            currentPoint,
+          );
+          if (segment.isEmpty) segment = [lastPoint, currentPoint];
+
+          // Calcular distancia de este segmento
+          for (int i = 0; i < segment.length - 1; i++) {
+            multiRouteTotalDistance += Geolocator.distanceBetween(
+              segment[i].latitude,
+              segment[i].longitude,
+              segment[i + 1].latitude,
+              segment[i + 1].longitude,
+            );
+          }
+
+          _polylines.add(
+            Polyline(
+              polylineId: PolylineId('segment_${point.id}'),
+              points: segment,
+              color: stopIndex == 1 
+                ? const Color(0xFF3498DB) 
+                : const Color(0xFF3498DB).withValues(alpha: 0.4),
+              width: 6,
+            ),
+          );
+        }
+
+        totalWaitTime += point.waitTime ?? 0;
+        lastPoint = currentPoint;
+        stopIndex++;
+      }
+
+      // Actualizar ETA basado en la ruta completa
+      int travelMinutes = (multiRouteTotalDistance / 333).ceil(); // 20km/h aprox
+      int totalMinutes = travelMinutes + totalWaitTime.toInt();
+      
+      if (totalMinutes > 0) {
+        DateTime arrivalTime = DateTime.now().add(Duration(minutes: totalMinutes));
+        _estimatedArrivalTime = DateFormat('HH:mm').format(arrivalTime);
+      }
+    } else {
+      // Lógica original para un solo pedido
+      _markers.clear();
+      _polylines.clear();
+
       if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('delivery_to_store'),
-            points: segment1Points,
-            color: Theme.of(Get.context!).primaryColor,
-            width: 5,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
+        Uint8List customMarker = await _createNumberedMarkerBitmap(
+          1,
+          const Color(0xFFF39C12), // Orange for store
+        );
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('store'),
+            position: storeLocation,
+            icon: BitmapDescriptor.fromBytes(customMarker),
           ),
         );
       }
 
-      // Segmento 2: Tienda -> Cliente (Solo si ya recogimos el pedido)
       if (_orderPhase == 'going_to_customer') {
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('store_to_destination'),
-            points: segment2Points,
-            color: Theme.of(Get.context!).primaryColor,
-            width: 5,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-          ),
+        Uint8List customMarker = await _createNumberedMarkerBitmap(
+          1,
+          const Color(0xFF2ECC71), // Green for customer
         );
-      } else if (_orderPhase == 'none') {
-        // En vista previa mostramos la ruta al cliente punteada (misma geometría que Mapbox cuando aplica)
-        _polylines.add(
-          Polyline(
-            polylineId: const PolylineId('store_to_destination'),
-            points: segment2Points,
-            color: Theme.of(Get.context!).primaryColor.withValues(alpha: 0.6),
-            width: 5,
-            jointType: JointType.round,
-            startCap: Cap.roundCap,
-            endCap: Cap.roundCap,
-            patterns: [PatternItem.dash(15), PatternItem.gap(10)],
+        _markers.add(
+          Marker(
+            markerId: const MarkerId('destination'),
+            position: destinationLocation,
+            icon: BitmapDescriptor.fromBytes(customMarker),
           ),
         );
       }
+
+      if (drawPolylines) {
+        if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('delivery_to_store'),
+              points: segment1Points,
+              color: Theme.of(context).primaryColor,
+              width: 5,
+            ),
+          );
+        }
+        if (_orderPhase == 'going_to_customer') {
+          _polylines.add(
+            Polyline(
+              polylineId: const PolylineId('store_to_destination'),
+              points: segment2Points,
+              color: Theme.of(context).primaryColor,
+              width: 5,
+            ),
+          );
+        }
+      }
     }
+    if (mounted) setState(() {});
   }
 
   void _fitCamera(
