@@ -393,6 +393,24 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
 
           if (widget.activeOrders.length > 1 ||
               (widget.activeOrders.length == 1 && _isMinimized)) ...[
+            if (widget.activeOrders.any((order) => order.transactionReference != null))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      'Pedido Multi tienda',
+                      style: robotoBold.copyWith(color: Colors.blue, fontSize: 14),
+                    ),
+                  ),
+                ),
+              ),
             Container(
               height: 50,
               decoration: BoxDecoration(
@@ -429,18 +447,31 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                           clipBehavior: Clip.none,
                           children: [
                             Center(
-                              child: Text(
-                                'Pedido ${index + 1}',
-                                style: robotoBold.copyWith(
-                                  color: isActive
-                                      ? Colors.black
-                                      : Colors.white60,
-                                  fontSize:
-                                      (widget.activeOrders.length == 1 &&
-                                          _isMinimized)
-                                      ? 20
-                                      : 16,
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Pedido ${index + 1}',
+                                    style: robotoBold.copyWith(
+                                      color: isActive
+                                          ? Colors.black
+                                          : Colors.white60,
+                                      fontSize:
+                                          (widget.activeOrders.length == 1 &&
+                                              _isMinimized)
+                                          ? 20
+                                          : 16,
+                                    ),
+                                  ),
+                                  if (widget.activeOrders[index].transactionReference != null)
+                                    Text(
+                                      'Multi tienda',
+                                      style: robotoBold.copyWith(
+                                        color: isActive ? Colors.black.withOpacity(0.6) : Colors.blue.withOpacity(0.6),
+                                        fontSize: 8,
+                                      ),
+                                    ),
+                                ],
                               ),
                             ),
                             if (index ==
@@ -735,6 +766,21 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                                               ],
                                             ),
                                           ),
+
+                                          if (_currentOrder.transactionReference != null)
+                                            Container(
+                                              margin: const EdgeInsets.only(left: Dimensions.paddingSizeExtraSmall),
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.blue.withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(10),
+                                                border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
+                                              ),
+                                              child: Text(
+                                                'misma_direccion'.tr,
+                                                style: robotoBold.copyWith(color: Colors.blue, fontSize: 8),
+                                              ),
+                                            ),
                                         ],
                                       ),
                                       if (!_isCustomerDetailsExpanded)
@@ -816,15 +862,31 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                                                 ],
                                               ),
                                               const SizedBox(height: 6),
-                                              if (_currentOrder.orderNote != null && _currentOrder.orderNote!.isNotEmpty)
+                                              if (_currentOrder.transactionReference != null)
+                                                Padding(
+                                                  padding: const EdgeInsets.only(bottom: 6),
+                                                  child: Text(
+                                                    '${'misma_direccion'.tr} - Entregar junto con los otros pedidos de la misma dirección.',
+                                                    style: robotoBold.copyWith(color: Colors.blue, fontSize: 13),
+                                                  ),
+                                                ),
+                                              if (_currentOrder.orderNote != null &&
+                                                  _currentOrder.orderNote!.isNotEmpty &&
+                                                  !_currentOrder.orderNote!.contains('Tarifa de multitienda'))
                                                 Text(
                                                   _currentOrder.orderNote!,
                                                   style: robotoMedium.copyWith(color: Colors.white, fontSize: 13),
                                                 ),
-                                              if (_currentOrder.orderNote != null && _currentOrder.orderNote!.isNotEmpty &&
-                                                  _currentOrder.deliveryInstruction != null && _currentOrder.deliveryInstruction!.isNotEmpty)
+                                              if (_currentOrder.orderNote != null &&
+                                                  _currentOrder.orderNote!.isNotEmpty &&
+                                                  !_currentOrder.orderNote!.contains('Tarifa de multitienda') &&
+                                                  _currentOrder.deliveryInstruction != null &&
+                                                  _currentOrder.deliveryInstruction!.isNotEmpty &&
+                                                  !_currentOrder.deliveryInstruction!.contains('Tarifa de multitienda'))
                                                 const SizedBox(height: 5),
-                                              if (_currentOrder.deliveryInstruction != null && _currentOrder.deliveryInstruction!.isNotEmpty)
+                                              if (_currentOrder.deliveryInstruction != null &&
+                                                  _currentOrder.deliveryInstruction!.isNotEmpty &&
+                                                  !_currentOrder.deliveryInstruction!.contains('Tarifa de multitienda'))
                                                 Text(
                                                   _currentOrder.deliveryInstruction!,
                                                   style: robotoMedium.copyWith(color: Colors.white, fontSize: 13),
@@ -1163,23 +1225,36 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                             );
                           } else {
                             _checkProximityAndProceed(
-                              targetLat:
-                                  double.tryParse(
-                                    _currentOrder.deliveryAddress?.latitude ??
-                                        '',
-                                  ) ??
-                                  0,
-                              targetLng:
-                                  double.tryParse(
-                                    _currentOrder.deliveryAddress?.longitude ??
-                                        '',
-                                  ) ??
-                                  0,
+                              targetLat: double.tryParse(_currentOrder.deliveryAddress?.latitude ?? '') ?? 0,
+                              targetLng: double.tryParse(_currentOrder.deliveryAddress?.longitude ?? '') ?? 0,
                               maxDistance: 500,
-                              onSuccess: () =>
-                                  widget.onDelivered(_currentOrder),
-                              errorMessage:
-                                  'Debes estar cerca del cliente para entregar.',
+                              onSuccess: () {
+                                final bool isHighValue = (_currentOrder.orderAmount ?? 0) > 1000;
+                                final bool isNoContact = _isWaitingProtocolActivated;
+                                final bool hasOtp = Get.find<OrderController>().otp != null && Get.find<OrderController>().otp!.isNotEmpty;
+                                final bool hasPhoto = Get.find<OrderController>().pickedPrescriptions.isNotEmpty;
+
+                                if (isNoContact && !hasPhoto) {
+                                  showCustomSnackBar('Para entregas sin contacto es obligatorio subir una foto de evidencia.', isError: true);
+                                  return;
+                                }
+
+                                if (isHighValue && !hasPhoto) {
+                                  showCustomSnackBar('Este es un pedido de alto valor (\$${_currentOrder.orderAmount}). Se requiere foto de evidencia.', isError: true);
+                                  return;
+                                }
+
+                                // Si la verificación por OTP está activa pero no se ingresó el código,
+                                // permitimos finalizar SOLO si hay foto (como respaldo).
+                                final bool otpRequired = Get.find<SplashController>().configModel?.orderDeliveryVerification ?? false;
+                                if (otpRequired && !hasOtp && !hasPhoto) {
+                                  showCustomSnackBar('Debes ingresar el código de verificación o subir una foto de evidencia.', isError: true);
+                                  return;
+                                }
+
+                                widget.onDelivered(_currentOrder);
+                              },
+                              errorMessage: 'Debes estar cerca del cliente para entregar.',
                             );
                           }
                           setState(() => _sliderValue = 0.0);
@@ -1321,9 +1396,19 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Evidencia de Entrega',
-              style: robotoMedium.copyWith(color: Colors.white, fontSize: 14),
+            Row(
+              children: [
+                Text(
+                  'Evidencia de Entrega',
+                  style: robotoMedium.copyWith(color: Colors.white, fontSize: 14),
+                ),
+                const SizedBox(width: 5),
+                if (_isWaitingProtocolActivated || (_currentOrder.orderAmount ?? 0) > 1000)
+                  Text(
+                    '(Obligatorio)',
+                    style: robotoRegular.copyWith(color: Colors.redAccent, fontSize: 12),
+                  ),
+              ],
             ),
             const SizedBox(height: 10),
             Row(
@@ -1607,6 +1692,8 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   }
 
   void _chatWithAdmin(String? prefill) {
+    _reportContactStatusToController();
+
     if (prefill == 'No puedo continuar con el pedido') {
       Get.dialog(
         CancellationDialogueWidget(orderId: _currentOrder.id!),

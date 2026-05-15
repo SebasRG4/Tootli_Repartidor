@@ -311,6 +311,17 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                       controllerOrderModel.orderStatus!.tr,
                                       style: robotoBold,
                                     ),
+                                    if (controllerOrderModel.transactionReference != null)
+                                      Container(
+                                        margin: const EdgeInsets.only(left: Dimensions.paddingSizeSmall),
+                                        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: Dimensions.paddingSizeExtraSmall),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                                          color: Colors.blue.withValues(alpha: 0.1),
+                                          border: Border.all(color: Colors.blue, width: 0.5),
+                                        ),
+                                        child: Text('${'misma_direccion'.tr} (#${controllerOrderModel.transactionReference})', style: robotoMedium.copyWith(fontSize: 12, color: Colors.blue, fontWeight: FontWeight.bold)),
+                                      ),
                                   ],
                                 ),
 
@@ -535,9 +546,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                 ),
 
                                 isDelivered != true &&
-                                        controllerOrderModel
-                                                .deliveryInstruction !=
-                                            null
+                                        controllerOrderModel.deliveryInstruction != null && !controllerOrderModel.deliveryInstruction!.contains('Tarifa de multitienda')
                                     ? CustomOrderDetailsCard(
                                         title: '${'delivery_instruction'.tr}: ',
                                         metaValue: controllerOrderModel
@@ -615,6 +624,26 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                 const SizedBox(
                                   height: Dimensions.paddingSizeSmall,
                                 ),
+
+                                if (controllerOrderModel.transactionReference != null)
+                                  Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeDefault),
+                                    padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                                      border: Border.all(color: Colors.blue, width: 1),
+                                    ),
+                                    child: Row(children: [
+                                      const Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                                      const SizedBox(width: Dimensions.paddingSizeSmall),
+                                      Expanded(child: Text(
+                                        'Este es un ${'misma_direccion'.tr}. Se debe entregar junto con los demás pedidos de la misma dirección.',
+                                        style: robotoMedium.copyWith(color: Colors.blue, fontSize: Dimensions.fontSizeSmall),
+                                      )),
+                                    ]),
+                                  ),
 
                                 InfoCardWidget(
                                   title: parcel

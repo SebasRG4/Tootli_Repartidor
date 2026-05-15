@@ -197,6 +197,20 @@ class OrderRequestWidget extends StatelessWidget {
                                     ],
                                   ),
                                 ),
+                                if (orderModel.transactionReference != null) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      'misma_direccion'.tr,
+                                      style: robotoMedium.copyWith(fontSize: 10, color: Colors.blue[600]),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 4),

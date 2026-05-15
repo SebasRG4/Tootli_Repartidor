@@ -58,6 +58,17 @@ class HistoryOrderWidget extends StatelessWidget {
                 Expanded(
                   child: (orderModel.detailsCount ?? 0) > 0 ? Text(' (${orderModel.detailsCount} ${ (orderModel.detailsCount ?? 0) > 1 ?'items'.tr : "item".tr})', style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall)) : SizedBox(),
                 ),
+                if (orderModel.transactionReference != null)
+                  Container(
+                    margin: const EdgeInsets.only(right: Dimensions.paddingSizeExtraSmall),
+                    padding: const EdgeInsets.symmetric(vertical: 2, horizontal: Dimensions.paddingSizeExtraSmall),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      border: Border.all(color: Colors.blue, width: 0.5),
+                    ),
+                    child: Text('${'misma_direccion'.tr} (#${orderModel.transactionReference})', style: robotoMedium.copyWith(fontSize: 10, color: Colors.blue)),
+                  ),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: Dimensions.paddingSizeExtraSmall, horizontal: Dimensions.paddingSizeSmall),
                   decoration: BoxDecoration(

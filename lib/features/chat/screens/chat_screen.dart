@@ -89,9 +89,11 @@ class _ChatScreenState extends State<ChatScreen> {
     if (prefill != null && prefill.isNotEmpty) {
       _inputMessageController.text = prefill;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!Get.find<ChatController>().isSendButtonActive) {
-          Get.find<ChatController>().toggleSendButtonActivity();
+        final chatController = Get.find<ChatController>();
+        if (!chatController.isSendButtonActive) {
+          chatController.toggleSendButtonActivity();
         }
+        _sendMessage(chatController);
       });
     } else if (widget.notificationBody?.type == AppConstants.admin &&
         widget.notificationBody?.orderId != null) {

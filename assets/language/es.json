@@ -759,5 +759,6 @@
   "ganancia_limpia_envio_propina": "Ganancia limpia (Envío + Propina)",
   "unpaid_earnings": "Ganancia no pagada",
   "ganancia_neta": "Ganancia Neta",
-  "propina": "Propina"
+  "propina": "Propina",
+  "misma_direccion": "Pedido Multi tienda"
 }

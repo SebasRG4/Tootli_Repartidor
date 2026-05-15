@@ -896,17 +896,6 @@ class OrderController extends GetxController implements GetxService {
     int? contactSecondsRemaining,
   }) {
     if (orderId == null) return;
-    if (phase != 'going_to_customer') {
-      if (_cancelContactSnapshotOrderId == orderId) {
-        _cancelContactSnapshotOrderId = null;
-        _cancelContactSnapshotPhase = '';
-        _cancelContactSnapshotCalls = 0;
-        _cancelContactSnapshotWithin100m = false;
-        _cancelContactSnapshotCountdownStarted = false;
-        _cancelContactSnapshotSecondsRemaining = null;
-      }
-      return;
-    }
     _cancelContactSnapshotOrderId = orderId;
     _cancelContactSnapshotPhase = phase;
     _cancelContactSnapshotCalls = customerCallCount;
