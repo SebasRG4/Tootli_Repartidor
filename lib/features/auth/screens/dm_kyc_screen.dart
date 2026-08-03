@@ -577,7 +577,7 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
       case 'rejected':
         return 'Lamentablemente no pudimos validar tus documentos. Asegúrate de tomar fotos claras, legibles y que tu selfie tenga buena luz. Por favor, reintenta el proceso.';
       default:
-        return 'Para habilitar los pagos en efectivo necesitamos verificar tu identidad.';
+        return 'Esto nos ayuda a mantener segura a toda la comunidad y a proteger tu cuenta.';
     }
   }
 
