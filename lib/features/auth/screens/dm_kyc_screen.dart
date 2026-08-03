@@ -155,63 +155,52 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
           }
 
           return SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24.0,
-                      vertical: 16.0,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+              child: Column(
+                children: [
+                  const Spacer(),
+
+                  // Circular badge based on status
+                  _buildShieldBadge(status),
+                  const SizedBox(height: 20),
+
+                  // Main Title
+                  Text(
+                    _getStatusTitle(status),
+                    style: robotoBold.copyWith(
+                      fontSize: 22,
+                      color: const Color(0xFF1D2125),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const SizedBox(height: 10),
-                        // Circular badge based on status
-                        _buildShieldBadge(status),
-                        const SizedBox(height: 32),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
 
-                        // Main Title
-                        Text(
-                          _getStatusTitle(status),
-                          style: robotoBold.copyWith(
-                            fontSize: 24,
-                            color: const Color(0xFF1D2125),
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Subtitle / Description
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: Text(
-                            _getStatusDescription(status),
-                            style: robotoRegular.copyWith(
-                              fontSize: 15,
-                              color: const Color(0xFF626F84),
-                              height: 1.45,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-
-                        // Requirement steps card (only show if none or rejected)
-                        if (status == 'none' || status == 'rejected') ...[
-                          _buildRequirementCard(),
-                          const SizedBox(height: 24),
-                        ],
-                      ],
+                  // Subtitle / Description
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Text(
+                      _getStatusDescription(status),
+                      style: robotoRegular.copyWith(
+                        fontSize: 14,
+                        color: const Color(0xFF626F84),
+                        height: 1.35,
+                      ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 20),
 
-                // Bottom actions section
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24.0, 8.0, 24.0, 16.0),
-                  child: Column(
+                  // Requirement steps card (only show if none or rejected)
+                  if (status == 'none' || status == 'rejected') ...[
+                    _buildRequirementCard(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  const Spacer(),
+
+                  // Bottom actions section
+                  Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Action Button
@@ -251,7 +240,7 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
                         ),
 
                       if (status == 'none' || status == 'rejected') ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         TextButton.icon(
                           onPressed: _isProcessing ? null : _simulateVerificationSuccess,
                           icon: const Icon(Icons.science_rounded, size: 18, color: Color(0xFF0284C7)),
@@ -265,14 +254,14 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
                         ),
                       ],
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 10),
 
                       // Encrypted disclaimer footer
                       _buildFooter(),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
