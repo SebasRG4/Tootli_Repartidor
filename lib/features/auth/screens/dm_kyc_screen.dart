@@ -85,27 +85,41 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
     }
   }
 
+  void _handleBackNavigation() {
+    if (Get.previousRoute.isNotEmpty && Get.previousRoute != RouteHelper.dmKyc) {
+      Get.back();
+    } else {
+      Get.offAllNamed(RouteHelper.getSignInRoute());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text(
-          'Verificación de identidad',
-          style: robotoBold.copyWith(fontSize: 18, color: Colors.black),
-        ),
-        centerTitle: true,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackNavigation();
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.black,
-            size: 20,
+        appBar: AppBar(
+          title: Text(
+            'Verificación de identidad',
+            style: robotoBold.copyWith(fontSize: 18, color: Colors.black),
           ),
-          onPressed: () => Navigator.pop(context),
+          centerTitle: true,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.black,
+              size: 20,
+            ),
+            onPressed: _handleBackNavigation,
+          ),
         ),
-      ),
       body: GetBuilder<ProfileController>(
         builder: (profileController) {
           final String status;
@@ -208,7 +222,7 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
                         _buildActionButton(
                           text: 'Entendido',
                           isLoading: _isProcessing,
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: _handleBackNavigation,
                           color: const Color(0xFF006A4E),
                           showChevron: false,
                         ),
@@ -225,7 +239,8 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
           );
         },
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildShieldBadge(String status) {

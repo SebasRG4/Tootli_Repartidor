@@ -247,7 +247,7 @@ class _SignInScreenState extends State<SignInScreen> {
         } else {
           // Usuario NO registrado -> Pasa a subir documentos y KYC
           showCustomSnackBar('Número verificado. Completa tu registro.', isError: false);
-          Get.offAllNamed(RouteHelper.getDmKycRoute(), arguments: {
+          Get.toNamed(RouteHelper.getDmKycRoute(), arguments: {
             'phone': fullPhone,
           });
         }
