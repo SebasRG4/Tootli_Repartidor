@@ -179,7 +179,7 @@ class RouteHelper {
       name: splash,
       page: () {
         NotificationBodyModel? data;
-        if (Get.parameters['data'] != 'null') {
+        if (Get.parameters['data'] != null && Get.parameters['data'] != 'null') {
           List<int> decode = base64Decode(
             Get.parameters['data']!.replaceAll(' ', '+'),
           );
@@ -277,7 +277,7 @@ class RouteHelper {
       name: chatScreen,
       page: () {
         NotificationBodyModel? notificationBody;
-        if (Get.parameters['notification_body'] != 'null') {
+        if (Get.parameters['notification_body'] != null && Get.parameters['notification_body'] != 'null') {
           notificationBody = NotificationBodyModel.fromJson(
             jsonDecode(
               utf8.decode(
@@ -289,7 +289,7 @@ class RouteHelper {
           );
         }
         User? user;
-        if (Get.parameters['user'] != 'null') {
+        if (Get.parameters['user'] != null && Get.parameters['user'] != 'null') {
           user = User.fromJson(
             jsonDecode(
               utf8.decode(
