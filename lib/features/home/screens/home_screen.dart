@@ -31,6 +31,7 @@ import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/dashboard/widgets/accepted_order_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
+import 'package:sixam_mart_delivery/features/home/widgets/v2_home_bottom_panel_widget.dart';
 import 'dart:math';
 
 class HomeScreen extends StatefulWidget {
@@ -179,6 +180,9 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadData() async {
+    if (!Get.find<AuthController>().isLoggedIn()) {
+      return;
+    }
     if (widget.pendingRegistrationDashboard) {
       await Get.find<ProfileController>().getProfile();
       final int? zoneId = Get.find<ProfileController>().profileModel?.zoneId;
@@ -533,59 +537,106 @@ class HomeScreenState extends State<HomeScreen> {
                               (orderController.latestOrderList != null &&
                                   orderController.latestOrderList!.isNotEmpty);
 
-                          return Positioned(
-                            top:
-                                context.mediaQueryPadding.top +
-                                Dimensions.paddingSizeSmall,
-                            left: Dimensions.paddingSizeDefault,
-                            child: Container(
-                              height: 40,
-                              width: 40,
-                              decoration: BoxDecoration(
-                                color:
-                                    (_activeOrders.isNotEmpty ||
-                                        _pendingRequest != null)
-                                    ? Colors.red
-                                    : Theme.of(context).cardColor,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
+                          return Stack(
+                            children: [
+                              Positioned(
+                                top: context.mediaQueryPadding.top + Dimensions.paddingSizeSmall,
+                                left: Dimensions.paddingSizeDefault,
+                                child: Container(
+                                  height: 44,
+                                  width: 44,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.1),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                icon: Icon(
-                                  (_activeOrders.isNotEmpty ||
-                                          _pendingRequest != null)
-                                      ? Icons.close
-                                      : Icons.menu,
-                                  size: 25,
-                                  color:
-                                      (_activeOrders.isNotEmpty ||
-                                          _pendingRequest != null)
-                                      ? Colors.white
-                                      : Theme.of(
-                                          context,
-                                        ).textTheme.bodyLarge!.color,
+                                  child: IconButton(
+                                    padding: EdgeInsets.zero,
+                                    icon: Icon(
+                                      (_activeOrders.isNotEmpty || _pendingRequest != null)
+                                          ? Icons.close
+                                          : Icons.grid_view_rounded,
+                                      size: 22,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                    onPressed: () {
+                                      if (_pendingRequest != null) {
+                                        _performCancellation(order: _pendingRequest);
+                                      } else if (_activeOrders.isNotEmpty) {
+                                        cancelOrderRequest();
+                                      } else if (!hasActiveOrder) {
+                                        widget.onTapMenu?.call();
+                                      }
+                                    },
+                                  ),
                                 ),
-                                onPressed: () {
-                                  if (_pendingRequest != null) {
-                                    _performCancellation(
-                                      order: _pendingRequest,
-                                    );
-                                  } else if (_activeOrders.isNotEmpty) {
-                                    // Cancelar el pedido que se está viendo actualmente en el widget
-                                    cancelOrderRequest();
-                                  } else if (!hasActiveOrder) {
-                                    widget.onTapMenu?.call();
-                                  }
-                                },
                               ),
-                            ),
+
+                              // Pastilla de Estado Flotante (Conectado / Desconectado con Switch)
+                              Positioned(
+                                top: context.mediaQueryPadding.top + Dimensions.paddingSizeSmall,
+                                left: 74,
+                                child: GetBuilder<ProfileController>(
+                                  builder: (profileController) {
+                                    final bool isOnline = profileController.isOnline;
+                                    return Container(
+                                      height: 44,
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(24),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.1),
+                                            blurRadius: 10,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: isOnline ? const Color(0xFF006837) : const Color(0xFFDC2626),
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            isOnline ? 'Conectado' : 'Desconectado',
+                                            style: robotoBold.copyWith(
+                                              fontSize: 14,
+                                              color: const Color(0xFF0F172A),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Transform.scale(
+                                            scale: 0.85,
+                                            child: Switch(
+                                              value: isOnline,
+                                              activeColor: Colors.white,
+                                              activeTrackColor: const Color(0xFF006837),
+                                              inactiveThumbColor: Colors.white,
+                                              inactiveTrackColor: const Color(0xFFCBD5E1),
+                                              onChanged: (_) => _toggleOnlineStatus(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -891,10 +942,27 @@ class HomeScreenState extends State<HomeScreen> {
                       }
                     },
                   ))
-          : const SizedBox();
+          : V2HomeBottomPanelWidget(
+              onToggleConnection: _toggleOnlineStatus,
+            );
         },
       ),
     );
+  }
+
+  void _toggleOnlineStatus() {
+    final profileController = Get.find<ProfileController>();
+    if (!Get.find<AuthController>().isLoggedIn() ||
+        profileController.isPendingRegistrationDashboard ||
+        (profileController.profileModel != null &&
+            profileController.profileModel!.identityVerified != 'approved')) {
+      showCustomSnackBar(
+        'Tu solicitud de registro está siendo revisada por el equipo de Tootli. Te notificaremos cuando tu cuenta sea aprobada.',
+        isError: false,
+      );
+      return;
+    }
+    profileController.updateActiveStatus(back: false);
   }
 
   void cancelOrderRequest({OrderModel? order, bool callApi = true}) {

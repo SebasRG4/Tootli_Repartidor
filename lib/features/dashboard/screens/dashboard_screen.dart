@@ -73,11 +73,14 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     NotificationHelper.setAppInForeground(true);
 
     showDisbursementWarningMessage();
-    if (!Get.find<ProfileController>().isPendingRegistrationDashboard) {
+    final bool canFetchData = Get.find<AuthController>().isLoggedIn() &&
+        !Get.find<ProfileController>().isPendingRegistrationDashboard;
+
+    if (canFetchData) {
       _startLatestOrdersPolling();
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
+      if (!canFetchData) return;
       Get.find<OrderController>().getLatestOrders().then((_) {
         if (!mounted) return;
         final latestOrders = Get.find<OrderController>().latestOrderList;
