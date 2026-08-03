@@ -271,45 +271,86 @@ class _SignInScreenState extends State<SignInScreen> {
                 children: [
                   const SizedBox(height: 24),
 
-                  // Header Icono de Vehículo (Boton Oculto para Selector de Entorno)
-                  GestureDetector(
-                    onTap: () {
-                      final now = DateTime.now();
-                      if (_lastClickTime == null ||
-                          now.difference(_lastClickTime!) >
-                              const Duration(seconds: 2)) {
-                        _clickCount = 1;
-                      } else {
-                        _clickCount++;
-                      }
-                      _lastClickTime = now;
-                      if (_clickCount >= 5) {
-                        _clickCount = 0;
-                        _showEnvironmentSelector(context);
-                      }
-                    },
-                    child: Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF006837),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF006837).withValues(alpha: 0.25),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
+                  // Header Icono de Vehículo y Badge de Entorno (API URL)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          final now = DateTime.now();
+                          if (_lastClickTime == null ||
+                              now.difference(_lastClickTime!) >
+                                  const Duration(seconds: 2)) {
+                            _clickCount = 1;
+                          } else {
+                            _clickCount++;
+                          }
+                          _lastClickTime = now;
+                          if (_clickCount >= 5) {
+                            _clickCount = 0;
+                            _showEnvironmentSelector(context);
+                          }
+                        },
+                        child: Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF006837),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF006837).withValues(alpha: 0.25),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.directions_car_rounded,
-                          color: Colors.white,
-                          size: 32,
+                          child: const Center(
+                            child: Icon(
+                              Icons.directions_car_rounded,
+                              color: Colors.white,
+                              size: 32,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+
+                      // Badge con la URL del entorno activo
+                      GestureDetector(
+                        onTap: () => _showEnvironmentSelector(context),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: AppConstants.baseUrl.contains('localhost') || AppConstants.baseUrl.contains('10.0.2.2')
+                                      ? Colors.orange
+                                      : (AppConstants.baseUrl.contains('dev-api') ? Colors.blue : Colors.green),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                AppConstants.baseUrl.replaceAll('https://', '').replaceAll('http://', ''),
+                                style: robotoBold.copyWith(
+                                  fontSize: 11,
+                                  color: const Color(0xFF334155),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 32),
