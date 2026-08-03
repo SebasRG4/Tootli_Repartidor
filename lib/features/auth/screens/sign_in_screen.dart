@@ -126,30 +126,69 @@ class _SignInScreenState extends State<SignInScreen> {
     final prefs = Get.find<SharedPreferences>();
     final currentUrl =
         prefs.getString('tootli_base_url') ?? 'https://tootli.mx';
+    final TextEditingController customUrlController = TextEditingController();
 
     Get.dialog(
       AlertDialog(
         title: const Text('Seleccionar Entorno'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: const Text('Producción'),
-              subtitle: const Text('https://tootli.mx'),
-              trailing: currentUrl == 'https://tootli.mx'
-                  ? const Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () => _saveEnv('https://tootli.mx'),
-            ),
-            ListTile(
-              title: const Text('Sandbox (Staging)'),
-              subtitle: const Text('https://dev-api.tootli.mx'),
-              trailing: currentUrl == 'https://dev-api.tootli.mx'
-                  ? const Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () => _saveEnv('https://dev-api.tootli.mx'),
-            ),
-          ],
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text('Local (Simulador iOS / Mac)'),
+                subtitle: const Text('http://localhost'),
+                trailing: currentUrl == 'http://localhost'
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => _saveEnv('http://localhost'),
+              ),
+              ListTile(
+                title: const Text('Local (Emulador Android)'),
+                subtitle: const Text('http://10.0.2.2'),
+                trailing: currentUrl == 'http://10.0.2.2'
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => _saveEnv('http://10.0.2.2'),
+              ),
+              ListTile(
+                title: const Text('Producción'),
+                subtitle: const Text('https://tootli.mx'),
+                trailing: currentUrl == 'https://tootli.mx'
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => _saveEnv('https://tootli.mx'),
+              ),
+              ListTile(
+                title: const Text('Sandbox (Staging)'),
+                subtitle: const Text('https://dev-api.tootli.mx'),
+                trailing: currentUrl == 'https://dev-api.tootli.mx'
+                    ? const Icon(Icons.check, color: Colors.green)
+                    : null,
+                onTap: () => _saveEnv('https://dev-api.tootli.mx'),
+              ),
+              const Divider(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: TextField(
+                  controller: customUrlController,
+                  decoration: const InputDecoration(
+                    labelText: 'URL Personalizada',
+                    hintText: 'http://192.168.x.x',
+                    isDense: true,
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (customUrlController.text.trim().isNotEmpty) {
+                    _saveEnv(customUrlController.text.trim());
+                  }
+                },
+                child: const Text('Guardar URL Personalizada'),
+              ),
+            ],
+          ),
         ),
       ),
     );
