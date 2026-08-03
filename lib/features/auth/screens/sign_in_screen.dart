@@ -479,7 +479,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ],
 
-                  // Flujo Paso 2: Verificación OTP
+                  // Flujo Paso 2: Verificación SMS
                   if (_currentStep == 2) ...[
                     Row(
                       children: [
@@ -495,7 +495,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         ),
                         const SizedBox(width: 12),
                         Text(
-                          'Verificación OTP',
+                          'Verificación SMS',
                           style: robotoBold.copyWith(
                             fontSize: 20,
                             color: const Color(0xFF003822),
@@ -507,7 +507,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     const SizedBox(height: 24),
 
                     Text(
-                      'Ingresa el código enviado a',
+                      'Ingresa el código enviado por SMS a',
                       style: robotoRegular.copyWith(
                         fontSize: 15,
                         color: const Color(0xFF64748B),
@@ -524,7 +524,7 @@ class _SignInScreenState extends State<SignInScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Campo de Código OTP
+                    // Campo de Código SMS
                     Container(
                       height: 56,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -566,14 +566,14 @@ class _SignInScreenState extends State<SignInScreen> {
 
                     const SizedBox(height: 20),
 
-                    // Reenviar Código
+                    // Reenviar Código por SMS
                     Center(
                       child: TextButton(
                         onPressed: _canResend ? () => _onSendCode(authController) : null,
                         child: Text(
                           _canResend
-                              ? 'Reenviar código OTP'
-                              : 'Reenviar código en $_resendSeconds seg',
+                              ? 'Reenviar código por SMS'
+                              : 'Reenviar código por SMS en $_resendSeconds seg',
                           style: robotoMedium.copyWith(
                             fontSize: 14,
                             color: _canResend ? const Color(0xFF006837) : const Color(0xFF94A3B8),
