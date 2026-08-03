@@ -66,9 +66,9 @@ class DmRegistrationSuccessScreen extends StatelessWidget {
           const SizedBox(height: 50),
 
           CustomButtonWidget(
-            buttonText: 'back_to_login_page'.tr,
+            buttonText: 'Ir al Inicio / Dashboard',
             onPressed: () {
-              Get.offAllNamed(RouteHelper.getSignInRoute());
+              Get.offAllNamed(RouteHelper.getInitialRoute());
             },
           ),
 

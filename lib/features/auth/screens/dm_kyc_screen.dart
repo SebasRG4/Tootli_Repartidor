@@ -585,11 +585,11 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
   Future<void> _notifyStartVerification(String verificationId) async {
     try {
       final apiClient = Get.find<ApiClient>();
-      await apiClient.postData('/api/v1/delivery-man/kyc/start', {
-        'verification_id': verificationId,
-      });
-    } catch (e) {
-      // Ignorar errores menores de logs
-    }
+      await apiClient.postData(
+        '/api/v1/delivery-man/kyc/start',
+        {'verification_id': verificationId},
+        handleError: false,
+      );
+    } catch (_) {}
   }
 }
