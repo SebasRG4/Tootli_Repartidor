@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:intl/intl.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
@@ -131,7 +130,111 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
 
             GetBuilder<ProfileController>(
               builder: (profileController) {
-                return const SliverToBoxAdapter(child: SizedBox());
+                final bool isOffline =
+                    profileController.profileModel?.active == 0;
+                if (!isOffline) return const SliverToBoxAdapter(child: SizedBox());
+
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      Dimensions.paddingSizeLarge,
+                      Dimensions.paddingSizeLarge,
+                      Dimensions.paddingSizeLarge,
+                      0,
+                    ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                            Theme.of(context).primaryColor.withValues(alpha: 0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Theme.of(context).primaryColor.withValues(alpha: 0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(Dimensions.paddingSizeLarge),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.wifi_off_rounded,
+                                    color: Theme.of(context).primaryColor,
+                                    size: 26,
+                                  ),
+                                ),
+                                const SizedBox(width: Dimensions.paddingSizeDefault),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Estás desconectado',
+                                        style: robotoBold.copyWith(
+                                          fontSize: Dimensions.fontSizeDefault,
+                                          color: Theme.of(context).textTheme.bodyLarge!.color,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'puedes_conectarte_para_recibir_pedidos'.tr,
+                                        style: robotoRegular.copyWith(
+                                          fontSize: Dimensions.fontSizeSmall,
+                                          color: Theme.of(context).textTheme.bodyMedium!.color,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: Dimensions.paddingSizeLarge),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: profileController.profileModel != null
+                                    ? () => profileController.updateActiveStatus(back: false)
+                                    : null,
+                                icon: const Icon(Icons.wifi_rounded, size: 20),
+                                label: Text(
+                                  'conectarse'.tr,
+                                  style: robotoBold.copyWith(
+                                    fontSize: Dimensions.fontSizeDefault,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context).primaryColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
               },
             ),
 
@@ -140,13 +243,35 @@ class OrderRequestScreenState extends State<OrderRequestScreen> {
                 List<OrderModel> allOrders = [];
 
                 if (orderController.latestOrderList != null) {
-                  allOrders.addAll(orderController.latestOrderList!);
+                  for (var order in orderController.latestOrderList!) {
+                    if (order.transactionReference != null && order.transactionReference!.isNotEmpty) {
+                      int existingIndex = allOrders.indexWhere((o) => o.transactionReference == order.transactionReference);
+                      if (existingIndex != -1) {
+                        allOrders[existingIndex].deliveryCharge = (allOrders[existingIndex].deliveryCharge ?? 0) + (order.deliveryCharge ?? 0);
+                        allOrders[existingIndex].originalDeliveryCharge = (allOrders[existingIndex].originalDeliveryCharge ?? 0) + (order.originalDeliveryCharge ?? 0);
+                        allOrders[existingIndex].dmTips = (allOrders[existingIndex].dmTips ?? 0) + (order.dmTips ?? 0);
+                      } else {
+                        allOrders.add(order);
+                      }
+                    } else {
+                      allOrders.add(order);
+                    }
+                  }
                 }
                 if (orderController.currentOrderList != null) {
                   for (var order in orderController.currentOrderList!) {
-                    if (order.orderStatus == 'pending' ||
-                        order.orderStatus == 'confirmed') {
-                      if (!allOrders.any((element) => element.id == order.id)) {
+                    if (order.orderStatus == 'pending' || order.orderStatus == 'confirmed') {
+                      bool alreadyExists = allOrders.any((element) => element.id == order.id);
+                      if (!alreadyExists && order.transactionReference != null && order.transactionReference!.isNotEmpty) {
+                        int existingIndex = allOrders.indexWhere((o) => o.transactionReference == order.transactionReference);
+                        if (existingIndex != -1) {
+                          allOrders[existingIndex].deliveryCharge = (allOrders[existingIndex].deliveryCharge ?? 0) + (order.deliveryCharge ?? 0);
+                          allOrders[existingIndex].originalDeliveryCharge = (allOrders[existingIndex].originalDeliveryCharge ?? 0) + (order.originalDeliveryCharge ?? 0);
+                          allOrders[existingIndex].dmTips = (allOrders[existingIndex].dmTips ?? 0) + (order.dmTips ?? 0);
+                          alreadyExists = true;
+                        }
+                      }
+                      if (!alreadyExists) {
                         allOrders.add(order);
                       }
                     }

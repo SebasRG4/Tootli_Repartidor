@@ -74,6 +74,7 @@ class Images {
   static const String otherNotification = 'assets/image/other_notification.png';
   static const String homeDelivery = 'assets/image/home_delivery.png';
   static const String store = 'assets/image/store.png';
+  static const String motorcycle = 'assets/image/motorcycle.png';
 
   static const String settingIcon = 'assets/image/setting.png';
   static const String notificationBall = 'assets/image/notification-bing.png';

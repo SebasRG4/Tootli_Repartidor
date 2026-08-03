@@ -18,6 +18,7 @@ import 'package:sixam_mart_delivery/features/chat/widgets/search_field_widget.da
 
 import '../../auth/controllers/auth_controller.dart';
 import '../../order/widgets/sliver_delegate.dart';
+import '../../order/controllers/order_controller.dart';
 import '../../profile/controllers/profile_controller.dart';
 
 class ConversationScreen extends StatefulWidget {
@@ -75,13 +76,53 @@ class _ConversationScreenState extends State<ConversationScreen> with TickerProv
       ConversationsModel? conversation0;
       if(chatController.searchConversationModel != null) {
         conversation0 = chatController.searchConversationModel;
-        //_decideTabFromSearchResult(conversation0);
       } else {
         conversation0 = chatController.conversationModel;
       }
 
+      List<Conversation>? filteredConversations;
+      if (conversation0 != null && conversation0.conversations != null) {
+        final orderController = Get.find<OrderController>();
+        final runningOrders = orderController.currentOrderList ?? [];
+
+        filteredConversations = conversation0.conversations!.where((conv) {
+          User? user;
+          String? type;
+          if (conv.senderType == AppConstants.deliveryMan) {
+            user = conv.receiver;
+            type = conv.receiverType;
+          } else {
+            user = conv.sender;
+            type = conv.senderType;
+          }
+
+          // Chats con Soporte/Administrador siempre se mantienen visibles
+          if (type == 'admin') {
+            return true;
+          }
+
+          // Si no hay pedidos activos, no se muestra ningún chat de cliente o tienda
+          if (runningOrders.isEmpty) {
+            return false;
+          }
+
+          if (type == AppConstants.customer) {
+            // Se muestra solo si el ID del cliente coincide con un pedido activo
+            return runningOrders.any((order) =>
+              order.customer != null && order.customer!.id == user?.id
+            );
+          } else if (type == AppConstants.vendor) {
+            // Se muestra solo si el ID de la tienda coincide con un pedido activo
+            return runningOrders.any((order) =>
+              order.storeId == user?.vendorId || order.storeId == user?.id
+            );
+          }
+
+          return false;
+        }).toList();
+      }
+
       return Scaffold(
-        //backgroundColor: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.5),
         appBar: CustomAppBarWidget(title: 'conversation'.tr),
         body: Column(children: [
           // Search bar
@@ -163,9 +204,9 @@ class _ConversationScreenState extends State<ConversationScreen> with TickerProv
               ),
 
               // Conversation List
-              SliverToBoxAdapter(child: (conversation0 != null && conversation0.conversations != null) ?
-                conversation0.conversations!.isNotEmpty ?
-                conversationList(chatController, conversation0)
+              SliverToBoxAdapter(child: (conversation0 != null && filteredConversations != null) ?
+                filteredConversations.isNotEmpty ?
+                conversationList(chatController, conversation0, filteredConversations)
                 : Padding(padding: const EdgeInsets.only(top: 100), child: Center(child:
                     Column(children: [
                       Icon(Icons.chat_bubble_outline, size: 70, color: Theme.of(context).disabledColor.withValues(alpha: 0.5)),
@@ -183,7 +224,7 @@ class _ConversationScreenState extends State<ConversationScreen> with TickerProv
   }
 
 
-  Widget conversationList(ChatController chatController, ConversationsModel? conversation0) {
+  Widget conversationList(ChatController chatController, ConversationsModel? conversation0, List<Conversation> filteredConversations) {
     return Container(
       width: Dimensions.webMaxWidth,
       padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
@@ -194,13 +235,13 @@ class _ConversationScreenState extends State<ConversationScreen> with TickerProv
         offset: conversation0?.offset,
         enabledPagination: chatController.searchConversationModel == null,
         productView: ListView.builder(
-          itemCount: conversation0?.conversations!.length,
+          itemCount: filteredConversations.length,
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
           padding: EdgeInsets.zero,
           itemBuilder: (context, index) {
 
-            Conversation conversation = conversation0!.conversations![index];
+            Conversation conversation = filteredConversations[index];
 
             User? user;
             String? type;
@@ -226,10 +267,10 @@ class _ConversationScreenState extends State<ConversationScreen> with TickerProv
                   if(user != null) {
                     Get.toNamed(RouteHelper.getChatRoute(
                       notificationBody: NotificationBodyModel(
-                        type: conversation.senderType,
+                        type: type,
                         notificationType: NotificationType.message,
-                        customerId: type == AppConstants.customer ? user.userId : null,
-                        vendorId: type == AppConstants.vendor ? user.vendorId : null,
+                        customerId: type == AppConstants.customer ? (user.userId ?? user.id) : null,
+                        vendorId: type == AppConstants.vendor ? (user.vendorId ?? user.id) : null,
                       ),
                       conversationId: conversation.id,
                     ))!.then((value) => Get.find<ChatController>().getConversationList(1, type: chatController.type));

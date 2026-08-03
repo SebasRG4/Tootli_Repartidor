@@ -33,17 +33,18 @@ class OrderRequestWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool parcel = orderModel.orderType == 'parcel';
+    final bool isTaxi = orderModel.moduleType == 'taxi';
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
 
     double distance = Get.find<AddressController>().getRestaurantDistance(
       LatLng(
         double.parse(
-          parcel
+          (parcel || isTaxi)
               ? orderModel.deliveryAddress?.latitude ?? '0'
               : orderModel.storeLat ?? '0',
         ),
         double.parse(
-          parcel
+          (parcel || isTaxi)
               ? orderModel.deliveryAddress?.longitude ?? '0'
               : orderModel.storeLng ?? '0',
         ),
@@ -106,9 +107,9 @@ class OrderRequestWidget extends StatelessWidget {
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(13),
-                          child: parcel
+                          child: (parcel || isTaxi)
                               ? Icon(
-                                  Icons.inventory_2_rounded,
+                                  isTaxi ? Icons.local_taxi_rounded : Icons.inventory_2_rounded,
                                   color: Theme.of(context).primaryColor,
                                   size: 28,
                                 )
@@ -128,15 +129,20 @@ class OrderRequestWidget extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              parcel
-                                  ? orderModel.parcelCategory?.name ?? 'Paquete'
-                                  : orderModel.storeName ?? 'Tienda',
+                              isTaxi 
+                                  ? (orderModel.customer?.fName != null ? '${orderModel.customer?.fName} ${orderModel.customer?.lName ?? ''}'.trim() : 'Pasajero')
+                                  : (parcel
+                                      ? orderModel.parcelCategory?.name ?? 'Paquete'
+                                      : orderModel.storeName ?? 'Tienda'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: robotoBold.copyWith(fontSize: 15),
                             ),
                             const SizedBox(height: 3),
-                            Row(
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -150,16 +156,17 @@ class OrderRequestWidget extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
-                                    parcel
-                                        ? 'parcel'.tr
-                                        : '${orderModel.detailsCount ?? 0} ${(orderModel.detailsCount ?? 0) > 1 ? 'items'.tr : 'item'.tr}',
+                                    isTaxi 
+                                      ? 'viaje'.tr 
+                                      : (parcel
+                                          ? 'parcel'.tr
+                                          : '${orderModel.detailsCount ?? 0} ${(orderModel.detailsCount ?? 0) > 1 ? 'items'.tr : 'item'.tr}'),
                                     style: robotoMedium.copyWith(
                                       fontSize: 11,
                                       color: Theme.of(context).primaryColor,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
                                 // Badge efectivo/digital
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -197,8 +204,7 @@ class OrderRequestWidget extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                if (orderModel.transactionReference != null) ...[
-                                  const SizedBox(width: 6),
+                                if (orderModel.transactionReference != null)
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                     decoration: BoxDecoration(
@@ -210,14 +216,15 @@ class OrderRequestWidget extends StatelessWidget {
                                       style: robotoMedium.copyWith(fontSize: 10, color: Colors.blue[600]),
                                     ),
                                   ),
-                                ],
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              parcel
-                                  ? orderModel.parcelCategory?.description ?? ''
-                                  : orderModel.storeAddress ?? '',
+                              isTaxi 
+                                  ? (orderModel.deliveryAddress?.address ?? '')
+                                  : (parcel
+                                      ? orderModel.parcelCategory?.description ?? ''
+                                      : orderModel.storeAddress ?? ''),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: robotoRegular.copyWith(
@@ -338,7 +345,7 @@ class OrderRequestWidget extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Entregar en',
+                              isTaxi ? 'Destino' : 'Entregar en',
                               style: robotoMedium.copyWith(
                                 fontSize: 11,
                                 color: Theme.of(context).disabledColor,
@@ -346,7 +353,7 @@ class OrderRequestWidget extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              parcel
+                              (parcel || isTaxi)
                                   ? orderModel.receiverDetails?.address ?? ''
                                   : orderModel.deliveryAddress?.address ?? '',
                               maxLines: 2,

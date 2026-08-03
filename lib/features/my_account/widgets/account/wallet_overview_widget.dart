@@ -7,6 +7,7 @@ import 'package:sixam_mart_delivery/features/my_account/controllers/my_account_c
 import 'package:sixam_mart_delivery/features/my_account/widgets/amount_card_widget.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/empty_state_bottom_sheet.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/payment_method_bottom_sheet_widget.dart';
+import 'package:sixam_mart_delivery/features/my_account/widgets/offline_payment_bottom_sheet_widget.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/tab_section_widget.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/transaction_section_widget.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/wallet_attention_alert_widget.dart';
@@ -171,13 +172,28 @@ class WalletOverviewWidget extends StatelessWidget {
 
                             isPayable ? InkWell(
                               onTap: () {
-                                if(Get.find<SplashController>().configModel!.activePaymentMethodList!.isEmpty || !Get.find<SplashController>().configModel!.digitalPayment!){
-                                  showCustomBottomSheet(child: EmptyStateBottomSheet(noPaymentMethod: Get.find<SplashController>().configModel!.activePaymentMethodList!.isEmpty || !Get.find<SplashController>().configModel!.digitalPayment!));
-                                }else if(Get.find<SplashController>().configModel!.minAmountToPayDm! > profileController.profileModel!.payableBalance!){
-                                  showCustomBottomSheet(child: const EmptyStateBottomSheet());
-                                }else{
-                                  showCustomBottomSheet(child: const PaymentMethodBottomSheetWidget());
-                                }
+                                showModalBottomSheet(
+                                  isScrollControlled: true,
+                                  useRootNavigator: true,
+                                  context: context,
+                                  backgroundColor: Colors.white,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: Radius.circular(Dimensions.radiusExtraLarge),
+                                      topRight: Radius.circular(Dimensions.radiusExtraLarge),
+                                    ),
+                                  ),
+                                  builder: (context) {
+                                    return ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxHeight: MediaQuery.of(context).size.height * 0.8,
+                                      ),
+                                      child: OfflinePaymentBottomSheetWidget(
+                                        amount: profileController.profileModel?.payableBalance ?? 0,
+                                      ),
+                                    );
+                                  },
+                                );
                               },
                               child: Container(
                                 width: 100,

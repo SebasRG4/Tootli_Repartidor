@@ -13,8 +13,10 @@ class ConfirmationDialogWidget extends StatelessWidget {
   final Function onYesPressed;
   final bool isLogOut;
   final bool hasCancel;
+  final Function? onSecondaryPressed;
+  final String? secondaryButtonText;
   const ConfirmationDialogWidget({super.key, required this.icon, this.iconSize = 50, this.title, required this.description, required this.onYesPressed,
-    this.isLogOut = false, this.hasCancel = true});
+    this.isLogOut = false, this.hasCancel = true, this.onSecondaryPressed, this.secondaryButtonText});
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +69,18 @@ class ConfirmationDialogWidget extends StatelessWidget {
 
             ]) : const Center(child: CircularProgressIndicator());
           }),
+
+          if (onSecondaryPressed != null) ...[
+            const SizedBox(height: Dimensions.paddingSizeSmall),
+            TextButton(
+              onPressed: () => onSecondaryPressed!(),
+              child: Text(
+                secondaryButtonText ?? '',
+                style: robotoBold.copyWith(color: Theme.of(context).primaryColor),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
 
         ]),
       ),

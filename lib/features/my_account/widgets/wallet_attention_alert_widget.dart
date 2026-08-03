@@ -8,7 +8,7 @@ import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
-import 'package:sixam_mart_delivery/features/my_account/widgets/payment_method_bottom_sheet_widget.dart';
+import 'package:sixam_mart_delivery/features/my_account/widgets/offline_payment_bottom_sheet_widget.dart';
 
 class WalletAttentionAlertWidget extends StatelessWidget {
   final bool isOverFlowBlockWarning;
@@ -55,7 +55,9 @@ class WalletAttentionAlertWidget extends StatelessWidget {
                           builder: (context) {
                             return ConstrainedBox(
                               constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
-                              child: const PaymentMethodBottomSheetWidget(),
+                              child: OfflinePaymentBottomSheetWidget(
+                                amount: profileController.profileModel!.payableBalance ?? 0,
+                              ),
                             );
                           },
                         );

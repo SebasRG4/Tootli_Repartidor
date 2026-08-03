@@ -106,6 +106,17 @@ class OrderRepository implements OrderRepositoryInterface {
 
     final String otpField = updateStatusBody.otp ?? '';
 
+    double? lat;
+    double? lng;
+    try {
+      final Position locationResult = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 3),
+      );
+      lat = locationResult.latitude;
+      lng = locationResult.longitude;
+    } catch (_) {}
+
     if (updateStatusBody.isParcel ?? false) {
       data = {
         '_method': 'put',
@@ -125,6 +136,10 @@ class OrderRepository implements OrderRepositoryInterface {
         'otp': otpField,
         'reason': updateStatusBody.reason ?? '',
       };
+      if (lat != null && lng != null) {
+        data['lat'] = lat.toString();
+        data['lng'] = lng.toString();
+      }
       if (updateStatusBody.status == AppConstants.canceled) {
         if (updateStatusBody.cancelReasonId != null) {
           data['cancel_reason_id'] = updateStatusBody.cancelReasonId.toString();
@@ -184,6 +199,11 @@ class OrderRepository implements OrderRepositoryInterface {
       '${AppConstants.orderDetailsUri}${_getUserToken()}&order_id=$orderID',
     );
     if (response.statusCode == 200) {
+      try {
+        sharedPreferences.setString('order_details_cache_${orderID}', jsonEncode(response.body));
+      } catch (e) {
+        debugPrint('Failed to save order details to cache: $e');
+      }
       orderDetailsModel = [];
       response.body.forEach((orderDetails) {
         try {
@@ -195,7 +215,20 @@ class OrderRepository implements OrderRepositoryInterface {
         }
       });
     } else {
-      debugPrint('Failed to get order details: ${response.statusCode} - ${response.statusText}');
+      try {
+        String? cachedJson = sharedPreferences.getString('order_details_cache_${orderID}');
+        if (cachedJson != null && cachedJson.isNotEmpty) {
+          final decoded = jsonDecode(cachedJson);
+          if (decoded is List) {
+            orderDetailsModel = [];
+            for (var orderDetails in decoded) {
+              orderDetailsModel.add(OrderDetailsModel.fromJson(orderDetails));
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to read order details from cache: $e');
+      }
     }
     return orderDetailsModel;
   }
@@ -320,6 +353,11 @@ class OrderRepository implements OrderRepositoryInterface {
       '${AppConstants.currentOrdersUri + _getUserToken()}&offset=$offset&limit=10&order_status=$orderStatus',
     );
     if (response.statusCode == 200) {
+      try {
+        sharedPreferences.setString('current_orders_cache_${orderStatus}', jsonEncode(response.body));
+      } catch (e) {
+        debugPrint('Failed to save current orders to cache: $e');
+      }
       if (response.body is List) {
         paginatedOrderModel = PaginatedOrderModel(
           orders: (response.body as List)
@@ -331,6 +369,25 @@ class OrderRepository implements OrderRepositoryInterface {
         );
       } else {
         paginatedOrderModel = PaginatedOrderModel.fromJson(response.body);
+      }
+    } else {
+      try {
+        String? cachedJson = sharedPreferences.getString('current_orders_cache_${orderStatus}');
+        if (cachedJson != null && cachedJson.isNotEmpty) {
+          final decoded = jsonDecode(cachedJson);
+          if (decoded is List) {
+            paginatedOrderModel = PaginatedOrderModel(
+              orders: decoded.map((order) => OrderModel.fromJson(order)).toList(),
+              totalSize: decoded.length,
+              offset: offset.toString(),
+              limit: '10',
+            );
+          } else {
+            paginatedOrderModel = PaginatedOrderModel.fromJson(decoded);
+          }
+        }
+      } catch (e) {
+        debugPrint('Failed to read current orders from cache: $e');
       }
     }
     return paginatedOrderModel;
@@ -392,9 +449,54 @@ class OrderRepository implements OrderRepositoryInterface {
   }
 
   @override
+  Future<int> getOrderCallsCount(int orderId) async {
+    if (_getUserToken().isEmpty) {
+      return 0;
+    }
+    Response response = await apiClient.getData(
+      '${AppConstants.orderCallsCountUri}?token=${_getUserToken()}&order_id=$orderId',
+    );
+    if (response.statusCode == 200 && response.body is Map) {
+      return response.body['calls_count'] ?? 0;
+    }
+    return 0;
+  }
+
+  @override
   Future<Response> getOptimizedRoute(double lat, double lng) async {
     return await apiClient.getData(
       '${AppConstants.optimizedRouteUri}?token=${_getUserToken()}&latitude=$lat&longitude=$lng',
     );
+  }
+
+  @override
+  Future<ResponseModel> uploadReceiptPhotos(int orderId, List<MultipartBody> photos) async {
+    Map<String, String> data = {
+      'order_id': orderId.toString(),
+      'token': _getUserToken(),
+    };
+    Response response = await apiClient.postMultipartData(
+      AppConstants.parcelReceiptPhotoUri,
+      data,
+      photos,
+      handleError: false,
+    );
+    if (response.statusCode == 200) {
+      final dynamic body = response.body;
+      final String msg = body is Map && body['message'] != null
+          ? body['message'].toString()
+          : 'OK';
+      return ResponseModel(true, msg);
+    } else {
+      String? errorMessage = response.statusText;
+      final dynamic body = response.body;
+      if (body is Map && body['errors'] is List && (body['errors'] as List).isNotEmpty) {
+        final dynamic first = (body['errors'] as List).first;
+        if (first is Map) {
+          errorMessage = first['message'] as String? ?? errorMessage;
+        }
+      }
+      return ResponseModel(false, errorMessage ?? 'Error');
+    }
   }
 }

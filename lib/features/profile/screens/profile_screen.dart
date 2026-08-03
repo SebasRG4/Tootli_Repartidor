@@ -9,7 +9,6 @@ import 'package:sixam_mart_delivery/features/profile/controllers/profile_control
 import 'package:sixam_mart_delivery/features/profile/widgets/notification_status_change_bottom_sheet.dart';
 import 'package:sixam_mart_delivery/features/refer_and_earn/screens/refer_and_earn_screen.dart';
 import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
-import 'package:sixam_mart_delivery/common/controllers/theme_controller.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/util/app_constants.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
@@ -140,14 +139,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                             Row(
                               children: [
-                                ProfileCardWidget(
+                                /*ProfileCardWidget(
                                   title: 'days_since_joining'.tr,
                                   data:
                                       '${profileController.profileModel!.memberSinceDays}',
                                 ),
                                 const SizedBox(
                                   width: Dimensions.paddingSizeSmall,
-                                ),
+                                ),*/
                                 ProfileCardWidget(
                                   title: 'order_completed'.tr,
                                   data: profileController
@@ -360,7 +359,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                            ProfileButtonWidget(
+                            /*ProfileButtonWidget(
                               icon: Icons.dark_mode_outlined,
                               title: 'dark_mode'.tr,
                               isButtonActive: Get.isDarkMode,
@@ -368,7 +367,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Get.find<ThemeController>().toggleTheme();
                               },
                             ),
-                            const SizedBox(height: Dimensions.paddingSizeSmall),
+                            const SizedBox(height: Dimensions.paddingSizeSmall),*/
 
                             GetBuilder<AuthController>(
                               builder: (authController) {
@@ -467,6 +466,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
 
                             ProfileButtonWidget(
+                              icon: Icons.shield_rounded,
+                              title: 'Verificación de Identidad',
+                              onTap: () {
+                                Get.toNamed(RouteHelper.getDmKycRoute());
+                              },
+                            ),
+                            const SizedBox(height: Dimensions.paddingSizeSmall),
+
+                            ProfileButtonWidget(
                               iconImage: Images.security,
                               title: 'change_password'.tr,
                               onTap: () {
@@ -477,6 +485,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     'password-change',
                                   ),
                                 );
+                              },
+                            ),
+                            const SizedBox(height: Dimensions.paddingSizeSmall),
+
+                            ProfileButtonWidget(
+                              icon: Icons.settings_applications_outlined,
+                              title: 'app_permissions'.tr,
+                              onTap: () async {
+                                await openAppSettings();
                               },
                             ),
                             const SizedBox(height: Dimensions.paddingSizeSmall),

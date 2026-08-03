@@ -591,7 +591,7 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
                           RichText(
                             text: TextSpan(children: [
                               TextSpan(
-                                text: 'identity_image'.tr,
+                                text: 'Licencia de Conducir (Frente y Reverso)',
                                 style: robotoBold.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color),
                               ),
                               TextSpan(
@@ -604,8 +604,8 @@ class _DmRegistrationScreenState extends State<DmRegistrationScreen> {
 
                           Text(
                             _registrationRevisionMode
-                                ? 'optional_new_identity_images'.tr
-                                : 'identity_document_both_sides_hint'.tr,
+                                ? 'Sube las fotos de tu licencia si te lo solicitaron'
+                                : 'Sube una foto clara del frente y otra del reverso de tu licencia de conducir.',
                             style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor),
                           ),
                           const SizedBox(height: Dimensions.paddingSizeLarge),

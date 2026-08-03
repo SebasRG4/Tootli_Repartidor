@@ -1,3 +1,4 @@
+import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
@@ -55,8 +56,21 @@ class InfoCardWidget extends StatelessWidget {
           SizedBox(width: Dimensions.paddingSizeSmall),
           if (showCallButton) GestureDetector(
             onTap: () async {
-              if(await canLaunchUrlString('tel:$phone')) {
-                launchUrlString('tel:$phone', mode: LaunchMode.externalApplication);
+              final bool isCustomerPhone = phone != null && 
+                  (phone == order.customer?.phone || 
+                   phone == order.deliveryAddress?.contactPersonNumber ||
+                   phone == order.receiverDetails?.contactPersonNumber);
+              
+              String dialPhone = phone ?? '';
+              if (isCustomerPhone) {
+                final String? plivoProxy = Get.find<SplashController>().configModel?.plivoProxyPhone;
+                if (plivoProxy != null && plivoProxy.isNotEmpty) {
+                  dialPhone = plivoProxy;
+                }
+              }
+
+              if(await canLaunchUrlString('tel:$dialPhone')) {
+                launchUrlString('tel:$dialPhone', mode: LaunchMode.externalApplication);
               }else {
                 showCustomSnackBar('invalid_phone_number_found');
               }

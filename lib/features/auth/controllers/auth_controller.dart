@@ -11,6 +11,8 @@ import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/services/auth_service_interface.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
+import 'package:sixam_mart_delivery/helper/device_id_helper.dart';
+
 
 class AuthController extends GetxController implements GetxService {
   final AuthServiceInterface authServiceInterface;
@@ -33,11 +35,14 @@ class AuthController extends GetxController implements GetxService {
   List<XFile> _pickedIdentities = [];
   List<XFile> get pickedIdentities => _pickedIdentities;
   
-  final List<String> _identityTypeList = ['passport', 'driving_license', 'nid'];
+  final List<String> _identityTypeList = ['driving_license'];
   List<String> get identityTypeList => _identityTypeList;
 
-  String? _selectedIdentityType;
+  String? _selectedIdentityType = 'driving_license';
   String? get selectedIdentityType => _selectedIdentityType;
+
+  String? _identityTypeIndex = 'driving_license';
+  String? get identityTypeIndex => _identityTypeIndex;
   
   final List<String> _dmTypeList = ['freelancer', 'salary_based'];
   List<String> get dmTypeList => _dmTypeList;
@@ -125,10 +130,59 @@ class AuthController extends GetxController implements GetxService {
     update();
   }
 
+  Future<ResponseModel> sendOtp(String phone) async {
+    _isLoading = true;
+    update();
+    Response response = await authServiceInterface.sendOtp(phone);
+    ResponseModel responseModel;
+    if (response.statusCode == 200) {
+      bool exists = response.body['exists'] ?? false;
+      responseModel = ResponseModel(true, response.body['message'] ?? 'OTP enviado', isRegistered: exists);
+    } else {
+      String? errorMessage = response.statusText;
+      if (response.body != null && response.body is Map && response.body['errors'] != null && response.body['errors'] is List && response.body['errors'].isNotEmpty) {
+        errorMessage = response.body['errors'][0]['message'];
+      }
+      responseModel = ResponseModel(false, errorMessage);
+    }
+    _isLoading = false;
+    update();
+    return responseModel;
+  }
+
+  Future<ResponseModel> verifyOtp(String phone, String otp) async {
+    _isLoading = true;
+    update();
+    String deviceId = await DeviceIdHelper.getUniqueDeviceId();
+    Response response = await authServiceInterface.verifyOtp(phone, otp, deviceId: deviceId);
+    ResponseModel responseModel;
+    if (response.statusCode == 200) {
+      bool isRegistered = response.body['is_registered'] ?? false;
+      if (isRegistered) {
+        authServiceInterface.saveUserToken(response.body['token'], response.body['zone_topic'] ?? '', response.body['topic'] ?? '');
+        await authServiceInterface.updateToken();
+        await Get.find<ProfileController>().getProfile();
+        responseModel = ResponseModel(true, 'successful', isRegistered: true);
+      } else {
+        responseModel = ResponseModel(true, 'phone_verified', isRegistered: false);
+      }
+    } else {
+      String? errorMessage = response.statusText;
+      if (response.body != null && response.body is Map && response.body['errors'] != null && response.body['errors'] is List && response.body['errors'].isNotEmpty) {
+        errorMessage = response.body['errors'][0]['message'];
+      }
+      responseModel = ResponseModel(false, errorMessage);
+    }
+    _isLoading = false;
+    update();
+    return responseModel;
+  }
+
   Future<ResponseModel> login(String phone, String password) async {
     _isLoading = true;
     update();
-    Response response = await authServiceInterface.login(phone, password);
+    String deviceId = await DeviceIdHelper.getUniqueDeviceId();
+    Response response = await authServiceInterface.login(phone, password, deviceId: deviceId);
     ResponseModel responseModel;
     if (response.statusCode == 200) {
       _applyLoginRegistrationRevisionFlags(response);
@@ -136,7 +190,18 @@ class AuthController extends GetxController implements GetxService {
       await authServiceInterface.updateToken();
       responseModel = ResponseModel(true, 'successful');
     } else {
-      responseModel = ResponseModel(false, response.statusText);
+      String? errorMessage = response.statusText;
+      if (response.body != null && response.body is Map && response.body['errors'] != null && response.body['errors'] is List && response.body['errors'].isNotEmpty) {
+        final error = response.body['errors'][0];
+        if (error is Map) {
+          if (error['code'] == 'device_migration_allowed' || error['code'] == 'device_migration_blocked') {
+            errorMessage = error['code'];
+          } else {
+            errorMessage = error['message'];
+          }
+        }
+      }
+      responseModel = ResponseModel(false, errorMessage);
     }
     _isLoading = false;
     update();
@@ -154,7 +219,9 @@ class AuthController extends GetxController implements GetxService {
       await Get.find<ProfileController>().getProfile();
       Get.offAllNamed(RouteHelper.getInitialRoute());
     } else if (result.legacyHttpOkWithoutToken) {
-      Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
+      Get.offAllNamed(RouteHelper.getDmKycRoute(), arguments: {
+        'phone': deliveryManBody.phone,
+      });
     }
     _isLoading = false;
     update();
@@ -281,7 +348,7 @@ class AuthController extends GetxController implements GetxService {
       _pickedIdentities = [];
     }else {
       if (isLogo) {
-        _pickedImage = await authServiceInterface.pickDeliveryProfileSelfie();
+        _pickedImage = await authServiceInterface.pickImageFromSource(ImageSource.gallery);
       } else {
         final XFile? pickedIdentities = await authServiceInterface.pickImageFromSource(ImageSource.gallery);
         if(pickedIdentities != null) {
@@ -383,5 +450,52 @@ class AuthController extends GetxController implements GetxService {
     _lowercaseCheck = false;
     _spatialCheck = false;
   }
-  
+
+  Future<ResponseModel> requestDeviceMigrationOtp(String phone, String password) async {
+    _isLoading = true;
+    update();
+    Response response = await authServiceInterface.requestDeviceMigrationOtp(phone, password);
+    ResponseModel responseModel;
+    if (response.statusCode == 200) {
+      responseModel = ResponseModel(true, 'successful');
+    } else {
+      String? errorMessage = response.statusText;
+      if (response.body != null && response.body is Map && response.body['errors'] != null && response.body['errors'] is List && response.body['errors'].isNotEmpty) {
+        final error = response.body['errors'][0];
+        if (error is Map) {
+          errorMessage = error['message'];
+        }
+      }
+      responseModel = ResponseModel(false, errorMessage);
+    }
+    _isLoading = false;
+    update();
+    return responseModel;
+  }
+
+  Future<ResponseModel> verifyDeviceMigration(String phone, String password, String otp) async {
+    _isLoading = true;
+    update();
+    String deviceId = await DeviceIdHelper.getUniqueDeviceId();
+    Response response = await authServiceInterface.verifyDeviceMigration(phone, password, otp, deviceId);
+    ResponseModel responseModel;
+    if (response.statusCode == 200) {
+      _applyLoginRegistrationRevisionFlags(response);
+      authServiceInterface.saveUserToken(response.body['token'], response.body['zone_topic'], response.body['topic']);
+      await authServiceInterface.updateToken();
+      responseModel = ResponseModel(true, 'successful');
+    } else {
+      String? errorMessage = response.statusText;
+      if (response.body != null && response.body is Map && response.body['errors'] != null && response.body['errors'] is List && response.body['errors'].isNotEmpty) {
+        final error = response.body['errors'][0];
+        if (error is Map) {
+          errorMessage = error['message'];
+        }
+      }
+      responseModel = ResponseModel(false, errorMessage);
+    }
+    _isLoading = false;
+    update();
+    return responseModel;
+  }
 }

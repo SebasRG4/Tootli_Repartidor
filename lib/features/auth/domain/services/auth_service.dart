@@ -7,20 +7,43 @@ import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_resu
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/repositories/auth_repository_interface.dart';
 import 'package:sixam_mart_delivery/features/auth/domain/services/auth_service_interface.dart';
-import 'package:sixam_mart_delivery/helper/profile_selfie_composer.dart';
 
 class AuthService implements AuthServiceInterface {
   final AuthRepositoryInterface authRepositoryInterface;
   AuthService({required this.authRepositoryInterface});
 
   @override
-  Future<Response> login(String phone, String password) async {
-    return await authRepositoryInterface.login(phone, password);
+  Future<Response> login(
+    String phone,
+    String password, {
+    String? deviceId,
+  }) async {
+    return await authRepositoryInterface.login(
+      phone,
+      password,
+      deviceId: deviceId,
+    );
   }
 
   @override
-  Future<RegisterDmResult> registerDeliveryMan(DeliveryManBodyModel deliveryManBody, List<MultipartBody> multiParts) async {
-    return await authRepositoryInterface.registerDeliveryMan(deliveryManBody, multiParts);
+  Future<Response> sendOtp(String phone) async {
+    return await authRepositoryInterface.sendOtp(phone);
+  }
+
+  @override
+  Future<Response> verifyOtp(String phone, String otp, {String? deviceId}) async {
+    return await authRepositoryInterface.verifyOtp(phone, otp, deviceId: deviceId);
+  }
+
+  @override
+  Future<RegisterDmResult> registerDeliveryMan(
+    DeliveryManBodyModel deliveryManBody,
+    List<MultipartBody> multiParts,
+  ) async {
+    return await authRepositoryInterface.registerDeliveryMan(
+      deliveryManBody,
+      multiParts,
+    );
   }
 
   @override
@@ -47,8 +70,16 @@ class AuthService implements AuthServiceInterface {
   }
 
   @override
-  Future<bool> saveUserToken(String token, String zoneTopic, String vehicleWiseTopic) async {
-    return await authRepositoryInterface.saveUserToken(token, zoneTopic, vehicleWiseTopic);
+  Future<bool> saveUserToken(
+    String token,
+    String zoneTopic,
+    String vehicleWiseTopic,
+  ) async {
+    return await authRepositoryInterface.saveUserToken(
+      token,
+      zoneTopic,
+      vehicleWiseTopic,
+    );
   }
 
   @override
@@ -67,8 +98,18 @@ class AuthService implements AuthServiceInterface {
   }
 
   @override
-  Future<void> saveUserNumberAndPassword(String number, String password, String countryDialCode, String countryCode) async {
-    await authRepositoryInterface.saveUserNumberAndPassword(number, password, countryDialCode, countryCode);
+  Future<void> saveUserNumberAndPassword(
+    String number,
+    String password,
+    String countryDialCode,
+    String countryCode,
+  ) async {
+    await authRepositoryInterface.saveUserNumberAndPassword(
+      number,
+      password,
+      countryDialCode,
+      countryCode,
+    );
   }
 
   @override
@@ -107,27 +148,26 @@ class AuthService implements AuthServiceInterface {
   }
 
   @override
-  List<MultipartBody> prepareMultiPartsBody(XFile? pickedImage, List<XFile> pickedIdentities) {
+  List<MultipartBody> prepareMultiPartsBody(
+    XFile? pickedImage,
+    List<XFile> pickedIdentities,
+  ) {
     List<MultipartBody> multiParts = [];
     multiParts.add(MultipartBody('image', pickedImage));
-    for(XFile file in pickedIdentities) {
+    for (XFile file in pickedIdentities) {
       multiParts.add(MultipartBody('identity_image[]', file));
     }
     return multiParts;
   }
+
   @override
-  List<int?> vehicleIds (List<VehicleModel>? vehicles) {
+  List<int?> vehicleIds(List<VehicleModel>? vehicles) {
     List<int?>? vehicleIds = [];
     vehicleIds.add(0);
-    for(VehicleModel vehicle in vehicles!) {
+    for (VehicleModel vehicle in vehicles!) {
       vehicleIds.add(vehicle.id);
     }
     return vehicleIds;
-  }
-
-  @override
-  Future<XFile?> pickDeliveryProfileSelfie() {
-    return ProfileSelfieComposer.pickComposedProfileSelfie();
   }
 
   @override
@@ -152,4 +192,29 @@ class AuthService implements AuthServiceInterface {
     return pickImage;
   }
 
+  @override
+  Future<Response> requestDeviceMigrationOtp(
+    String phone,
+    String password,
+  ) async {
+    return await authRepositoryInterface.requestDeviceMigrationOtp(
+      phone,
+      password,
+    );
+  }
+
+  @override
+  Future<Response> verifyDeviceMigration(
+    String phone,
+    String password,
+    String otp,
+    String deviceId,
+  ) async {
+    return await authRepositoryInterface.verifyDeviceMigration(
+      phone,
+      password,
+      otp,
+      deviceId,
+    );
+  }
 }

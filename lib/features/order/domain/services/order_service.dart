@@ -155,7 +155,17 @@ class OrderService implements OrderServiceInterface {
   }
 
   @override
+  Future<int> getOrderCallsCount(int orderId) async {
+    return await orderRepositoryInterface.getOrderCallsCount(orderId);
+  }
+
+  @override
   Future<Response> getOptimizedRoute(double lat, double lng) async {
     return await orderRepositoryInterface.getOptimizedRoute(lat, lng);
+  }
+
+  @override
+  Future<ResponseModel> uploadReceiptPhotos(int orderId, List<MultipartBody> photos) async {
+    return await orderRepositoryInterface.uploadReceiptPhotos(orderId, photos);
   }
 }

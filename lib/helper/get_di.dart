@@ -46,6 +46,7 @@ import 'package:sixam_mart_delivery/features/notification/domain/repositories/no
 import 'package:sixam_mart_delivery/features/notification/domain/repositories/notification_repository_interface.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/services/notification_service.dart';
 import 'package:sixam_mart_delivery/features/notification/domain/services/notification_service_interface.dart';
+import 'package:sixam_mart_delivery/features/home/controllers/home_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/repositories/order_repository.dart';
 import 'package:sixam_mart_delivery/features/order/domain/repositories/order_repository_interface.dart';
@@ -284,6 +285,7 @@ Future<Map<String, Map<String, String>>> init() async {
     () => ReferAndEarnController(referEarnServiceInterface: Get.find()),
   );
   Get.lazyPut(() => MissionController(missionServiceInterface: Get.find()));
+  Get.lazyPut(() => HomeController());
 
   /// Retrieving localized data
   Map<String, Map<String, String>> languages = {};

@@ -19,6 +19,7 @@ class HistoryOrderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     bool parcel = orderModel.orderType == 'parcel';
+    bool isTaxi = orderModel.moduleType == 'taxi';
 
     return InkWell(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => OrderDetailsScreen(orderId: orderModel.id, isRunningOrder: isRunning, orderIndex: index))),
@@ -91,7 +92,16 @@ class HistoryOrderWidget extends StatelessWidget {
               Divider(thickness: 1, color: Theme.of(context).disabledColor.withValues(alpha: 0.1)),
 
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                parcel ? Row(
+                isTaxi ? Row(
+                  children: [
+                    Icon(Icons.local_taxi_rounded, size: 16, color: Theme.of(context).disabledColor),
+                    SizedBox(width: Dimensions.paddingSizeExtraSmall),
+                    Text(
+                       (orderModel.customer?.fName != null ? '${orderModel.customer?.fName} ${orderModel.customer?.lName ?? ''}'.trim() : 'Pasajero'),
+                      style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
+                    ),
+                  ],
+                ) : parcel ? Row(
                   children: [
                     orderModel.parcelCategory!.name == 'Gifts' ? Image.asset(Images.giftIcon, width: 16) : Icon(Icons.store_mall_directory, size: 16, color:  Theme.of(context).disabledColor),
                     SizedBox(width: Dimensions.paddingSizeExtraSmall),
@@ -114,7 +124,7 @@ class HistoryOrderWidget extends StatelessWidget {
                     color: Theme.of(context).disabledColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
                   ),
-                  child: Text(orderModel.moduleType == 'parcel' ? 'parcel'.tr : orderModel.moduleType == 'food' ? 'food'.tr : orderModel.moduleType == 'grocery' ? 'grocery'.tr : orderModel.moduleType == 'pharmacy' ? 'pharmacy'.tr : orderModel.moduleType!,
+                  child: Text(isTaxi ? 'viaje'.tr : orderModel.moduleType == 'parcel' ? 'parcel'.tr : orderModel.moduleType == 'food' ? 'food'.tr : orderModel.moduleType == 'grocery' ? 'grocery'.tr : orderModel.moduleType == 'pharmacy' ? 'pharmacy'.tr : orderModel.moduleType!,
                     style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor),
                   ),
                 ),

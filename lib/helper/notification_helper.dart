@@ -406,6 +406,7 @@ class NotificationHelper {
     } else {
       return FlutterForegroundTask.startService(
         serviceId: 257,
+        serviceTypes: [ForegroundServiceTypes.location],
         notificationTitle: 'Tootli operativo',
         notificationText: 'Rastreando tu ubicación (segundo plano)',
         callback: locationStartCallback,
@@ -429,6 +430,7 @@ class NotificationHelper {
     } else {
       return FlutterForegroundTask.startService(
         serviceId: 256,
+        serviceTypes: [ForegroundServiceTypes.location],
         notificationTitle: 'Nueva solicitud de pedido',
         notificationText: notificationType == NotificationType.order_request
             ? 'Tienes una nueva solicitud de entrega.'
@@ -820,9 +822,9 @@ class MyTaskHandler extends TaskHandler {
               AVAudioSessionRouteSharingPolicy.defaultPolicy,
           avAudioSessionSetActiveOptions: AVAudioSessionSetActiveOptions.none,
           androidAudioAttributes: AndroidAudioAttributes(
-            contentType: AndroidAudioContentType.sonification,
+            contentType: AndroidAudioContentType.music,
             flags: AndroidAudioFlags.none,
-            usage: AndroidAudioUsage.notification,
+            usage: AndroidAudioUsage.alarm,
           ),
           androidAudioFocusGainType:
               AndroidAudioFocusGainType.gainTransientMayDuck,

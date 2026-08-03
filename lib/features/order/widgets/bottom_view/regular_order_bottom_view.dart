@@ -392,6 +392,12 @@ class RegularOrderBottomView extends StatelessWidget {
   }
 
   Widget _buildOrderReturnSlider(OrderController orderController, OrderModel controllerOrderModel) {
+    final action = controllerOrderModel.failedDeliveryAction?.toLowerCase() ?? 'return';
+    final isDonation = action == 'donation' || action == 'donate';
+    
+    final Color buttonColor = isDonation ? Colors.teal : Theme.of(Get.context!).primaryColor;
+    final String labelText = isDonation ? 'Desliza para confirmar donación' : 'swipe_to_confirm_return'.tr;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
@@ -402,10 +408,10 @@ class RegularOrderBottomView extends StatelessWidget {
       child: SliderButton(
         action: () => _handleOrderReturn(orderController, controllerOrderModel),
         label: Text(
-          'swipe_to_confirm_return'.tr,
+          labelText,
           style: robotoMedium.copyWith(
             fontSize: Dimensions.fontSizeLarge,
-            color: Theme.of(Get.context!).primaryColor,
+            color: buttonColor,
           ),
         ),
         dismissThresholds: 0.5,
@@ -418,9 +424,9 @@ class RegularOrderBottomView extends StatelessWidget {
         icon: _buildSliderIcon(),
         isLtr: Get.find<LocalizationController>().isLtr,
         boxShadow: const BoxShadow(blurRadius: 0),
-        buttonColor: Theme.of(Get.context!).primaryColor,
+        buttonColor: buttonColor,
         backgroundColor: const Color(0xffF4F7FC),
-        baseColor: Theme.of(Get.context!).primaryColor,
+        baseColor: buttonColor,
       ),
     );
   }

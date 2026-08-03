@@ -184,15 +184,24 @@ class MyApp extends StatelessWidget {
                         defaultTransition: Transition.topLevel,
                         transitionDuration: const Duration(milliseconds: 500),
                         builder: (BuildContext context, widget) {
-                          return MediaQuery(
-                            data: MediaQuery.of(context).copyWith(
-                              textScaler: const TextScaler.linear(1.0),
-                            ),
-                            child: Material(
-                              child: SafeArea(
-                                top: false,
-                                bottom: GetPlatform.isAndroid,
-                                child: Stack(children: [widget!]),
+                          return GestureDetector(
+                            onTap: () {
+                              FocusScopeNode currentFocus = FocusScope.of(context);
+                              if (!currentFocus.hasPrimaryFocus && currentFocus.focusedChild != null) {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                              }
+                            },
+                            behavior: HitTestBehavior.translucent,
+                            child: MediaQuery(
+                              data: MediaQuery.of(context).copyWith(
+                                textScaler: const TextScaler.linear(1.0),
+                              ),
+                              child: Material(
+                                child: SafeArea(
+                                  top: false,
+                                  bottom: GetPlatform.isAndroid,
+                                  child: Stack(children: [widget!]),
+                                ),
                               ),
                             ),
                           );

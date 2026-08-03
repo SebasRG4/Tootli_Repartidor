@@ -7,27 +7,33 @@ import 'package:sixam_mart_delivery/features/mission/controllers/mission_control
 import 'package:sixam_mart_delivery/features/mission/domain/models/mission_model.dart';
 import 'package:sixam_mart_delivery/helper/route_helper.dart';
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
+import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
+import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
+import 'package:sixam_mart_delivery/features/my_account/widgets/offline_payment_bottom_sheet_widget.dart';
+import 'package:sixam_mart_delivery/util/images.dart';
 
 class OnlinePanelWidget extends StatelessWidget {
   final VoidCallback onDisconnect;
   final ScrollController scrollController;
+  final VoidCallback? onGoToOrderCenter;
   const OnlinePanelWidget({
     super.key,
     required this.onDisconnect,
     required this.scrollController,
+    this.onGoToOrderCenter,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0C0E12), // Dark sheet background
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
+            color: Colors.black54,
+            blurRadius: 15,
+            offset: Offset(0, -5),
           ),
         ],
       ),
@@ -38,46 +44,147 @@ class OnlinePanelWidget extends StatelessWidget {
           // Drag Handle
           Center(
             child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 5),
+              margin: const EdgeInsets.only(top: 12, bottom: 8),
               height: 4,
               width: 40,
               decoration: BoxDecoration(
-                color: Theme.of(context).disabledColor.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
           ),
 
-          // Header: Buscando pedidos
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: Dimensions.paddingSizeDefault,
-              vertical: Dimensions.paddingSizeSmall,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.tune,
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
+          // Order Center Button (only when there are available orders)
+          GetBuilder<OrderController>(
+            builder: (orderController) {
+              final hasOrders = orderController.latestOrderList != null &&
+                  orderController.latestOrderList!.isNotEmpty;
+              if (!hasOrders) return const SizedBox.shrink();
+              final count = orderController.latestOrderList!.length;
+              return Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Dimensions.paddingSizeDefault,
+                  vertical: 6,
                 ),
-                const SizedBox(width: Dimensions.paddingSizeDefault),
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      'Buscando pedidos',
-                      style: robotoBold.copyWith(
-                        fontSize: 22,
-                        color: Theme.of(context).textTheme.bodyLarge?.color,
-                      ),
-                    ),
-                  ),
+                child: _OrderCenterButton(
+                  count: count,
+                  onTap: onGoToOrderCenter,
                 ),
-                _AnimatedDots(),
-              ],
-            ),
+              );
+            },
           ),
 
-          const SizedBox(height: Dimensions.paddingSizeSmall),
+          // Header Status: Buscando pedidos / Bloqueo por efectivo
+          GetBuilder<ProfileController>(
+            builder: (profileController) {
+              final profile = profileController.profileModel;
+              final double cash = profile?.cashInHands ?? 0;
+              final double limitBlock = profile?.cashLimitForTotalBlock ?? 0;
+              final double limitPaid = profile?.cashLimitForOnlyPaid ?? 0;
+
+              final bool isBlocked = limitBlock > 0 && cash >= limitBlock;
+              final bool isWarning = !isBlocked && limitPaid > 0 && cash >= limitPaid;
+
+              if (isBlocked) {
+                return _CashBlockedHeader(
+                  cashInHands: cash,
+                  limitBlock: limitBlock,
+                  isHardBlock: true,
+                );
+              } else if (isWarning) {
+                return _CashBlockedHeader(
+                  cashInHands: cash,
+                  limitBlock: limitPaid,
+                  isHardBlock: false,
+                );
+              }
+
+              // Normal status: buscando pedidos (Mockup alignment with overlapping motorcycle)
+              return Container(
+                margin: const EdgeInsets.symmetric(
+                  horizontal: Dimensions.paddingSizeDefault,
+                  vertical: Dimensions.paddingSizeSmall,
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141922),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05), width: 1),
+                ),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Row(
+                      children: [
+                        // Green radar icon
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF5EC44B).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.gps_fixed,
+                            color: Color(0xFF5EC44B),
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    'Buscando pedidos',
+                                    style: robotoBold.copyWith(
+                                      fontSize: 20,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    height: 8,
+                                    width: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF5EC44B),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Te avisaremos cuando haya uno disponible',
+                                style: robotoRegular.copyWith(
+                                  fontSize: 12,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Spacer to make room for motorcycle overlap
+                        const SizedBox(width: 70),
+                      ],
+                    ),
+                    // Overlapping motorcycle delivery image
+                    Positioned(
+                      right: -25,
+                      top: -45,
+                      bottom: -20,
+                      child: Image.asset(
+                        Images.motorcycle,
+                        width: 120,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
 
           Padding(
             padding: const EdgeInsets.symmetric(
@@ -85,38 +192,78 @@ class OnlinePanelWidget extends StatelessWidget {
             ),
             child: Column(
               children: [
-                // Zone Limit Details Blue Bar
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: Dimensions.paddingSizeDefault,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[700],
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(15),
+                // Ver detalles de bonos (Mockup styled card)
+                GestureDetector(
+                  onTap: onGoToOrderCenter,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F2642), // Dark blue background
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF2196F3).withValues(alpha: 0.15),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Blue gift/bonus icon box
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2196F3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.card_giftcard,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ver detalles de bonos',
+                                style: robotoBold.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Descubre y activa tus bonos',
+                                style: robotoRegular.copyWith(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Blue chevron button
+                        Container(
+                          height: 32,
+                          width: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2196F3).withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.chevron_right,
+                            color: Color(0xFF2196F3),
+                            size: 20,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Ver detalles de bonos'.tr,
-                        style: robotoMedium.copyWith(
-                          color: Colors.white,
-                          fontSize: Dimensions.fontSizeSmall,
-                        ),
-                      ),
-                      const Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.white,
-                        size: 14,
-                      ),
-                    ],
-                  ),
                 ),
+                const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                // Incentive Card 1: Bonus per Order
+                // Incentive Card 1 & 2 (Only if maxIncentive > 0, in a clean dark container)
                 GetBuilder<AddressController>(
                   builder: (addressController) {
                     double maxIncentive = 0;
@@ -140,12 +287,11 @@ class OnlinePanelWidget extends StatelessWidget {
                                   Dimensions.paddingSizeDefault,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Get.isDarkMode
-                                      ? Colors.grey[900]
-                                      : Colors.grey[100],
+                                  color: const Color(0xFF141922),
                                   borderRadius: const BorderRadius.vertical(
                                     bottom: Radius.circular(15),
                                   ),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                                 ),
                                 child: Row(
                                   children: [
@@ -168,10 +314,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                                   text: '+MXN\$ ',
                                                   style: robotoMedium.copyWith(
                                                     fontSize: 14,
-                                                    color: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyLarge
-                                                        ?.color,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                                 TextSpan(
@@ -179,20 +322,14 @@ class OnlinePanelWidget extends StatelessWidget {
                                                       .toStringAsFixed(0),
                                                   style: robotoBold.copyWith(
                                                     fontSize: 24,
-                                                    color: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyLarge
-                                                        ?.color,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                                 TextSpan(
                                                   text: ' /Pedido',
                                                   style: robotoRegular.copyWith(
                                                     fontSize: 14,
-                                                    color: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyLarge
-                                                        ?.color,
+                                                    color: Colors.white70,
                                                   ),
                                                 ),
                                               ],
@@ -202,9 +339,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                             'Zona de alta demanda detectada',
                                             style: robotoRegular.copyWith(
                                               fontSize: 12,
-                                              color: Theme.of(
-                                                context,
-                                              ).disabledColor,
+                                              color: Colors.white38,
                                             ),
                                           ),
                                         ],
@@ -223,10 +358,9 @@ class OnlinePanelWidget extends StatelessWidget {
                                   Dimensions.paddingSizeDefault,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Get.isDarkMode
-                                      ? Colors.grey[900]
-                                      : Colors.grey[100],
+                                  color: const Color(0xFF141922),
                                   borderRadius: BorderRadius.circular(15),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                                 ),
                                 child: Row(
                                   children: [
@@ -249,10 +383,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                                   text: '+MXN\$ ',
                                                   style: robotoMedium.copyWith(
                                                     fontSize: 14,
-                                                    color: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyLarge
-                                                        ?.color,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                                 TextSpan(
@@ -260,10 +391,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                                       .toStringAsFixed(0),
                                                   style: robotoBold.copyWith(
                                                     fontSize: 24,
-                                                    color: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyLarge
-                                                        ?.color,
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                               ],
@@ -273,9 +401,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                             'Potencial con multiplicador',
                                             style: robotoRegular.copyWith(
                                               fontSize: 12,
-                                              color: Theme.of(
-                                                context,
-                                              ).disabledColor,
+                                              color: Colors.white38,
                                             ),
                                           ),
                                         ],
@@ -300,7 +426,7 @@ class OnlinePanelWidget extends StatelessWidget {
 
                 const SizedBox(height: Dimensions.paddingSizeSmall),
 
-                // Missions Section
+                // Missions Section (Dark Theme Compliant)
                 GetBuilder<MissionController>(
                   builder: (missionController) {
                     List<MissionModel> activeMissions =
@@ -366,14 +492,10 @@ class OnlinePanelWidget extends StatelessWidget {
                                         Dimensions.paddingSizeSmall,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: Theme.of(
-                                          context,
-                                        ).primaryColor.withValues(alpha: 0.05),
+                                        color: const Color(0xFF141922),
                                         borderRadius: BorderRadius.circular(15),
                                         border: Border.all(
-                                          color: Theme.of(
-                                            context,
-                                          ).primaryColor.withValues(alpha: 0.1),
+                                          color: Colors.white.withValues(alpha: 0.05),
                                         ),
                                       ),
                                       child: Column(
@@ -389,6 +511,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                             style: robotoMedium.copyWith(
                                               fontSize:
                                                   Dimensions.fontSizeSmall,
+                                              color: Colors.white,
                                             ),
                                           ),
                                           const SizedBox(height: 5),
@@ -401,9 +524,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                                   ? 1
                                                   : progress,
                                               minHeight: 8,
-                                              backgroundColor: Theme.of(context)
-                                                  .disabledColor
-                                                  .withValues(alpha: 0.2),
+                                              backgroundColor: Colors.white10,
                                               valueColor:
                                                   AlwaysStoppedAnimation<Color>(
                                                     Theme.of(
@@ -421,9 +542,7 @@ class OnlinePanelWidget extends StatelessWidget {
                                                 '${mission.currentProgress}/${mission.targetOrders}',
                                                 style: robotoRegular.copyWith(
                                                   fontSize: 10,
-                                                  color: Theme.of(
-                                                    context,
-                                                  ).disabledColor,
+                                                  color: Colors.white54,
                                                 ),
                                               ),
                                               Text(
@@ -451,82 +570,110 @@ class OnlinePanelWidget extends StatelessWidget {
 
                 const SizedBox(height: Dimensions.paddingSizeDefault),
 
-                // Promo Banner
+                // Orange Gradient Reward Booster Banner (Mockup rocket card design)
                 Container(
-                  height: 120,
+                  height: 130,
                   width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
                     gradient: const LinearGradient(
-                      colors: [Colors.orange, Colors.deepOrange],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFF5211), Color(0xFFFFB74D)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF5211).withValues(alpha: 0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Stack(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.all(
-                          Dimensions.paddingSizeDefault,
-                        ),
+                        padding: const EdgeInsets.all(16.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.shopping_bag,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'elige_y_compra'.tr,
-                                  style: robotoMedium.copyWith(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              'acelerador_de_recompensa'.tr,
-                              style: robotoBold.copyWith(
-                                color: Colors.white,
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
+                            // ⭐ Elige y compra
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 6,
-                              ),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                'conoce_mas'.tr,
-                                style: robotoMedium.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.star,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'elige_y_compra'.tr,
+                                    style: robotoMedium.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'acelerador_de_recompensa'.tr,
+                              style: robotoBold.copyWith(
+                                color: Colors.white,
+                                fontSize: 20,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Aumenta tus ganancias hoy mismo',
+                              style: robotoRegular.copyWith(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      // Rocket icon/graphic
                       Positioned(
-                        right: 10,
-                        bottom: 10,
-                        top: 10,
-                        child: Icon(
-                          Icons.rocket_launch,
-                          size: 80,
-                          color: Colors.white.withValues(alpha: 0.3),
+                        right: 50,
+                        bottom: 0,
+                        top: 0,
+                        child: Center(
+                          child: Icon(
+                            Icons.rocket_launch,
+                            size: 65,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ),
+                      // Chevron right circular button
+                      Positioned(
+                        right: 16,
+                        bottom: 0,
+                        top: 0,
+                        child: Center(
+                          child: Container(
+                            height: 36,
+                            width: 36,
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.black87,
+                              size: 22,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -535,31 +682,30 @@ class OnlinePanelWidget extends StatelessWidget {
 
                 const SizedBox(height: Dimensions.paddingSizeDefault),
 
-                // Disconnect Button
+                // Disconnect Button (Red outline premium style)
                 Padding(
                   padding: const EdgeInsets.only(
                     bottom: Dimensions.paddingSizeDefault,
                   ),
-                  child: ElevatedButton(
+                  child: OutlinedButton(
                     onPressed: onDisconnect,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.redAccent, width: 1.2),
                       minimumSize: const Size(double.infinity, 55),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(15),
                       ),
-                      elevation: 2,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.double_arrow, color: Colors.white),
+                        const Icon(Icons.power_settings_new, color: Colors.redAccent, size: 22),
                         const SizedBox(width: Dimensions.paddingSizeSmall),
                         Text(
                           'desconectarse'.tr.toUpperCase(),
                           style: robotoBold.copyWith(
-                            color: Colors.white,
-                            fontSize: 18,
+                            color: Colors.redAccent,
+                            fontSize: 16,
                           ),
                         ),
                       ],
@@ -570,6 +716,267 @@ class OnlinePanelWidget extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CashBlockedHeader extends StatelessWidget {
+  final double cashInHands;
+  final double limitBlock;
+  final bool isHardBlock;
+
+  const _CashBlockedHeader({
+    required this.cashInHands,
+    required this.limitBlock,
+    required this.isHardBlock,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color statusColor = isHardBlock ? Colors.red : Colors.orange;
+    final String title = isHardBlock ? 'Bloqueo Total' : 'Solo Órdenes Pagadas';
+    final String subtitle = isHardBlock
+        ? 'Límite superado. Deposita efectivo para recibir órdenes.'
+        : 'Límite parcial alcanzado. No recibirás pedidos en efectivo.';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: Dimensions.paddingSizeDefault,
+        vertical: Dimensions.paddingSizeSmall,
+      ),
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: statusColor.withValues(alpha: 0.5), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isHardBlock ? Icons.block : Icons.warning_amber_rounded,
+                color: statusColor,
+                size: 24,
+              ),
+              const SizedBox(width: Dimensions.paddingSizeSmall),
+              Expanded(
+                child: Text(
+                  title,
+                  style: robotoBold.copyWith(
+                    fontSize: 18,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+              Text(
+                PriceConverterHelper.convertPrice(cashInHands),
+                style: robotoBold.copyWith(
+                  fontSize: 18,
+                  color: statusColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Dimensions.paddingSizeSmall),
+          Text(
+            subtitle,
+            style: robotoRegular.copyWith(
+              fontSize: 13,
+              color: Colors.white70,
+            ),
+          ),
+          const SizedBox(height: Dimensions.paddingSizeDefault),
+          InkWell(
+            onTap: () {
+              showModalBottomSheet(
+                isScrollControlled: true,
+                useRootNavigator: true,
+                context: context,
+                backgroundColor: Colors.white,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(Dimensions.radiusExtraLarge),
+                    topRight: Radius.circular(Dimensions.radiusExtraLarge),
+                  ),
+                ),
+                builder: (context) {
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.8,
+                    ),
+                    child: OfflinePaymentBottomSheetWidget(
+                      amount: cashInHands,
+                    ),
+                  );
+                },
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                vertical: Dimensions.paddingSizeSmall,
+              ),
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                'Pagar Ahora',
+                style: robotoMedium.copyWith(
+                  color: Colors.white,
+                  fontSize: Dimensions.fontSizeSmall,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OrderCenterButton extends StatefulWidget {
+  final int count;
+  final VoidCallback? onTap;
+  const _OrderCenterButton({required this.count, this.onTap});
+
+  @override
+  State<_OrderCenterButton> createState() => _OrderCenterButtonState();
+}
+
+class _OrderCenterButtonState extends State<_OrderCenterButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A1A2E), Color(0xFF16213E)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: const Color(0xFF2196F3).withValues(alpha: 0.4),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2196F3).withValues(alpha: 0.15),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Icono con fondo azul
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2196F3).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.inbox_rounded,
+                color: Color(0xFF2196F3),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Textos
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Centro de pedidos',
+                    style: robotoBold.copyWith(
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    widget.count == 1
+                        ? '1 pedido disponible para tomar'
+                        : '${widget.count} pedidos disponibles para tomar',
+                    style: robotoRegular.copyWith(
+                      fontSize: 12,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Badge rojo con pulso
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _pulseAnimation.value,
+                  child: child,
+                );
+              },
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.red.withValues(alpha: 0.5),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Text(
+                    widget.count > 9 ? '9+' : '${widget.count}',
+                    style: robotoBold.copyWith(
+                      color: Colors.white,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.arrow_forward_ios,
+              color: Color(0xFF2196F3),
+              size: 14,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -589,48 +996,6 @@ class _IconCircle extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       child: Icon(icon, color: color, size: 20),
-    );
-  }
-}
-
-class _AnimatedDots extends StatefulWidget {
-  @override
-  State<_AnimatedDots> createState() => _AnimatedDotsState();
-}
-
-class _AnimatedDotsState extends State<_AnimatedDots>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  int _dotCount = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
-    _controller.addListener(() {
-      int newCount = (_controller.value * 4).floor();
-      if (newCount != _dotCount) {
-        setState(() {
-          _dotCount = newCount;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 30,
-      child: Text('.' * _dotCount, style: robotoBold.copyWith(fontSize: 22)),
     );
   }
 }

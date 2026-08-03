@@ -47,6 +47,14 @@ class ProfileModel {
   double? cashLimitForOnlyPaid;
   double? cashLimitForTotalBlock;
   int? userInfoId;
+  
+  // Trip Module Flags
+  bool? canDeliver;
+  bool? canDriveTaxi;
+
+  // MetaMap KYC
+  String? metamapVerificationId;
+  String? identityVerified;
 
   ProfileModel({
     this.id,
@@ -96,6 +104,10 @@ class ProfileModel {
     this.cashLimitForOnlyPaid,
     this.cashLimitForTotalBlock,
     this.userInfoId,
+    this.canDeliver,
+    this.canDriveTaxi,
+    this.metamapVerificationId,
+    this.identityVerified,
   });
 
   ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -153,6 +165,12 @@ class ProfileModel {
     cashLimitForOnlyPaid = json['cash_limit_for_only_paid']?.toDouble();
     cashLimitForTotalBlock = json['cash_limit_for_total_block']?.toDouble();
     userInfoId = json['userinfo'] != null ? json['userinfo']['id'] : null;
+    
+    canDeliver = json['can_deliver'] == true || json['can_deliver'] == 1 || '${json['can_deliver']}' == '1';
+    canDriveTaxi = json['can_drive_taxi'] == true || json['can_drive_taxi'] == 1 || '${json['can_drive_taxi']}' == '1';
+    
+    metamapVerificationId = json['metamap_verification_id'];
+    identityVerified = json['identity_verified'];
   }
 
   Map<String, dynamic> toJson() {
@@ -204,8 +222,12 @@ class ProfileModel {
     data['cash_limit_for_only_paid'] = cashLimitForOnlyPaid;
     data['cash_limit_for_total_block'] = cashLimitForTotalBlock;
     if (userInfoId != null) {
-      data['userinfo'] = {'id': userInfoId};
+      data['user_info_id'] = userInfoId;
     }
+    data['can_deliver'] = canDeliver == true ? 1 : 0;
+    data['can_drive_taxi'] = canDriveTaxi == true ? 1 : 0;
+    data['metamap_verification_id'] = metamapVerificationId;
+    data['identity_verified'] = identityVerified;
     return data;
   }
 }

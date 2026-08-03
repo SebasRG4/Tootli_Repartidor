@@ -54,6 +54,55 @@ class EarningListWidget extends StatelessWidget {
   final int selectedIndex;
   const EarningListWidget({super.key, required this.transactions, required this.selectedIndex});
 
+  String _getTranslatedStatus(String? status) {
+    if (status == null) return '';
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return 'Aprobado';
+      case 'denied':
+        return 'Denegado';
+      case 'pending':
+        return 'Pendiente';
+      default:
+        return status;
+    }
+  }
+
+  String _getTranslatedMethod(int selectedIndex, dynamic item) {
+    if (selectedIndex == 0) {
+      return 'Retiro vía ${item.bankName}';
+    }
+    
+    final String methodStr = item.method.toString().toLowerCase();
+    if (selectedIndex == 1) {
+      if (methodStr == 'adjustment') {
+        return 'Ajuste de billetera';
+      } else if (methodStr == 'offline_payment') {
+        return 'Pago offline';
+      }
+      return 'Pagado vía ${item.method}';
+    } else {
+      if (methodStr == 'adjustment') {
+        return 'Ajuste de billetera';
+      } else if (methodStr == 'offline_payment') {
+        return 'Pago offline';
+      }
+      return 'Billetera: ${item.method}';
+    }
+  }
+
+  Color _getStatusColor(BuildContext context, String? status) {
+    if (status == null) return Colors.blue;
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return Colors.green;
+      case 'denied':
+        return Theme.of(context).colorScheme.error;
+      default:
+        return Colors.blue;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (transactions == null) {
@@ -82,25 +131,14 @@ class EarningListWidget extends StatelessWidget {
         final item = transactions![index];
         return TransactionItemWidget(
           amount: item.amount,
-          method: selectedIndex == 0 ? '${'withdraw_via'.tr} ${item.bankName}' : '${selectedIndex == 1 ? 'paid_via'.tr : 'wallet'.tr} ${item.method}',
+          method: _getTranslatedMethod(selectedIndex, item),
           date: selectedIndex == 0 ? DateConverterHelper.utcToDateTime(item.requestedAt) : item.paymentTime.toString(),
-          status: item.status,
+          status: _getTranslatedStatus(item.status),
           statusColor: _getStatusColor(context, item.status),
           fromWalletEarning: selectedIndex == 2,
         );
       },
     );
-  }
-
-  Color _getStatusColor(BuildContext context, String? status) {
-    switch (status) {
-      case 'approved' || 'Approved':
-        return Theme.of(context).primaryColor;
-      case 'denied':
-        return Theme.of(context).colorScheme.error;
-      default:
-        return Colors.blue;
-    }
   }
 }
 
@@ -141,7 +179,7 @@ class TransactionItemWidget extends StatelessWidget {
                       ),
                       margin: const EdgeInsets.only(left: Dimensions.paddingSizeExtraSmall),
                       child: Text(
-                        status.tr,
+                        status,
                         style: robotoRegular.copyWith(
                           fontSize: Dimensions.fontSizeSmall,
                           color: statusColor,
@@ -174,7 +212,7 @@ class TransactionItemWidget extends StatelessWidget {
 
             if(!fromWalletEarning)
             Text(
-              status.tr,
+              status,
               style: robotoRegular.copyWith(
                 fontSize: Dimensions.fontSizeSmall,
                 color: statusColor,

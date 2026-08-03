@@ -45,9 +45,20 @@ class _WalletProvidedHistoryScreenState extends State<WalletProvidedHistoryScree
                       Text(PriceConverterHelper.convertPrice(myAccountController.walletProvidedTransactions![index].amount), style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeDefault)),
                       const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
-                      Text('${'wallet'.tr} ${myAccountController.walletProvidedTransactions![index].method?.replaceAll('_', ' ').capitalize??''}', style: robotoRegular.copyWith(
-                        fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor,
-                      )),
+                      Text(
+                        (() {
+                          final String methodRaw = myAccountController.walletProvidedTransactions![index].method?.toString().toLowerCase() ?? '';
+                          if (methodRaw == 'adjustment') {
+                            return 'Ajuste de billetera';
+                          } else if (methodRaw == 'offline_payment') {
+                            return 'Pago offline';
+                          }
+                          return 'Billetera: ${methodRaw.replaceAll('_', ' ').capitalize}';
+                        })(),
+                        style: robotoRegular.copyWith(
+                          fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor,
+                        ),
+                      ),
 
                     ]),
                   ),
@@ -59,11 +70,24 @@ class _WalletProvidedHistoryScreenState extends State<WalletProvidedHistoryScree
                     ),
                     const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
-                    Text(myAccountController.walletProvidedTransactions![index].status!.tr, style: robotoRegular.copyWith(
-                      fontSize: Dimensions.fontSizeSmall,
-                      color: myAccountController.walletProvidedTransactions![index].status == 'approved' ? Theme.of(context).primaryColor : myAccountController.walletProvidedTransactions![index].status == 'denied'
-                          ? Theme.of(context).colorScheme.error : Colors.blue,
-                    )),
+                    Text(
+                      (() {
+                        final String statusRaw = myAccountController.walletProvidedTransactions![index].status?.toString().toLowerCase() ?? '';
+                        if (statusRaw == 'approved') {
+                          return 'Aprobado';
+                        } else if (statusRaw == 'denied') {
+                          return 'Denegado';
+                        } else if (statusRaw == 'pending') {
+                          return 'Pendiente';
+                        }
+                        return statusRaw.capitalizeFirst ?? '';
+                      })(),
+                      style: robotoRegular.copyWith(
+                        fontSize: Dimensions.fontSizeSmall,
+                        color: myAccountController.walletProvidedTransactions![index].status == 'approved' ? Colors.green : myAccountController.walletProvidedTransactions![index].status == 'denied'
+                            ? Theme.of(context).colorScheme.error : Colors.blue,
+                      ),
+                    ),
 
                   ]),
                 ]),

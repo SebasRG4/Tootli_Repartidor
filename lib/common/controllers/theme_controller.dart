@@ -12,13 +12,15 @@ class ThemeController extends GetxController implements GetxService {
   bool get darkTheme => _darkTheme;
 
   void toggleTheme() {
-    _darkTheme = !_darkTheme;
+    // Deshabilitado temporalmente para forzar modo oscuro por defecto
+    _darkTheme = true;
     sharedPreferences.setBool(AppConstants.theme, _darkTheme);
     update();
   }
 
   void _loadCurrentTheme() async {
-    _darkTheme = sharedPreferences.getBool(AppConstants.theme) ?? true;
+    // Deshabilitado temporalmente para forzar modo oscuro por defecto
+    _darkTheme = true;
     update();
   }
 }

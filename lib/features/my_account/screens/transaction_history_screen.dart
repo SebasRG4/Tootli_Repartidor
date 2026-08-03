@@ -43,9 +43,20 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       Text(PriceConverterHelper.convertPrice(myAccountController.transactions![index].amount), style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeDefault)),
                       const SizedBox(height: Dimensions.paddingSizeExtraSmall),
 
-                      Text('${'paid_via'.tr} ${myAccountController.transactions![index].method?.replaceAll('_', ' ').capitalize??''}', style: robotoRegular.copyWith(
-                        fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor,
-                      )),
+                      Text(
+                        (() {
+                          final String methodRaw = myAccountController.transactions![index].method?.toString().toLowerCase() ?? '';
+                          if (methodRaw == 'adjustment') {
+                            return 'Ajuste de billetera';
+                          } else if (methodRaw == 'offline_payment') {
+                            return 'Pago offline';
+                          }
+                          return 'Pagado vía ${methodRaw.replaceAll('_', ' ').capitalize}';
+                        })(),
+                        style: robotoRegular.copyWith(
+                          fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor,
+                        ),
+                      ),
                     ]),
                   ),
                   Text(myAccountController.transactions![index].paymentTime.toString(),

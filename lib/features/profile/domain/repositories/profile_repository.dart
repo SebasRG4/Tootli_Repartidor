@@ -109,7 +109,14 @@ class ProfileRepository implements ProfileRepositoryInterface {
     if (response.statusCode == 200) {
       responseModel = ResponseModel(true, response.body['message']);
     } else {
-      responseModel = ResponseModel(false, response.body['errors'][0]['message']);
+      String? errorMessage = response.statusText;
+      if (response.body != null && response.body is Map && response.body['errors'] != null && response.body['errors'] is List && response.body['errors'].isNotEmpty) {
+        final error = response.body['errors'][0];
+        if (error is Map) {
+          errorMessage = error['message'];
+        }
+      }
+      responseModel = ResponseModel(false, errorMessage);
     }
     return responseModel;
   }

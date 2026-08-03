@@ -85,9 +85,6 @@ class ProfileService implements ProfileServiceInterface {
     LocationPermission permission = await Geolocator.requestPermission();
     _isCheckingPermission = false;
 
-    while (Get.isDialogOpen == true) {
-      Get.back();
-    }
 
     if (permission == LocationPermission.denied) {
       Get.dialog(

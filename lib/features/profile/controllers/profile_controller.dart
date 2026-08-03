@@ -1,6 +1,8 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sixam_mart_delivery/common/models/response_model.dart';
+import 'package:sixam_mart_delivery/common/widgets/confirmation_dialog_widget.dart';
+import 'package:sixam_mart_delivery/util/images.dart';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/splash/controllers/splash_controller.dart';
 import 'package:sixam_mart_delivery/features/address/domain/models/record_location_body_model.dart';
@@ -12,8 +14,8 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/features/profile/domain/services/profile_service_interface.dart';
-import 'package:sixam_mart_delivery/helper/profile_selfie_composer.dart';
 import 'package:sixam_mart_delivery/features/my_account/domain/models/offline_payment_method_model.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ProfileController extends GetxController implements GetxService {
   final ProfileServiceInterface profileServiceInterface;
@@ -21,6 +23,10 @@ class ProfileController extends GetxController implements GetxService {
 
   ProfileModel? _profileModel;
   ProfileModel? get profileModel => _profileModel;
+  set profileModel(ProfileModel? model) {
+    _profileModel = model;
+    update();
+  }
 
   /// Cualquier registro aún en estado `pending`: panel inferior, drawer limitado, sin pedidos.
   bool get isPendingRegistrationDashboard {
@@ -49,6 +55,7 @@ class ProfileController extends GetxController implements GetxService {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+  bool _isUpdatingActiveStatus = false;
 
   XFile? _pickedFile;
   XFile? get pickedFile => _pickedFile;
@@ -111,7 +118,7 @@ class ProfileController extends GetxController implements GetxService {
   }
 
   void pickImage() async {
-    _pickedFile = await ProfileSelfieComposer.pickComposedProfileSelfie();
+    _pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
     update();
   }
 
@@ -120,31 +127,100 @@ class ProfileController extends GetxController implements GetxService {
   }
 
   Future<bool> updateActiveStatus({bool back = true}) async {
-    ResponseModel responseModel = await profileServiceInterface
-        .updateActiveStatus();
-    if (responseModel.isSuccess) {
-      if (back) {
-        Get.back();
-      }
-      _profileModel!.active = _profileModel!.active == 0 ? 1 : 0;
-      showCustomSnackBar(responseModel.message, isError: false);
-      if (_profileModel!.active == 1) {
-        profileServiceInterface.checkPermission(() => startLocationRecord());
-      } else {
-        stopLocationRecord();
-        profileServiceInterface.checkPermission(
-          () => startMapLocationWhileInactive(),
-        );
-      }
-    } else {
-      if (isPendingRegistrationDashboard) {
-        showCustomSnackBar('registration_in_progress_title'.tr, isError: false);
-      } else {
-        showCustomSnackBar(responseModel.message, isError: true);
-      }
+    if (_isUpdatingActiveStatus) {
+      debugPrint('[ProfileController] 🛑 updateActiveStatus ya está en ejecución. Ignorando llamada duplicada.');
+      return false;
     }
+    _isUpdatingActiveStatus = true;
     update();
-    return responseModel.isSuccess;
+
+    try {
+      // SALVAVIDAS: Validar permisos críticos antes de permitir ponerse en línea (Ubicación Permitir Siempre y Notificaciones)
+      if (_profileModel != null && _profileModel!.active == 0) {
+        final LocationPermission locPermission = await Geolocator.checkPermission();
+        final notifStatus = await Permission.notification.status;
+        
+        debugPrint('[ProfileController] 📍 Location Status (Geolocator): $locPermission, 🔔 Notification Status: $notifStatus');
+        
+        final bool isLocationGranted = locPermission == LocationPermission.always;
+        final bool isNotificationGranted = notifStatus.isGranted || notifStatus.isProvisional || notifStatus.isLimited;
+        
+        if (!isLocationGranted || !isNotificationGranted) {
+          Get.dialog(
+            ConfirmationDialogWidget(
+              icon: Images.warning,
+              title: 'Permisos requeridos'.tr,
+              description: 'Debes otorgar permisos de Ubicación (Permitir siempre) y Notificaciones para recibir pedidos. ¿Deseas abrir la configuración para activarlos?'.tr,
+              onYesPressed: () async {
+                Get.back();
+                await openAppSettings();
+              },
+            ),
+          );
+          return false; // Bloquea el cambio a online
+        }
+
+        if (_profileModel!.identityVerified != 'approved') {
+          Get.dialog(
+            ConfirmationDialogWidget(
+              icon: Images.warning,
+              title: 'Verificación requerida'.tr,
+              description: 'Debes completar tu verificación de identidad (INE y Selfie) para poder recibir pedidos.'.tr,
+              onYesPressed: () {
+                Get.back();
+                Get.toNamed(RouteHelper.getDmKycRoute());
+              },
+            ),
+          );
+          return false; // Bloquea el cambio a online
+        }
+      }
+
+      ResponseModel responseModel = await profileServiceInterface
+          .updateActiveStatus();
+      if (responseModel.isSuccess) {
+        if (back) {
+          Get.back();
+        }
+        _profileModel!.active = _profileModel!.active == 0 ? 1 : 0;
+        showCustomSnackBar(responseModel.message, isError: false);
+        if (_profileModel!.active == 1) {
+          profileServiceInterface.checkPermission(() => startLocationRecord());
+          Future.delayed(const Duration(milliseconds: 200), () {
+            Get.dialog(
+              ConfirmationDialogWidget(
+                icon: Images.warning,
+                title: 'Atención Repartidor'.tr,
+                description: 'Revisa tu vehiculo, medidas de seguriodad y llevar cambio suficiente para pagar o dar cambio'.tr,
+                hasCancel: false,
+                onYesPressed: () {
+                  Get.back();
+                },
+              ),
+              barrierDismissible: false,
+            );
+          });
+        } else {
+          stopLocationRecord();
+          profileServiceInterface.checkPermission(
+            () => startMapLocationWhileInactive(),
+          );
+        }
+      } else {
+        if (isPendingRegistrationDashboard) {
+          showCustomSnackBar('registration_in_progress_title'.tr, isError: false);
+        } else {
+          showCustomSnackBar(responseModel.message, isError: true);
+        }
+      }
+      return responseModel.isSuccess;
+    } catch (e) {
+      debugPrint('[ProfileController] ❌ Error en updateActiveStatus: $e');
+      return false;
+    } finally {
+      _isUpdatingActiveStatus = false;
+      update();
+    }
   }
 
   Future deleteDriver() async {
@@ -198,6 +274,22 @@ class ProfileController extends GetxController implements GetxService {
         return;
       }
       final Position locationResult = await Geolocator.getCurrentPosition();
+
+      // Anti-Fraud: Mock Location Detection (COO operational mandate)
+      // Solo se activa en Release para permitir pruebas y desarrollo (Simulador / Fake GPS)
+      if (locationResult.isMocked) {
+        if (kReleaseMode) {
+          stopLocationRecord();
+          if (_profileModel != null && _profileModel!.active == 1) {
+            await updateActiveStatus(back: false);
+          }
+          showCustomSnackBar('mock_location_detected'.tr, isError: true);
+          return;
+        } else {
+          debugPrint('[ProfileController] 📍 Mock location detected but IGNORED in debug mode to allow testing.');
+        }
+      }
+
       String address = await profileServiceInterface.addressPlaceMark(
         locationResult,
       );
@@ -213,7 +305,8 @@ class ProfileController extends GetxController implements GetxService {
         return;
       }
 
-      if (Get.find<SplashController>().configModel!.webSocketStatus!) {
+      final configModel = Get.find<SplashController>().configModel;
+      if (configModel != null && configModel.webSocketStatus == true) {
         await profileServiceInterface.recordWebSocketLocation(_recordLocation!);
       }
       // Siempre persistir por HTTP: el rastreo web (Tootli Directo) lee delivery_histories;

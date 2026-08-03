@@ -68,7 +68,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   bool _within100mOfCustomer = false;
   int _customerTelLaunchCount = 0;
   bool _customerContactCountdownStarted = false;
-  int? _customerContactSecondsRemaining;
+  final Rx<int?> _customerContactSecondsRemaining = Rx<int?>(null);
   bool _awaitingCallReturnConfirm = false;
   DateTime? _customerCallLaunchedAt;
   static const String _prefPrefixCalls = 'dm_cust_confirmed_call_attempts_';
@@ -151,7 +151,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
       final int left = ((endMs - DateTime.now().millisecondsSinceEpoch) / 1000)
           .ceil()
           .clamp(0, 600);
-      _customerContactSecondsRemaining = left;
+      _customerContactSecondsRemaining.value = left;
       if (left > 0) {
         _runCountdownTicker();
       }
@@ -201,7 +201,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
       customerCallCount: _customerTelLaunchCount,
       within100mOfCustomer: _within100mOfCustomer,
       contactCountdownStarted: _customerContactCountdownStarted,
-      contactSecondsRemaining: _customerContactSecondsRemaining,
+      contactSecondsRemaining: _customerContactSecondsRemaining.value,
     );
   }
 
@@ -212,7 +212,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
         ((_countdownDeadlineMs! - DateTime.now().millisecondsSinceEpoch) / 1000)
             .ceil()
             .clamp(0, 600);
-    setState(() => _customerContactSecondsRemaining = left);
+    _customerContactSecondsRemaining.value = left;
     if (left > 0) _runCountdownTicker();
   }
 
@@ -314,11 +314,9 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
     final int startMs = DateTime.now().millisecondsSinceEpoch;
     final int deadline = startMs + 600000;
     await _persistCountdownState(startMs, deadline);
-    setState(() {
-      _countdownDeadlineMs = deadline;
-      _countdownStartMs = startMs;
-      _customerContactSecondsRemaining = 600;
-    });
+    _countdownDeadlineMs = deadline;
+    _countdownStartMs = startMs;
+    _customerContactSecondsRemaining.value = 600;
     _reportContactStatusToController();
     _runCountdownTicker();
   }
@@ -337,7 +335,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
                     1000)
                 .ceil()
                 .clamp(0, 600);
-        setState(() => _customerContactSecondsRemaining = next);
+        _customerContactSecondsRemaining.value = next;
         _reportContactStatusToController();
         if (next <= 0) t.cancel();
       },
@@ -1751,7 +1749,7 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
       _countdownDeadlineMs = DateTime.now()
           .add(const Duration(minutes: 10))
           .millisecondsSinceEpoch;
-      _customerContactSecondsRemaining = 600; // 10 minutes
+      _customerContactSecondsRemaining.value = 600; // 10 minutes
     });
 
     _persistProtocolActivated();
@@ -1900,92 +1898,94 @@ class _AcceptedOrderWidgetState extends State<AcceptedOrderWidget>
   }
 
   Widget _buildCustomerContactTimerCard(BuildContext context) {
-    final bool callsOk = _customerTelLaunchCount >= 3;
-    final bool locOk = _within100mOfCustomer;
-    final int? sec = _customerContactSecondsRemaining;
-    final bool finished =
-        sec != null && sec <= 0 && _customerContactCountdownStarted;
+    return Obx(() {
+      final bool callsOk = _customerTelLaunchCount >= 3;
+      final bool locOk = _within100mOfCustomer;
+      final int? sec = _customerContactSecondsRemaining.value;
+      final bool finished =
+          sec != null && sec <= 0 && _customerContactCountdownStarted;
 
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(
-          color: const Color(0xFFF39C12).withValues(alpha: 0.2),
+      return Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(
+            color: const Color(0xFFF39C12).withValues(alpha: 0.2),
+          ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.timer_outlined,
-                color: Color(0xFFF39C12),
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'Protocolo de Espera',
-                style: robotoMedium.copyWith(color: Colors.white, fontSize: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _timerRequirementRow(
-            context,
-            done: callsOk,
-            label: 'Llamadas confirmadas: $_customerTelLaunchCount / 3',
-          ),
-          const SizedBox(height: 8),
-          _timerRequirementRow(
-            context,
-            done: locOk,
-            label: locOk
-                ? 'En zona de entrega'
-                : 'Debes estar a < 100m del cliente',
-          ),
-          const SizedBox(height: 15),
-          if (!_customerContactCountdownStarted)
-            Text(
-              'El temporizador iniciará al cumplir los requisitos.',
-              style: robotoRegular.copyWith(
-                color: Colors.white38,
-                fontSize: 12,
-              ),
-            )
-          else if (finished)
-            Text(
-              'Tiempo agotado. Puedes contactar a soporte.',
-              style: robotoBold.copyWith(
-                color: const Color(0xFF2ECC71),
-                fontSize: 13,
-              ),
-            )
-          else
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             Row(
               children: [
-                Text(
-                  'Tiempo restante: ',
-                  style: robotoRegular.copyWith(
-                    color: Colors.white70,
-                    fontSize: 13,
-                  ),
+                const Icon(
+                  Icons.timer_outlined,
+                  color: Color(0xFFF39C12),
+                  size: 20,
                 ),
+                const SizedBox(width: 10),
                 Text(
-                  _formatMmSs(sec ?? 0),
-                  style: robotoBold.copyWith(
-                    color: const Color(0xFFF39C12),
-                    fontSize: 20,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
+                  'Protocolo de Espera',
+                  style: robotoMedium.copyWith(color: Colors.white, fontSize: 14),
                 ),
               ],
             ),
-        ],
-      ),
-    );
+            const SizedBox(height: 12),
+            _timerRequirementRow(
+              context,
+              done: callsOk,
+              label: 'Llamadas confirmadas: $_customerTelLaunchCount / 3',
+            ),
+            const SizedBox(height: 8),
+            _timerRequirementRow(
+              context,
+              done: locOk,
+              label: locOk
+                  ? 'En zona de entrega'
+                  : 'Debes estar a < 100m del cliente',
+            ),
+            const SizedBox(height: 15),
+            if (!_customerContactCountdownStarted)
+              Text(
+                'El temporizador iniciará al cumplir los requisitos.',
+                style: robotoRegular.copyWith(
+                  color: Colors.white38,
+                  fontSize: 12,
+                ),
+              )
+            else if (finished)
+              Text(
+                'Tiempo agotado. Puedes contactar a soporte.',
+                style: robotoBold.copyWith(
+                  color: const Color(0xFF2ECC71),
+                  fontSize: 13,
+                ),
+              )
+            else
+              Row(
+                children: [
+                  Text(
+                    'Tiempo restante: ',
+                    style: robotoRegular.copyWith(
+                      color: Colors.white70,
+                      fontSize: 13,
+                    ),
+                  ),
+                  Text(
+                    _formatMmSs(sec ?? 0),
+                    style: robotoBold.copyWith(
+                      color: const Color(0xFFF39C12),
+                      fontSize: 20,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _timerRequirementRow(

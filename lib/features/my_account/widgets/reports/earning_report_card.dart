@@ -1,6 +1,6 @@
-import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get_utils/src/extensions/internacionalization.dart';
+import 'package:intl/intl.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_bottom_sheet_widget.dart';
 import 'package:sixam_mart_delivery/features/my_account/controllers/my_account_controller.dart';
 import 'package:sixam_mart_delivery/features/my_account/domain/models/earning_report_model.dart';
@@ -9,9 +9,7 @@ import 'package:sixam_mart_delivery/features/my_account/domain/models/referral_r
 import 'package:sixam_mart_delivery/features/my_account/widgets/earning_history_bottom_sheet.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/loyalty_history_bottom_sheet.dart';
 import 'package:sixam_mart_delivery/features/my_account/widgets/referral_history_bottom_sheet.dart';
-import 'package:sixam_mart_delivery/helper/date_converter_helper.dart';
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
-import 'package:sixam_mart_delivery/util/dimensions.dart';
 import 'package:sixam_mart_delivery/util/styles.dart';
 
 class EarningReportCard extends StatelessWidget {
@@ -23,114 +21,175 @@ class EarningReportCard extends StatelessWidget {
   final RefrealEarnings? refrealEarnings;
   final LoyalityPoints? loyalityPoints;
   const EarningReportCard({
-    super.key, required this.index, required this.myAccountController, required this.earning,
-    required this.createdAt, required this.showDivider, required this.refrealEarnings, required this.loyalityPoints,
+    super.key,
+    required this.index,
+    required this.myAccountController,
+    required this.earning,
+    required this.createdAt,
+    required this.showDivider,
+    required this.refrealEarnings,
+    required this.loyalityPoints,
   });
 
   @override
   Widget build(BuildContext context) {
     double amount = 0;
-    if(earning != null) {
+    bool isOrder = earning != null;
+    bool isReferral = refrealEarnings != null;
+    bool isLoyalty = loyalityPoints != null;
+
+    if (isOrder) {
       amount = (earning!.dmTips ?? 0) + (earning!.originalDeliveryCharge ?? 0);
-    } else if(refrealEarnings != null) {
+    } else if (isReferral) {
       amount = refrealEarnings!.amount ?? 0;
-    } else if(loyalityPoints != null) {
-      amount = loyalityPoints!.convertedAmount??0;
+    } else if (isLoyalty) {
+      amount = loyalityPoints!.convertedAmount ?? 0;
     }
+
+    DateTime parsedDate = DateTime.parse(createdAt).toLocal();
+    String formattedDate = DateFormat('dd MMM, yyyy').format(parsedDate);
+    String formattedTime = DateFormat('h:mm a').format(parsedDate);
+
+    IconData iconData = Icons.shopping_bag_outlined;
+    String mainTitle = '';
+    String subtitle = '';
+
+    if (isOrder) {
+      iconData = Icons.shopping_bag_outlined;
+      mainTitle = '${'order'.tr} #${earning!.order?.id}';
+      subtitle = 'delivery_fee'.tr;
+      if (earning?.dmTips != 0) {
+        subtitle += ' & ${'delivery_tips'.tr}';
+      }
+    } else if (isReferral) {
+      iconData = Icons.people_outline;
+      mainTitle = '${'transaction_id'.tr} #${refrealEarnings!.transactionId}';
+      subtitle = 'referral'.tr;
+    } else if (isLoyalty) {
+      iconData = Icons.stars_outlined;
+      mainTitle = '${'transaction_id'.tr} #${loyalityPoints!.transactionId}';
+      subtitle = loyalityPoints!.transactionType?.tr ?? '';
+    }
+
     return InkWell(
       onTap: () {
-        if(earning != null) {
+        if (isOrder) {
           showCustomBottomSheet(child: EarningHistoryBottomSheet(data: earning));
-        } else if(refrealEarnings != null) {
+        } else if (isReferral) {
           showCustomBottomSheet(child: ReferralHistoryBottomSheet(refrealEarnings: refrealEarnings));
-        } else if(loyalityPoints != null) {
+        } else if (isLoyalty) {
           showCustomBottomSheet(child: LoyaltyHistoryBottomSheet(loyalityPoints: loyalityPoints));
         }
       },
-      child: Column(children: [
-        Container(
-          margin: EdgeInsets.only(bottom: index == myAccountController.earningList!.length - 1 ? 0 : Dimensions.paddingSizeSmall),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.start, children: [
-                Text(
-                  PriceConverterHelper.convertPrice(amount),
-                  style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12.0),
+            child: Row(
+              children: [
+                // Left Icon Circle
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141922),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.03)),
+                  ),
+                  child: Icon(
+                    iconData,
+                    color: const Color(0xFF5EC44B),
+                    size: 20,
+                  ),
                 ),
+                const SizedBox(width: 14),
 
-                if (earning != null && earning!.order?.id != null)...[
-                  Text('${'order'.tr} #${earning!.order?.id}', style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color!.withValues(alpha: 0.6), fontSize: Dimensions.fontSizeSmall)),
-                ] else if(refrealEarnings != null)...[
-                  Text(
-                    '${'transaction_id'.tr} #${refrealEarnings!.transactionId}', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color!.withValues(alpha: 0.6), fontSize: Dimensions.fontSizeSmall),
-                  ),
-                ] else if(loyalityPoints != null)...[
-                  Text(
-                    '${'transaction_id'.tr} #${loyalityPoints!.transactionId}', maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color!.withValues(alpha: 0.6), fontSize: Dimensions.fontSizeSmall),
-                  ),
-                  Text(
-                    loyalityPoints!.transactionType!.tr, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: robotoRegular.copyWith(color: Theme.of(context).textTheme.bodyLarge!.color!.withValues(alpha: 0.6), fontSize: Dimensions.fontSizeSmall),
-                  ),
-
-                ],
-
-                if (earning != null)
-                  Row(
+                // Transaction Details (Value and Subtitles)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (earning?.originalDeliveryCharge != 0)
-                        Text(
-                          'delivery_fee'.tr,
-                          style: robotoRegular.copyWith(color: Theme.of(context).disabledColor),
+                      // Amount
+                      Text(
+                        PriceConverterHelper.convertPrice(amount),
+                        style: robotoBold.copyWith(
+                          fontSize: 18,
+                          color: Colors.white,
                         ),
-
-                      if (earning?.originalDeliveryCharge != 0 && earning?.dmTips != 0)
-                        Text(', ', style: robotoRegular.copyWith(color: Theme.of(context).hintColor)),
-
-                      if (earning?.dmTips != 0)
-                        Text(
-                          'delivery_tips'.tr,
-                          style: robotoRegular.copyWith(color: Theme.of(context).disabledColor),
+                      ),
+                      const SizedBox(height: 3),
+                      // Main Title (Order/Tx ID)
+                      Text(
+                        mainTitle,
+                        style: robotoRegular.copyWith(
+                          color: Colors.white70,
+                          fontSize: 13,
                         ),
+                      ),
+                      const SizedBox(height: 2),
+                      // Subtitle (delivery fee, etc.)
+                      Text(
+                        subtitle,
+                        style: robotoRegular.copyWith(
+                          color: Colors.white38,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
-              ]),
-            ),
-            // const Spacer(),
-
-            Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(DateConverterHelper.utcToDateTime(createdAt), style: robotoRegular.copyWith(color: Theme.of(context).disabledColor)),
-              const SizedBox(height: Dimensions.paddingSizeDefault),
-
-              Container(
-                padding: const EdgeInsets.all(Dimensions.paddingSizeExtraSmall),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).hintColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
                 ),
-                child: Icon(Icons.arrow_forward_ios, size: 12,
-                  color: Theme.of(context).hintColor,
-                ),
-              ),
-            ]),
-          ]),
-        ),
 
-        if (showDivider)
-          Padding(
-            padding: const EdgeInsets.only(top: Dimensions.paddingSizeSmall, bottom: Dimensions.paddingSizeDefault),
-            child: DottedBorder(
-              options: RoundedRectDottedBorderOptions(
-                color: Theme.of(context).hintColor.withValues(alpha: 0.2), strokeWidth: 1, dashPattern: const [4, 8],
-                padding: const EdgeInsets.only(left: Dimensions.paddingSizeDefault, right: Dimensions.paddingSizeDefault),
-                radius: Radius.zero,
-              ),
-              child: Container(),
+                // Date, Time and Arrow
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          formattedDate,
+                          style: robotoRegular.copyWith(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          formattedTime,
+                          style: robotoRegular.copyWith(
+                            color: Colors.white38,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    // Chevron button
+                    Container(
+                      height: 32,
+                      width: 32,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF141922),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chevron_right,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-      ]),
+          if (showDivider)
+            Divider(
+              color: Colors.white.withValues(alpha: 0.05),
+              height: 1,
+              thickness: 1,
+            ),
+        ],
+      ),
     );
   }
 }

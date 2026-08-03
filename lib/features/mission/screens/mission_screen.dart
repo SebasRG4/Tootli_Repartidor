@@ -45,7 +45,10 @@ class _MissionScreenState extends State<MissionScreen> {
                         ),
                       )
                     : Center(
-                        child: Text('no_mission_found'.tr, style: robotoMedium),
+                        child: Text(
+                          'No hay misiones activas',
+                          style: robotoMedium,
+                        ),
                       )
               : const Center(child: CircularProgressIndicator());
         },

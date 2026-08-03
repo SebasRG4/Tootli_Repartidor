@@ -7,8 +7,10 @@ import 'package:sixam_mart_delivery/features/disbursement/helper/disbursement_he
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/notification_helper.dart';
 import 'package:sixam_mart_delivery/util/dimensions.dart';
+import 'package:sixam_mart_delivery/util/styles.dart';
 
 import 'package:sixam_mart_delivery/features/home/screens/home_screen.dart';
+import 'package:sixam_mart_delivery/features/my_account/screens/my_earning_screen.dart';
 import 'package:sixam_mart_delivery/helper/order_notification_service.dart';
 import 'package:sixam_mart_delivery/helper/pusher_service.dart';
 import 'package:sixam_mart_delivery/features/mission/controllers/mission_controller.dart';
@@ -53,6 +55,10 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       GlobalKey<HomeScreenState>();
   /// IDs de pedidos ya enviados al HomeScreen para evitar duplicados
   final Set<int> _shownOrderIds = {};
+  /// transactionReferences de grupos multitienda ya mostrados (bloquea hermanos individuales)
+  final Set<String> _shownTransactionRefs = {};
+  /// Mapa transactionRef → orderIds del grupo (para limpiar _shownOrderIds en reoferta)
+  final Map<String, Set<int>> _transactionRefOrderIds = {};
 
   bool? _lastPendingRegistration;
   bool _handledRegistrationApprovalTransition = false;
@@ -185,11 +191,32 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   /// Implementa una estrategia de "Respuesta Instantánea" abriendo el UI inmediatamente.
   void _triggerShowOrder(int orderId) {
     debugPrint("[Dashboard] _triggerShowOrder($orderId)");
-    // ── Paso 0: Deduplicación INMEDIATA (antes de cualquier async) ──────────
+    // ── Paso 0: Deduplicación por ID ──────────────────────────────────────
     if (_shownOrderIds.contains(orderId)) {
-      debugPrint("[Dashboard] ⛔ orderId=$orderId BLOCKED by dedup");
+      debugPrint("[Dashboard] ⛔ orderId=$orderId BLOCKED by dedup (ID)");
       return;
     }
+
+    // ── Paso 0b: Deduplicación por transactionReference (multitienda) ──────
+    // Si la caché ya tiene este pedido y pertenece a un grupo ya mostrado, omitir.
+    final cachedForRef = Get.find<OrderController>()
+        .latestOrderList
+        ?.firstWhereOrNull((o) => o.id == orderId);
+    if (cachedForRef != null &&
+        cachedForRef.transactionReference != null &&
+        cachedForRef.transactionReference!.isNotEmpty &&
+        _shownTransactionRefs.contains(cachedForRef.transactionReference)) {
+      debugPrint(
+        "[Dashboard] ⛔ orderId=$orderId BLOCKED by dedup (transactionRef=${cachedForRef.transactionReference})",
+      );
+      _shownOrderIds.add(orderId); // registrar para no revisitar
+      // Asociar este orderId al grupo para limpiarlo en reoferta
+      _transactionRefOrderIds
+          .putIfAbsent(cachedForRef.transactionReference!, () => {})
+          .add(orderId);
+      return;
+    }
+
     _shownOrderIds.add(orderId);
     debugPrint("[Dashboard] ✅ orderId=$orderId passed dedup check");
 
@@ -203,6 +230,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     if (cachedOrder != null) {
       debugPrint("[FCM] orderId=$orderId encontrado en caché.");
+      _registerTransactionRef(cachedOrder);
       _dispatchOrderToHome(cachedOrder);
       _refreshCounters();
     } else {
@@ -220,6 +248,17 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             ?.firstWhereOrNull((o) => o.id == orderId);
 
         if (order != null) {
+          // ── Paso 2b: Comprobar dedup por transactionRef DESPUÉS del fetch ──
+          if (order.transactionReference != null &&
+              order.transactionReference!.isNotEmpty &&
+              _shownTransactionRefs.contains(order.transactionReference)) {
+            debugPrint(
+              "[Dashboard] ⛔ orderId=$orderId BLOCKED post-fetch (transactionRef=${order.transactionReference} ya mostrado)",
+            );
+            _refreshCounters();
+            return;
+          }
+          _registerTransactionRef(order);
           debugPrint("[FCM] orderId=$orderId datos obtenidos de latest-orders. Actualizando UI...");
           _dispatchOrderToHome(order);
           _refreshCounters();
@@ -228,6 +267,16 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           Get.find<OrderController>().fetchOrderForNotification(orderId).then((fetched) {
             if (!mounted) return;
             if (fetched != null) {
+              if (fetched.transactionReference != null &&
+                  fetched.transactionReference!.isNotEmpty &&
+                  _shownTransactionRefs.contains(fetched.transactionReference)) {
+                debugPrint(
+                  "[Dashboard] ⛔ orderId=$orderId BLOCKED fallback (transactionRef=${fetched.transactionReference} ya mostrado)",
+                );
+                _refreshCounters();
+                return;
+              }
+              _registerTransactionRef(fetched);
               debugPrint("[FCM] orderId=$orderId datos obtenidos por fetch directo. Actualizando UI...");
               _dispatchOrderToHome(fetched);
             }
@@ -236,6 +285,57 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
         }
       });
     }
+  }
+
+  /// Registra el transactionReference del pedido para bloquear hermanos multitienda.
+  void _registerTransactionRef(OrderModel order) {
+    if (order.transactionReference != null &&
+        order.transactionReference!.isNotEmpty) {
+      final ref = order.transactionReference!;
+      _shownTransactionRefs.add(ref);
+      if (order.id != null) {
+        _transactionRefOrderIds.putIfAbsent(ref, () => {}).add(order.id!);
+      }
+      debugPrint(
+        "[Dashboard] 🔗 Registrado transactionRef=$ref (orderId=${order.id})",
+      );
+    }
+  }
+
+  /// Libera el bloqueo de un grupo multitienda (cuando el pedido es rechazado/ignorado).
+  /// Limpia: transactionRef, todos los orderIds del grupo en _shownOrderIds,
+  /// y los processedOrderIds de OrderNotificationService para que la siguiente reoferta
+  /// del backend (mismos IDs) llegue limpia.
+  /// [orderId] es el ID del pedido principal que fue rechazado (siempre limpiado).
+  /// [transactionRef] limpia también los hermanos del grupo multitienda.
+  void releaseTransactionRef(int? orderId, String? transactionRef) {
+    final idsToRelease = <int>{};
+
+    // 1. Siempre limpiar el orderId principal (cubre dummies sin transactionRef)
+    if (orderId != null) {
+      idsToRelease.add(orderId);
+      _shownOrderIds.remove(orderId);
+    }
+
+    // 2. Si hay transactionRef, limpiar todos los hermanos del grupo
+    if (transactionRef != null && transactionRef.isNotEmpty) {
+      _shownTransactionRefs.remove(transactionRef);
+      final groupIds = _transactionRefOrderIds.remove(transactionRef) ?? {};
+      for (final id in groupIds) {
+        _shownOrderIds.remove(id);
+        idsToRelease.add(id);
+      }
+    }
+
+    // 3. Limpiar el dedup interno de OrderNotificationService
+    if (idsToRelease.isNotEmpty) {
+      OrderNotificationService.instance.releaseOrderIds(idsToRelease);
+    }
+
+    debugPrint(
+      "[Dashboard] 🔓 releaseTransactionRef: ref=$transactionRef — "
+      "orderIds limpiados: $idsToRelease (listos para reoferta)",
+    );
   }
 
 
@@ -318,6 +418,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           PusherService.instance.disconnect();
           final profileModel = Get.find<ProfileController>().profileModel;
           if (profileModel != null && profileModel.id != null) {
+            PusherService.instance.resetReconnectAttempts();
             PusherService.instance.initPusher(profileModel.id!);
           }
           if (Get.find<ProfileController>().isPendingRegistrationDashboard) {
@@ -408,6 +509,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                   });
                 }
               },
+              onOrderDismissed: (orderId, transactionRef) {
+                releaseTransactionRef(orderId, transactionRef);
+              },
             ),
             OrderRequestScreen(
               onTap: () => _setPage(0),
@@ -419,12 +523,15 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             ProfileScreen(
               onTapMenu: () => _scaffoldKey.currentState?.openDrawer(),
             ),
+            const MyEarningScreen(),
           ];
 
           bool isHome = _pageIndex == 0;
           bool isOffline = profileController.profileModel?.active == 0;
           bool showBottomBar = isOffline || _isBottomBarVisible;
           bool hasSlider = isHome && profileController.profileModel != null;
+
+          debugPrint('[Dashboard Build Debug] isHome=$isHome, hasSlider=$hasSlider, active=${profileController.profileModel?.active}, appStatus=${profileController.profileModel?.applicationStatus}, _isOrderActive=$_isOrderActive, pendingReg=$pendingReg, isOffline=$isOffline');
 
           return Scaffold(
             key: _scaffoldKey,
@@ -438,6 +545,49 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 _setPage(index);
               },
             ),
+            bottomNavigationBar: (!_isOrderActive && !pendingReg && (_pageIndex == 0 || _pageIndex == 3 || _pageIndex == 4))
+                ? Theme(
+                    data: Theme.of(context).copyWith(
+                      canvasColor: const Color(0xFF0A0A0A),
+                    ),
+                    child: BottomNavigationBar(
+                      currentIndex: _pageIndex == 0
+                          ? 0
+                          : _pageIndex == 4
+                              ? 1
+                              : 2, // Maps index 0 -> 0, 4 -> 1, 3 -> 2
+                      onTap: (index) {
+                        if (index == 0) {
+                          _setPage(0);
+                        } else if (index == 1) {
+                          _setPage(4); // MyEarnings
+                        } else if (index == 2) {
+                          _setPage(3); // Profile
+                        }
+                      },
+                      backgroundColor: const Color(0xFF0A0A0A),
+                      selectedItemColor: const Color(0xFF5EC44B),
+                      unselectedItemColor: Colors.white38,
+                      selectedLabelStyle: robotoMedium.copyWith(fontSize: 12),
+                      unselectedLabelStyle: robotoRegular.copyWith(fontSize: 11),
+                      type: BottomNavigationBarType.fixed,
+                      items: const [
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.home_filled),
+                          label: 'Inicio',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.bar_chart),
+                          label: 'Ganancias',
+                        ),
+                        BottomNavigationBarItem(
+                          icon: Icon(Icons.person_outline),
+                          label: 'Cuenta',
+                        ),
+                      ],
+                    ),
+                  )
+                : null,
             body: Stack(
               children: [
                 PageView.builder(
@@ -482,41 +632,73 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     ),
                   ),
 
-                // FAB debug (simular pedido) + ubicación — se ocultan con pedido activo o registro pendiente.
+                // FAB controls: Location and Layer toggles (circular black buttons)
                 if (hasSlider && !_isOrderActive && !pendingReg)
                   Positioned(
                     bottom:
                         MediaQuery.of(context).size.height *
-                        (isOffline ? 0.36 : 0.26),
+                        (isOffline ? 0.38 : 0.28),
                     right: Dimensions.paddingSizeDefault,
                     child: Column(
                       children: [
-                        // DEBUG: solo UI + polilínea; no es FCM/API ni OrderNotificationService (ver HomeScreenState.simulateOrderRequest).
-                        /*
-                        FloatingActionButton.small(
-                          heroTag: 'bug_button',
-                          onPressed: () {
-                            _homeScreenKey.currentState?.simulateOrderRequest();
-                          },
-                          backgroundColor: Theme.of(context).primaryColor,
-                          child: const Icon(
-                            Icons.bug_report,
-                            color: Colors.white,
+                        // Location Button
+                        Container(
+                          height: 40,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F161E),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(
+                              Icons.gps_fixed,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            onPressed: () => _homeScreenKey.currentState?.animateToMyLocation(),
                           ),
                         ),
-                        const SizedBox(height: Dimensions.paddingSizeSmall),
-                        */
-
-                        // Location Button
-                        FloatingActionButton.small(
-                          heroTag: 'location_button',
-                          onPressed: () => _homeScreenKey.currentState
-                              ?.animateToMyLocation(),
-                          backgroundColor: Theme.of(context).cardColor,
-                          child: Icon(
-                            Icons.my_location,
-                            color: Theme.of(context).primaryColor,
-                          ),
+                        const SizedBox(height: 12),
+                        // Traffic toggle Button
+                        Builder(
+                          builder: (context) {
+                            final bool trafficActive = _homeScreenKey.currentState?.isTrafficEnabled ?? false;
+                            return Container(
+                              height: 40,
+                              width: 40,
+                              decoration: BoxDecoration(
+                                color: trafficActive ? const Color(0xFF5EC44B) : const Color(0xFF0F161E),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                icon: Icon(
+                                  Icons.layers,
+                                  color: trafficActive ? Colors.black : Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: () {
+                                  _homeScreenKey.currentState?.toggleTraffic();
+                                  setState(() {});
+                                },
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -559,6 +741,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                                   back: false,
                                 );
                               },
+                              onGoToOrderCenter: () => _setPage(1),
                             );
                     },
                   ),

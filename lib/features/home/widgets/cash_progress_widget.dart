@@ -27,8 +27,9 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
         double limitPaid = profile.cashLimitForOnlyPaid ?? 0;
         double limitBlock = profile.cashLimitForTotalBlock ?? 0;
 
-        if (limitPaid == 0)
+        if (limitPaid == 0) {
           return const SizedBox(); // Si no hay limite configurado
+        }
 
         bool isOrange = cashInHands >= limitPaid && cashInHands < limitBlock;
         bool isRed = cashInHands >= limitBlock;
@@ -68,18 +69,17 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
-            width: MediaQuery.of(context).size.width * 0.85,
-            padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
             decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+              color: const Color(0xFF0F161E), // Dark container background
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: statusColor.withValues(alpha: 0.5),
+                color: statusColor,
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -93,18 +93,38 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
                   children: [
                     Row(
                       children: [
-                        Icon(
-                          Icons.account_balance_wallet,
-                          color: statusColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: Dimensions.paddingSizeSmall),
-                        Text(
-                          PriceConverterHelper.convertPrice(cashInHands),
-                          style: robotoBold.copyWith(
-                            fontSize: Dimensions.fontSizeLarge,
-                            color: statusColor,
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
                           ),
+                          child: Icon(
+                            Icons.account_balance_wallet_outlined,
+                            color: statusColor,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Balance',
+                              style: robotoRegular.copyWith(
+                                color: Colors.white54,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              PriceConverterHelper.convertPrice(cashInHands),
+                              style: robotoBold.copyWith(
+                                fontSize: 22,
+                                color: statusColor,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -113,17 +133,16 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
                         Text(
                           statusText,
                           style: robotoMedium.copyWith(
-                            fontSize: Dimensions.fontSizeSmall,
+                            fontSize: 14,
                             color: statusColor,
                           ),
                         ),
-                        if (!forceExpanded)
-                          Icon(
-                            expanded
-                                ? Icons.keyboard_arrow_up
-                                : Icons.keyboard_arrow_down,
-                            color: Theme.of(context).disabledColor,
-                          ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          color: statusColor,
+                          size: 20,
+                        ),
                       ],
                     ),
                   ],
@@ -135,9 +154,7 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
                     borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
                     child: LinearProgressIndicator(
                       value: progress,
-                      backgroundColor: Theme.of(
-                        context,
-                      ).disabledColor.withValues(alpha: 0.2),
+                      backgroundColor: Colors.white10,
                       valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                       minHeight: 8,
                     ),
@@ -150,7 +167,7 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
                         '0',
                         style: robotoRegular.copyWith(
                           fontSize: Dimensions.fontSizeExtraSmall,
-                          color: Theme.of(context).disabledColor,
+                          color: Colors.white38,
                         ),
                       ),
                       Text(
@@ -174,7 +191,7 @@ class _CashProgressWidgetState extends State<CashProgressWidget> {
                     subText,
                     style: robotoRegular.copyWith(
                       fontSize: Dimensions.fontSizeSmall,
-                      color: Theme.of(context).textTheme.bodyLarge!.color,
+                      color: Colors.white70,
                     ),
                     textAlign: TextAlign.center,
                   ),

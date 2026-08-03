@@ -26,5 +26,7 @@ abstract class OrderRepositoryInterface implements RepositoryInterface {
     required int attemptNumber,
     required int confirmedAtMs,
   });
+  Future<int> getOrderCallsCount(int orderId);
   Future<dynamic> getOptimizedRoute(double lat, double lng);
+  Future<dynamic> uploadReceiptPhotos(int orderId, List<MultipartBody> photos);
 }

@@ -20,7 +20,11 @@ class DateConverterHelper {
   }
 
   static DateTime dateTimeStringToDate(String dateTime) {
-    return DateFormat('yyyy-MM-dd HH:mm:ss').parse(dateTime);
+    try {
+      return DateFormat('yyyy-MM-dd HH:mm:ss').parse(dateTime);
+    } catch (e) {
+      return DateTime.parse(dateTime);
+    }
   }
 
   static DateTime convertStringToDatetime(String dateTime) {

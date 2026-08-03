@@ -37,5 +37,7 @@ abstract class OrderServiceInterface{
     required int attemptNumber,
     required int confirmedAtMs,
   });
+  Future<int> getOrderCallsCount(int orderId);
   Future<Response> getOptimizedRoute(double lat, double lng);
+  Future<ResponseModel> uploadReceiptPhotos(int orderId, List<MultipartBody> photos);
 }

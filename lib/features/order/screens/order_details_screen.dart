@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:async';
 import 'package:dotted_border/dotted_border.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/bottom_view/parcel_bottom_view.dart';
 import 'package:sixam_mart_delivery/features/order/widgets/bottom_view/regular_order_bottom_view.dart';
@@ -77,8 +79,10 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
     super.initState();
 
     WidgetsBinding.instance.addObserver(this);
-    _loadData();
-    _startApiCalling();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+      _startApiCalling();
+    });
   }
 
   @override
@@ -165,6 +169,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                   offlinePay,
                   digitalyPaid,
                   isDelivered;
+              bool isTaxi = false;
 
               bool showDeliveryConfirmImage = false;
 
@@ -235,10 +240,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                   dmTips! +
                   additionalCharge +
                   extraPackagingAmount -
-                  referrerBonusAmount;
+                  referrerBonusAmount +
+                  (order?.parcelInsuranceFee ?? 0);
 
               if (controllerOrderModel != null) {
                 parcel = controllerOrderModel.orderType == 'parcel';
+                isTaxi = controllerOrderModel.moduleType == 'taxi';
                 pickedUp =
                     controllerOrderModel.orderStatus == AppConstants.pickedUp;
                 cod = controllerOrderModel.paymentMethod == 'cash_on_delivery';
@@ -269,8 +276,18 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                               Dimensions.paddingSizeDefault,
                             ),
                             physics: const ClampingScrollPhysics(),
-                            child: Column(
-                              children: [
+                            child: controllerOrderModel.orderStatus?.toLowerCase() == 'canceled'
+                                ? _buildCanceledOrderView(
+                                    context,
+                                    orderController,
+                                    controllerOrderModel,
+                                    parcel!,
+                                    order!,
+                                    showChatPermission,
+                                    isDelivered == true,
+                                  )
+                                : Column(
+                                    children: [
                                 Row(
                                   children: [
                                     Text(
@@ -328,6 +345,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                 const SizedBox(
                                   height: Dimensions.paddingSizeLarge,
                                 ),
+
+                                _buildFailedDeliveryInstructionCard(context, controllerOrderModel),
 
                                 parcel &&
                                         order?.orderStatus ==
@@ -645,25 +664,115 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                     ]),
                                   ),
 
+                                if (controllerOrderModel.paymentMethod == 'cash_on_delivery' &&
+                                    controllerOrderModel.orderType == 'delivery' &&
+                                    controllerOrderModel.cashOnPickupAmount != null &&
+                                    controllerOrderModel.cashOnPickupAmount! > 0 &&
+                                    (controllerOrderModel.orderStatus == 'accepted' ||
+                                     controllerOrderModel.orderStatus == 'confirmed' ||
+                                     controllerOrderModel.orderStatus == 'processing' ||
+                                     controllerOrderModel.orderStatus == 'handover'))
+                                  Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeDefault),
+                                    padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          Colors.amber.shade800,
+                                          Colors.amber.shade600,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.amber.withValues(alpha: 0.3),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.payments_outlined,
+                                          color: Colors.white,
+                                          size: 28,
+                                        ),
+                                        const SizedBox(width: Dimensions.paddingSizeSmall),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'pago_en_recoleccion'.tr,
+                                                style: robotoBold.copyWith(
+                                                  color: Colors.white,
+                                                  fontSize: Dimensions.fontSizeLarge,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              RichText(
+                                                text: TextSpan(
+                                                  children: [
+                                                    TextSpan(
+                                                      text: 'deberas_pagar_al_restaurante'.tr,
+                                                      style: robotoRegular.copyWith(
+                                                        color: Colors.white.withValues(alpha: 0.9),
+                                                        fontSize: Dimensions.fontSizeDefault,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text: ' ${PriceConverterHelper.convertPrice(controllerOrderModel.cashOnPickupAmount)} ',
+                                                      style: robotoBold.copyWith(
+                                                        color: Colors.white,
+                                                        fontSize: Dimensions.fontSizeDefault,
+                                                        fontWeight: FontWeight.w900,
+                                                      ),
+                                                    ),
+                                                    TextSpan(
+                                                      text: 'en_efectivo_al_recoger_el_pedido'.tr,
+                                                      style: robotoRegular.copyWith(
+                                                        color: Colors.white.withValues(alpha: 0.9),
+                                                        fontSize: Dimensions.fontSizeDefault,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
                                 InfoCardWidget(
-                                  title: parcel
-                                      ? 'sender_details'.tr
-                                      : 'store_details'.tr,
-                                  address: parcel
+                                  title: isTaxi 
+                                      ? 'Detalles del Pasajero'
+                                      : (parcel
+                                          ? 'sender_details'.tr
+                                          : 'store_details'.tr),
+                                  address: parcel || isTaxi
                                       ? controllerOrderModel.deliveryAddress
                                       : DeliveryAddress(
                                           address:
                                               controllerOrderModel.storeAddress,
                                         ),
-                                  image: parcel
+                                  image: parcel || isTaxi
                                       ? ''
                                       : '${controllerOrderModel.storeLogoFullUrl}',
-                                  name: parcel
-                                      ? controllerOrderModel
-                                            .deliveryAddress!
-                                            .contactPersonName
-                                      : controllerOrderModel.storeName,
-                                  phone: parcel
+                                  name: isTaxi 
+                                      ? (controllerOrderModel.customer?.fName != null ? '${controllerOrderModel.customer?.fName} ${controllerOrderModel.customer?.lName ?? ''}'.trim() : 'Pasajero')
+                                      : (parcel
+                                          ? controllerOrderModel
+                                                .deliveryAddress!
+                                                .contactPersonName
+                                          : controllerOrderModel.storeName),
+                                  phone: parcel || isTaxi
                                       ? controllerOrderModel
                                             .deliveryAddress!
                                             .contactPersonNumber
@@ -928,6 +1037,28 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                                       ),
                                                     ],
                                                   ),
+                                                  if (controllerOrderModel.parcelDeclaredValue != null && controllerOrderModel.parcelDeclaredValue! > 0) ...[
+                                                    const SizedBox(height: Dimensions.paddingSizeSmall),
+                                                    Divider(color: Theme.of(context).disabledColor.withValues(alpha: 0.3)),
+                                                    const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        Text('declared_value'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor)),
+                                                        Text(PriceConverterHelper.convertPrice(controllerOrderModel.parcelDeclaredValue), style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                  if (controllerOrderModel.parcelInsuranceFee != null && controllerOrderModel.parcelInsuranceFee! > 0) ...[
+                                                    const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                                                    Row(
+                                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                      children: [
+                                                        Text('insurance_fee'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor)),
+                                                        Text(PriceConverterHelper.convertPrice(controllerOrderModel.parcelInsuranceFee), style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+                                                      ],
+                                                    ),
+                                                  ],
                                                 ],
                                               )
                                             : SizedBox(
@@ -1008,6 +1139,8 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                                           ],
                                         ),
                                       ),
+                                 if (parcel && controllerOrderModel.parcelCategory?.buyAndDeliver == true && isDelivered != true)
+                                   ParcelReceiptUploadWidget(order: controllerOrderModel, orderController: orderController),
                                 SizedBox(
                                   height:
                                       parcel && order.parcelCancellation != null
@@ -1750,6 +1883,12 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
                       ]) : const SizedBox(),
                       (order.additionalCharge != null && order.additionalCharge! > 0) ? const SizedBox(height: 10) : const SizedBox(),
 
+                      parcel && (order.parcelInsuranceFee ?? 0) > 0 ? Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                        Text('insurance_fee'.tr, style: robotoRegular),
+                        Text('(+) ${PriceConverterHelper.convertPrice(order.parcelInsuranceFee)}', style: robotoRegular),
+                      ]) : const SizedBox(),
+                      parcel && (order.parcelInsuranceFee ?? 0) > 0 ? const SizedBox(height: 10) : const SizedBox(),
+
                       (tax! == 0) || taxIncluded ? const SizedBox() : Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                         Text('vat_tax'.tr, style: robotoRegular),
                         Text('(+) ${PriceConverterHelper.convertPrice(tax)}', style: robotoRegular),
@@ -1858,6 +1997,469 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
     );
   }
 
+  Widget _buildCanceledOrderView(
+    BuildContext context,
+    OrderController orderController,
+    OrderModel controllerOrderModel,
+    bool parcel,
+    OrderModel order,
+    bool showChatPermission,
+    bool isDelivered,
+  ) {
+    return Column(
+      children: [
+        // 1. id pedido - estado
+        Row(
+          children: [
+            Text(
+              '${parcel ? 'delivery_id'.tr : 'order_id'.tr}:',
+              style: robotoRegular,
+            ),
+            const SizedBox(
+              width: Dimensions.paddingSizeExtraSmall,
+            ),
+            Text(
+              controllerOrderModel.id.toString(),
+              style: robotoBold,
+            ),
+            const SizedBox(
+              width: Dimensions.paddingSizeExtraSmall,
+            ),
+            const Expanded(child: SizedBox()),
+            Container(
+              height: 7,
+              width: 7,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(
+              width: Dimensions.paddingSizeExtraSmall,
+            ),
+            Text(
+              controllerOrderModel.orderStatus!.tr,
+              style: robotoBold,
+            ),
+          ],
+        ),
+        const SizedBox(height: Dimensions.paddingSizeLarge),
+
+        _buildFailedDeliveryInstructionCard(context, controllerOrderModel),
+
+        // 2. horario
+        parcel &&
+                order.orderStatus ==
+                    AppConstants.canceled &&
+                !(order
+                        .parcelCancellation
+                        ?.beforePickup ==
+                    1)
+            ? Row(
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'return_date_and_time'.tr,
+                    style: robotoRegular,
+                  ),
+                  Text(
+                    order
+                                .parcelCancellation
+                                ?.returnDate !=
+                            null
+                        ? DateConverterHelper.dateTimeStringToDateTime(
+                            order
+                                .parcelCancellation!
+                                .returnDate!,
+                          )
+                        : 'not_set_yet'.tr,
+                    style: robotoRegular,
+                  ),
+                ],
+              )
+            : const SizedBox(),
+
+        controllerOrderModel.scheduleAt!.isNotEmpty &&
+                controllerOrderModel.scheduleAt != null
+            ? Column(
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '${'schedule'.tr} ',
+                        style: robotoRegular,
+                      ),
+                      const Expanded(child: SizedBox()),
+                      Text(
+                        DateConverterHelper.dateTimeStringToDateTime(
+                          controllerOrderModel
+                              .scheduleAt!,
+                        ),
+                        style: robotoRegular,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(
+                    height: Dimensions.paddingSizeLarge,
+                  ),
+                ],
+              )
+            : const SizedBox(),
+
+        SizedBox(
+          height:
+              parcel &&
+                  order.orderStatus ==
+                      AppConstants.canceled &&
+                  !(order
+                          .parcelCancellation
+                          ?.beforePickup ==
+                      1)
+                  ? Dimensions.paddingSizeLarge
+                  : 0,
+        ),
+
+        // 3. detalles de la tienda / pasajero
+        InfoCardWidget(
+          title: (controllerOrderModel.moduleType == 'taxi')
+              ? 'Detalles del Pasajero'
+              : (parcel
+                  ? 'sender_details'.tr
+                  : 'store_details'.tr),
+          address: parcel || (controllerOrderModel.moduleType == 'taxi')
+              ? controllerOrderModel.deliveryAddress
+              : DeliveryAddress(
+                  address:
+                      controllerOrderModel.storeAddress,
+                ),
+          image: parcel || (controllerOrderModel.moduleType == 'taxi')
+              ? ''
+              : '${controllerOrderModel.storeLogoFullUrl}',
+          name: (controllerOrderModel.moduleType == 'taxi')
+              ? (controllerOrderModel.customer?.fName != null ? '${controllerOrderModel.customer?.fName} ${controllerOrderModel.customer?.lName ?? ''}'.trim() : 'Pasajero')
+              : (parcel
+                  ? controllerOrderModel
+                        .deliveryAddress!
+                        .contactPersonName
+                  : controllerOrderModel.storeName),
+          phone: parcel || (controllerOrderModel.moduleType == 'taxi')
+              ? controllerOrderModel
+                    .deliveryAddress!
+                    .contactPersonNumber
+              : controllerOrderModel.storePhone,
+          latitude: parcel
+              ? controllerOrderModel
+                    .deliveryAddress!
+                    .latitude
+              : controllerOrderModel.storeLat,
+          longitude: parcel
+              ? controllerOrderModel
+                    .deliveryAddress!
+                    .longitude
+              : controllerOrderModel.storeLng,
+          showButton: false,
+          isStore: !parcel,
+          isChatAllow: false,
+          showCallButton: false,
+          messageOnTap: () {},
+          order: order,
+        ),
+        const SizedBox(height: Dimensions.paddingSizeLarge),
+
+        // 4. detalles de contacto del cliente
+        InfoCardWidget(
+          title: parcel
+              ? 'receiver_details'.tr
+              : 'customer_contact_details'.tr,
+          address: parcel
+              ? controllerOrderModel.receiverDetails
+              : controllerOrderModel.deliveryAddress,
+          image: parcel
+              ? ''
+              : controllerOrderModel.customer != null
+              ? '${controllerOrderModel.customer!.imageFullUrl}'
+              : '',
+          name: parcel
+              ? controllerOrderModel
+                    .receiverDetails!
+                    .contactPersonName
+              : controllerOrderModel
+                    .deliveryAddress!
+                    .contactPersonName,
+          phone: parcel
+              ? controllerOrderModel
+                    .receiverDetails!
+                    .contactPersonNumber
+              : controllerOrderModel
+                    .deliveryAddress!
+                    .contactPersonNumber,
+          latitude: parcel
+              ? controllerOrderModel
+                    .receiverDetails!
+                    .latitude
+              : controllerOrderModel
+                    .deliveryAddress!
+                    .latitude,
+          longitude: parcel
+              ? controllerOrderModel
+                    .receiverDetails!
+                    .longitude
+              : controllerOrderModel
+                    .deliveryAddress!
+                    .longitude,
+          showButton: false,
+          isStore: !parcel,
+          isChatAllow: false,
+          showCallButton: false,
+          messageOnTap: () {},
+          order: order,
+        ),
+        const SizedBox(height: Dimensions.paddingSizeLarge),
+
+        // 5. informacion del articulo
+        parcel
+            ? Container(
+                padding: const EdgeInsets.all(
+                  Dimensions.paddingSizeSmall,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(
+                    Dimensions.radiusSmall,
+                  ),
+                  boxShadow: Get.isDarkMode
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.grey[200]!,
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                          ),
+                        ],
+                ),
+                child:
+                    controllerOrderModel
+                            .parcelCategory !=
+                        null
+                    ? Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'parcel_category'.tr,
+                            style: robotoBold,
+                          ),
+                          const SizedBox(
+                            height: Dimensions
+                                .paddingSizeExtraSmall,
+                          ),
+                          Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius:
+                                    BorderRadius.circular(
+                                      Dimensions
+                                          .radiusSmall,
+                                    ),
+                                child: CustomImageWidget(
+                                  image:
+                                      '${controllerOrderModel.parcelCategory!.imageFullUrl}',
+                                  height: 35,
+                                  width: 35,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              const SizedBox(
+                                width: Dimensions
+                                    .paddingSizeSmall,
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment
+                                          .start,
+                                  children: [
+                                    Text(
+                                      controllerOrderModel
+                                          .parcelCategory!
+                                          .name!,
+                                      maxLines: 1,
+                                      overflow:
+                                          TextOverflow
+                                              .ellipsis,
+                                      style: robotoRegular
+                                          .copyWith(
+                                            fontSize:
+                                                Dimensions
+                                                    .fontSizeSmall,
+                                          ),
+                                    ),
+                                    Text(
+                                      controllerOrderModel
+                                          .parcelCategory!
+                                          .description!,
+                                      maxLines: 1,
+                                      overflow:
+                                          TextOverflow
+                                              .ellipsis,
+                                      style: robotoRegular.copyWith(
+                                        fontSize: Dimensions
+                                            .fontSizeSmall,
+                                        color: Theme.of(
+                                          context,
+                                        ).disabledColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : SizedBox(
+                        width: context.width,
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'parcel_category'.tr,
+                              style: robotoRegular,
+                            ),
+                            const SizedBox(
+                              height: Dimensions
+                                  .paddingSizeExtraSmall,
+                            ),
+                            Text(
+                              'no_parcel_category_data_found'
+                                  .tr,
+                              style: robotoMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+              )
+            : Container(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).cardColor,
+                  borderRadius: BorderRadius.circular(
+                    Dimensions.radiusSmall,
+                  ),
+                  boxShadow: Get.isDarkMode
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: Colors.grey[200]!,
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                          ),
+                        ],
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
+                child: Column(
+                  spacing: 10,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'item_info'.tr,
+                      style: robotoBold.copyWith(
+                        fontSize:
+                            Dimensions.fontSizeDefault,
+                      ),
+                    ),
+                    ListView.separated(
+                      shrinkWrap: true,
+                      physics:
+                          const NeverScrollableScrollPhysics(),
+                      itemCount: orderController
+                          .orderDetailsModel!
+                          .length,
+                      itemBuilder: (context, index) {
+                        return OrderItemWidget(
+                          order: controllerOrderModel,
+                          orderDetails: orderController
+                              .orderDetailsModel![index],
+                        );
+                      },
+                      separatorBuilder:
+                          (context, index) {
+                            return const Divider(height: 25);
+                          },
+                    ),
+                  ],
+                ),
+              ),
+        const SizedBox(height: Dimensions.paddingSizeLarge),
+
+        // 6. ganancia neta por este viaje
+        Container(
+          padding: const EdgeInsets.all(
+            Dimensions.paddingSizeSmall,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(
+              Dimensions.radiusSmall,
+            ),
+            boxShadow: Get.isDarkMode
+                ? null
+                : [
+                    BoxShadow(
+                      color: Colors.grey[200]!,
+                      spreadRadius: 1,
+                      blurRadius: 5,
+                    ),
+                  ],
+          ),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              Text(
+                'ganancia_neta_por_este_viaje'.tr,
+                style: robotoBold.copyWith(
+                  fontSize: Dimensions.fontSizeDefault,
+                ),
+              ),
+              const SizedBox(
+                height: Dimensions.paddingSizeSmall,
+              ),
+              Row(
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'ganancia_limpia_envio_propina'.tr,
+                    style: robotoRegular,
+                  ),
+                  Text(
+                    PriceConverterHelper.convertPrice(
+                      (order.deliveryCharge ?? 0) +
+                          (order.dmTips ?? 0),
+                    ),
+                    style: robotoMedium.copyWith(
+                      fontSize:
+                          Dimensions.fontSizeLarge,
+                      color: Theme.of(
+                        context,
+                      ).primaryColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   void openDialog(BuildContext context, String imageUrl) => showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -1890,4 +2492,292 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen>
       );
     },
   );
+
+  Widget _buildFailedDeliveryInstructionCard(BuildContext context, OrderModel order) {
+    final status = order.orderStatus?.toLowerCase() ?? '';
+    final isNotReceived = status == 'returned' || status == 'failed' || status == 'canceled';
+    
+    // Solo mostrar si el pedido no fue recibido (devuelto, fallido o cancelado)
+    if (!isNotReceived) {
+      return const SizedBox();
+    }
+
+    final action = order.failedDeliveryAction?.toLowerCase() ?? 'return';
+    final isDonation = action == 'donation' || action == 'donate';
+    
+    final Color cardColor = isDonation ? const Color(0xFFE0F2F1) : const Color(0xFFFFF8E1);
+    final Color borderColor = isDonation ? const Color(0xFF4DB6AC) : const Color(0xFFFFD54F);
+    final Color textColor = isDonation ? const Color(0xFF004D40) : const Color(0xFFFF8F00);
+    final Color iconColor = isDonation ? Colors.teal : Colors.amber.shade800;
+    final IconData icon = isDonation ? Icons.volunteer_activism : Icons.assignment_return;
+    
+    final String title = isDonation ? 'Instrucción del Administrador: Donación' : 'Instrucción del Administrador: Retornar a Tienda';
+    final String instructionText = isDonation
+        ? 'El cliente no recibió el pedido. El administrador ha decidido que este pedido sea DONADO. Por favor, dona los productos a una persona o institución que lo necesite. No es necesario regresarlo a la tienda.'
+        : 'El cliente no recibió el pedido. Por favor, regresa los productos a la tienda o restaurante de origen: ${order.storeName ?? "la tienda"}.';
+    
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: Dimensions.paddingSizeLarge),
+      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+        border: Border.all(color: borderColor, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: iconColor.withValues(alpha: 0.1),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: iconColor, size: 26),
+              const SizedBox(width: Dimensions.paddingSizeSmall),
+              Expanded(
+                child: Text(
+                  title,
+                  style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge, color: textColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Dimensions.paddingSizeSmall),
+          Text(
+            instructionText,
+            style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeDefault, color: textColor.withValues(alpha: 0.85), height: 1.4),
+          ),
+          if (order.failedDeliveryInstruction != null && order.failedDeliveryInstruction!.trim().isNotEmpty) ...[
+            const SizedBox(height: Dimensions.paddingSizeSmall),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                border: Border.all(color: borderColor.withValues(alpha: 0.5), width: 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Instrucciones especiales del Administrador:',
+                    style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall, color: textColor),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    order.failedDeliveryInstruction!,
+                    style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: textColor),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class ParcelReceiptUploadWidget extends StatelessWidget {
+  final OrderModel order;
+  final OrderController orderController;
+  const ParcelReceiptUploadWidget({super.key, required this.order, required this.orderController});
+
+  @override
+  Widget build(BuildContext context) {
+    bool hasUploaded = order.parcelReceiptPhotos != null && order.parcelReceiptPhotos!.isNotEmpty;
+    bool hasPending = orderController.pickedReceiptPhotos.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(top: Dimensions.paddingSizeLarge),
+      padding: const EdgeInsets.all(Dimensions.paddingSizeSmall),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+        boxShadow: Get.isDarkMode ? null : [
+          BoxShadow(
+            color: Colors.grey[200]!,
+            spreadRadius: 1,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('receipt_images'.tr, style: robotoBold),
+              Text('receipt_photo_limit'.tr, style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Theme.of(context).disabledColor)),
+            ],
+          ),
+          const SizedBox(height: Dimensions.paddingSizeSmall),
+
+          if (hasUploaded) ...[
+            Text('receipt_photos'.tr, style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+            const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+            SizedBox(
+              height: 80,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: order.parcelReceiptPhotos!.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: Dimensions.paddingSizeSmall),
+                    child: InkWell(
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => Dialog(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                              child: CustomImageWidget(
+                                image: order.parcelReceiptPhotos![index],
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                        child: CustomImageWidget(
+                          image: order.parcelReceiptPhotos![index],
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: Dimensions.paddingSizeSmall),
+          ],
+
+          Text('add_receipt_photo'.tr, style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall)),
+          const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                ...List.generate(orderController.pickedReceiptPhotos.length, (index) {
+                  return Stack(
+                    children: [
+                      Container(
+                        margin: const EdgeInsets.only(right: Dimensions.paddingSizeSmall),
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                          image: DecorationImage(
+                            image: FileImage(File(orderController.pickedReceiptPhotos[index].path)),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 0,
+                        right: 8,
+                        child: InkWell(
+                          onTap: () => orderController.removeReceiptPhotoAt(index),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(Icons.close, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+
+                if (orderController.pickedReceiptPhotos.length < 3)
+                  InkWell(
+                    onTap: () {
+                      Get.bottomSheet(
+                        Container(
+                          color: Theme.of(context).cardColor,
+                          padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('select_receipt_photos'.tr, style: robotoBold),
+                              const SizedBox(height: Dimensions.paddingSizeLarge),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  InkWell(
+                                    onTap: () {
+                                      Get.back();
+                                      orderController.pickReceiptPhoto(isCamera: true, isRemove: false);
+                                    },
+                                    child: Column(
+                                      children: [
+                                        const Icon(Icons.camera_alt, size: 40),
+                                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                                        Text('camera'.tr, style: robotoMedium),
+                                      ],
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: () {
+                                      Get.back();
+                                      orderController.pickReceiptPhoto(isCamera: false, isRemove: false);
+                                    },
+                                    child: Column(
+                                      children: [
+                                        const Icon(Icons.photo, size: 40),
+                                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                                        Text('gallery'.tr, style: robotoMedium),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: Dimensions.paddingSizeLarge),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Theme.of(context).primaryColor, style: BorderStyle.solid),
+                        borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                      ),
+                      child: Icon(Icons.camera_alt, color: Theme.of(context).primaryColor),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          if (hasPending) ...[
+            const SizedBox(height: Dimensions.paddingSizeDefault),
+            CustomButtonWidget(
+              isLoading: orderController.isLoading,
+              buttonText: 'upload_receipt'.tr,
+              onPressed: () {
+                orderController.uploadReceiptPhotos(order.id!);
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

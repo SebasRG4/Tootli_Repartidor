@@ -91,6 +91,12 @@ class OrderModel {
 
   /// URL pública `/rastreo-orden/tootli-directo/...` (invitado): el chat del cliente está en la web.
   String? customerTrackingUrl;
+  double? cashOnPickupAmount;
+  String? failedDeliveryAction;
+  String? failedDeliveryInstruction;
+  double? parcelDeclaredValue;
+  double? parcelInsuranceFee;
+  List<String>? parcelReceiptPhotos;
 
   OrderModel({
     this.id,
@@ -149,6 +155,12 @@ class OrderModel {
     this.bringChangeAmount,
     this.tootliDirectTrackable,
     this.customerTrackingUrl,
+    this.cashOnPickupAmount,
+    this.failedDeliveryAction,
+    this.failedDeliveryInstruction,
+    this.parcelDeclaredValue,
+    this.parcelInsuranceFee,
+    this.parcelReceiptPhotos,
   });
 
   /// Hay enlace público de seguimiento (misma página donde el invitado chatea).
@@ -240,6 +252,21 @@ class OrderModel {
     final dynamic ct = json['customer_tracking_url'];
     final String ctStr = ct?.toString().trim() ?? '';
     customerTrackingUrl = ctStr.isEmpty ? null : ctStr;
+    cashOnPickupAmount = json['cash_on_pickup_amount']?.toDouble();
+    failedDeliveryInstruction = json['failed_delivery_instruction'];
+    parcelDeclaredValue = json['parcel_declared_value']?.toDouble();
+    parcelInsuranceFee = json['parcel_insurance_fee']?.toDouble();
+    if (json['parcel_receipt_photos_full_url'] != null) {
+      parcelReceiptPhotos = [];
+      json['parcel_receipt_photos_full_url'].forEach((v) {
+        parcelReceiptPhotos!.add(v.toString());
+      });
+    } else if (json['parcel_receipt_photos'] != null) {
+      parcelReceiptPhotos = [];
+      json['parcel_receipt_photos'].forEach((v) {
+        parcelReceiptPhotos!.add(v.toString());
+      });
+    }
   }
 
   Map<String, dynamic> toJson() {
@@ -311,6 +338,12 @@ class OrderModel {
     data['bring_change_amount'] = bringChangeAmount;
     data['tootli_direct_trackable'] = tootliDirectTrackable;
     data['customer_tracking_url'] = customerTrackingUrl;
+    data['cash_on_pickup_amount'] = cashOnPickupAmount;
+    data['failed_delivery_action'] = failedDeliveryAction;
+    data['failed_delivery_instruction'] = failedDeliveryInstruction;
+    data['parcel_declared_value'] = parcelDeclaredValue;
+    data['parcel_insurance_fee'] = parcelInsuranceFee;
+    data['parcel_receipt_photos'] = parcelReceiptPhotos;
     return data;
   }
 }
@@ -441,6 +474,7 @@ class ParcelCategory {
   String? description;
   String? createdAt;
   String? updatedAt;
+  bool? buyAndDeliver;
 
   ParcelCategory({
     this.id,
@@ -449,6 +483,7 @@ class ParcelCategory {
     this.description,
     this.createdAt,
     this.updatedAt,
+    this.buyAndDeliver,
   });
 
   ParcelCategory.fromJson(Map<String, dynamic> json) {
@@ -458,6 +493,8 @@ class ParcelCategory {
     description = json['description'];
     createdAt = json['created_at'];
     updatedAt = json['updated_at'];
+    final dynamic bd = json['buy_and_deliver'];
+    buyAndDeliver = bd == 1 || bd == '1' || bd == true;
   }
 
   Map<String, dynamic> toJson() {
@@ -468,6 +505,7 @@ class ParcelCategory {
     data['description'] = description;
     data['created_at'] = createdAt;
     data['updated_at'] = updatedAt;
+    data['buy_and_deliver'] = buyAndDeliver;
     return data;
   }
 }

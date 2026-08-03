@@ -142,6 +142,15 @@ class OrderNotificationService {
     }
   }
 
+  /// Libera los orderIds de un grupo rechazado/ignorado del dedup interno,
+  /// para que la siguiente reoferta del backend (mismos IDs) no quede bloqueada.
+  void releaseOrderIds(Set<int> orderIds) {
+    _processedOrderIds.removeWhere((id) => orderIds.contains(id));
+    debugPrint(
+      "[OrderNotifService] 🔓 releaseOrderIds: limpiados $orderIds de processedOrderIds",
+    );
+  }
+
   /// Sólo para usar en tests unitarios. Limpia el estado interno del singleton.
   /// NO llamar en código de producción.
   // ignore: invalid_use_of_visible_for_testing_member

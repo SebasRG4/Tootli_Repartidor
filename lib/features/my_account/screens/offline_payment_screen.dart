@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_app_bar_widget.dart';
 import 'package:sixam_mart_delivery/common/widgets/custom_button_widget.dart';
@@ -22,13 +23,37 @@ class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
   final Map<String, TextEditingController> _controllers = {};
   final TextEditingController _amountController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  String _generatedReference = '';
 
   @override
   void initState() {
     super.initState();
     _amountController.text = widget.amount.toStringAsFixed(2);
+
+    // Generar número de referencia único: TT + ID Repartidor + bloque de timestamp corto
+    final profileController = Get.find<ProfileController>();
+    final int dmId = profileController.profileModel?.id ?? 0;
+    final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    final String shortTime = timestamp.length > 5 ? timestamp.substring(timestamp.length - 5) : timestamp;
+    _generatedReference = 'TT-$dmId-$shortTime';
+
     for (var info in widget.method.methodInformations!) {
-      _controllers[info.customerInput!] = TextEditingController();
+      final controller = TextEditingController();
+      _controllers[info.customerInput!] = controller;
+
+      // Auto-llenar campos de referencia, concepto o transacción para agilizar el flujo
+      final inputLower = info.customerInput!.toLowerCase();
+      final placeholderLower = info.customerPlaceholder!.toLowerCase();
+      if (inputLower.contains('ref') ||
+          inputLower.contains('concept') ||
+          inputLower.contains('transac') ||
+          inputLower.contains('id') ||
+          placeholderLower.contains('ref') ||
+          placeholderLower.contains('concept') ||
+          placeholderLower.contains('transac') ||
+          placeholderLower.contains('id')) {
+        controller.text = _generatedReference;
+      }
     }
   }
 
@@ -98,6 +123,63 @@ class _OfflinePaymentScreenState extends State<OfflinePaymentScreen> {
                       inputType: TextInputType.number,
                       isRequired: true,
                       showTitle: true,
+                    ),
+                    const SizedBox(height: Dimensions.paddingSizeLarge),
+
+                    // Tarjeta de Referencia Sugerida
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(Dimensions.paddingSizeDefault),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(Dimensions.radiusDefault),
+                        border: Border.all(color: Theme.of(context).primaryColor.withOpacity(0.15)),
+                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(
+                          'Referencia sugerida para SPEI / Transferencia:',
+                          style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).disabledColor),
+                        ),
+                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                        Row(children: [
+                          Expanded(
+                            child: SelectableText(
+                              _generatedReference,
+                              style: robotoBold.copyWith(
+                                fontSize: Dimensions.fontSizeExtraLarge,
+                                color: Theme.of(context).primaryColor,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: _generatedReference));
+                              showCustomSnackBar('Referencia copiada al portapapeles', isError: false);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: Dimensions.paddingSizeSmall, vertical: Dimensions.paddingSizeExtraSmall),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).primaryColor,
+                                borderRadius: BorderRadius.circular(Dimensions.radiusSmall),
+                              ),
+                              child: Row(children: [
+                                const Icon(Icons.copy, size: 14, color: Colors.white),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Copiar',
+                                  style: robotoMedium.copyWith(fontSize: Dimensions.fontSizeExtraSmall, color: Colors.white),
+                                ),
+                              ]),
+                            ),
+                          ),
+                        ]),
+                        const SizedBox(height: Dimensions.paddingSizeExtraSmall),
+                        Text(
+                          'Coloca esta clave como "Concepto de pago" en tu app bancaria para que tu depósito sea aprobado en minutos.',
+                          style: robotoRegular.copyWith(fontSize: 10, color: Theme.of(context).disabledColor),
+                        ),
+                      ]),
                     ),
                     const SizedBox(height: Dimensions.paddingSizeLarge),
 

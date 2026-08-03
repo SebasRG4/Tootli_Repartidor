@@ -50,6 +50,7 @@ class ConfigModel {
   ParcelReturnTimeFee? parcelReturnTimeFee;
   DmLoyalityPointData? dmLoyalityPointData;
   DmReferralData? dmReferralData;
+  String? plivoProxyPhone;
 
   ConfigModel({
     this.businessName,
@@ -103,6 +104,7 @@ class ConfigModel {
     this.parcelReturnTimeFee,
     this.dmLoyalityPointData,
     this.dmReferralData,
+    this.plivoProxyPhone,
   });
 
   ConfigModel.fromJson(Map<String, dynamic> json) {
@@ -168,6 +170,7 @@ class ConfigModel {
     parcelReturnTimeFee = json['parcel_return_time_fee'] != null ? ParcelReturnTimeFee.fromJson(json['parcel_return_time_fee']) : null;
     dmLoyalityPointData = json['dm_loyality_point_data'] != null ? DmLoyalityPointData.fromJson(json['dm_loyality_point_data']) : null;
     dmReferralData = json['dm_referral_data'] != null ? DmReferralData.fromJson(json['dm_referral_data']) : null;
+    plivoProxyPhone = json['plivo_proxy_phone'];
   }
 
   Map<String, dynamic> toJson() {
@@ -239,6 +242,7 @@ class ConfigModel {
     if (dmReferralData != null) {
       data['dm_referral_data'] = dmReferralData!.toJson();
     }
+    data['plivo_proxy_phone'] = plivoProxyPhone;
     return data;
   }
 }

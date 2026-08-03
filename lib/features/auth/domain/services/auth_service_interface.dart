@@ -6,7 +6,9 @@ import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_resu
 import 'package:sixam_mart_delivery/features/auth/domain/models/vehicle_model.dart';
 
 abstract class AuthServiceInterface {
-  Future<Response> login(String phone, String password);
+  Future<Response> login(String phone, String password, {String? deviceId});
+  Future<Response> sendOtp(String phone);
+  Future<Response> verifyOtp(String phone, String otp, {String? deviceId});
   Future<Response> updateToken();
   Future<bool> saveUserToken(String token, String zoneTopic, String vehicleWiseTopic);
   String getUserToken();
@@ -34,6 +36,6 @@ abstract class AuthServiceInterface {
   /// Identidad u otras imágenes desde galería o cámara (máx. ~2 MB).
   Future<XFile?> pickImageFromSource(ImageSource source);
 
-  /// Selfie con cámara frontal + fondo Tootli (solo móvil).
-  Future<XFile?> pickDeliveryProfileSelfie();
+  Future<Response> requestDeviceMigrationOtp(String phone, String password);
+  Future<Response> verifyDeviceMigration(String phone, String password, String otp, String deviceId);
 }

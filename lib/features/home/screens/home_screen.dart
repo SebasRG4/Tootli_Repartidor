@@ -10,6 +10,7 @@ import 'dart:ui' as ui;
 import 'dart:typed_data';
 import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
+import 'package:sixam_mart_delivery/features/home/controllers/home_controller.dart';
 import 'package:sixam_mart_delivery/features/notification/controllers/notification_controller.dart';
 import 'package:sixam_mart_delivery/features/profile/controllers/profile_controller.dart';
 import 'package:sixam_mart_delivery/helper/price_converter_helper.dart';
@@ -39,6 +40,7 @@ class HomeScreen extends StatefulWidget {
     this.onNavigateToOrders,
     this.onTapMenu,
     this.onOrderActiveStatusChanged,
+    this.onOrderDismissed,
   });
 
   /// Registro con `application_status` pending (revisión inicial o correcciones del admin).
@@ -46,6 +48,7 @@ class HomeScreen extends StatefulWidget {
   final Function()? onNavigateToOrders;
   final Function()? onTapMenu;
   final Function(bool isActive)? onOrderActiveStatusChanged;
+  final Function(int? orderId, String? transactionRef)? onOrderDismissed;
 
   @override
   State<HomeScreen> createState() => HomeScreenState();
@@ -53,14 +56,8 @@ class HomeScreen extends StatefulWidget {
 
 class HomeScreenState extends State<HomeScreen> {
   late final AppLifecycleListener _listener;
-  bool _isNotificationPermissionGranted = true;
-  bool _isBatteryOptimizationGranted = true;
   GoogleMapController? _mapController;
   Timer? _gridTimer;
-  double _currentZoom = 16;
-  final Set<Polygon> _polygons = {};
-  final Set<Marker> _markers = {};
-  final Set<Polyline> _polylines = {};
   Timer? _routeOptimizationTimer;
   List<OrderModel> _activeOrders = [];
   OrderModel?
@@ -84,6 +81,15 @@ class HomeScreenState extends State<HomeScreen> {
   Uint8List? _cachedStoreMarker;
   Uint8List? _cachedDestinationMarker;
   StreamSubscription? _notificationSubscription;
+
+  bool _isTrafficEnabled = false;
+  bool get isTrafficEnabled => _isTrafficEnabled;
+
+  void toggleTraffic() {
+    setState(() {
+      _isTrafficEnabled = !_isTrafficEnabled;
+    });
+  }
 
   @override
   void initState() {
@@ -271,9 +277,8 @@ class HomeScreenState extends State<HomeScreen> {
         _activeOrders.removeAt(0);
         if (_activeOrders.isEmpty) {
           _orderPhase = 'none';
-          _polylines.clear();
-          _markers.clear();
-        }
+          Get.find<HomeController>().clearMapData();
+          }
       });
       if (_activeOrders.isEmpty) widget.onOrderActiveStatusChanged?.call(false);
       return;
@@ -304,26 +309,20 @@ class HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     if (notificationStatus.isDenied || notificationStatus.isPermanentlyDenied) {
-      setState(() {
-        _isNotificationPermissionGranted = false;
-        _isBatteryOptimizationGranted = true;
-      });
+      Get.find<HomeController>().setNotificationPermissionGranted(false);
+      Get.find<HomeController>().setBatteryOptimizationGranted(true);
 
       await Get.find<AuthController>().setNotificationActive(
         !notificationStatus.isDenied,
       );
     } else if (batteryStatus.isDenied) {
-      setState(() {
-        _isBatteryOptimizationGranted = false;
-        _isNotificationPermissionGranted = true;
-      });
+      Get.find<HomeController>().setBatteryOptimizationGranted(false);
+      Get.find<HomeController>().setNotificationPermissionGranted(true);
     } else if (overlayStatus.isDenied && GetPlatform.isAndroid) {
       // Opcional: manejar estado de superposición
     } else {
-      setState(() {
-        _isNotificationPermissionGranted = true;
-        _isBatteryOptimizationGranted = true;
-      });
+      Get.find<HomeController>().setNotificationPermissionGranted(true);
+      Get.find<HomeController>().setBatteryOptimizationGranted(true);
       Get.find<ProfileController>().setBackgroundNotificationActive(true);
     }
 
@@ -358,12 +357,13 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void _getPolygons(List<ZoneModel> zoneList) {
-    _polygons.clear();
+    final homeController = Get.find<HomeController>();
+    Set<Polygon> newPolygons = {};
     int? profileZoneId = Get.find<ProfileController>().profileModel?.zoneId;
 
     for (var zone in zoneList) {
       if (zone.coordinates != null && zone.coordinates!.coordinates != null) {
-        _polygons.add(
+        newPolygons.add(
           Polygon(
             polygonId: PolygonId('zone_${zone.id}'),
             points: zone.coordinates!.coordinates!,
@@ -378,6 +378,7 @@ class HomeScreenState extends State<HomeScreen> {
         );
       }
     }
+    homeController.setPolygons(newPolygons);
   }
 
   @override
@@ -398,8 +399,9 @@ class HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: null,
 
-      body: GetBuilder<OrderController>(
-        builder: (orderController) {
+      body: Builder(
+        builder: (context) {
+          final orderController = Get.find<OrderController>();
           // Lógica para detectar si el pedido que se está solicitando fue tomado por otro repartidor o expiró
           if (_pendingRequest != null &&
               _orderPhase == 'none' &&
@@ -426,8 +428,9 @@ class HomeScreenState extends State<HomeScreen> {
             }
           }
 
-          return GetBuilder<ProfileController>(
-            builder: (profileController) {
+          return Builder(
+            builder: (context) {
+              final profileController = Get.find<ProfileController>();
               // Auto-centro inicial cuando la ubicación llega por primera vez y no hay pedido activo
               if (!_hasCenteredOnLaunch &&
                   profileController.recordLocationBody != null &&
@@ -448,76 +451,75 @@ class HomeScreenState extends State<HomeScreen> {
                 );
               }
 
-              return GetBuilder<AddressController>(
-                builder: (addressController) {
+              return Builder(
+                builder: (context) {
+                  final addressController = Get.find<AddressController>();
                   if (addressController.zoneList != null) {
                     _getPolygons(addressController.zoneList!);
                   }
 
                   return Stack(
                     children: [
-                      GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target:
-                              currentLatLng ??
-                              const LatLng(
-                                19.4326,
-                                -99.1332,
-                              ), // Default to CDMX if location unknown
-                          zoom: 16,
-                        ),
-                        myLocationEnabled: true,
-                        myLocationButtonEnabled: false,
-                        zoomControlsEnabled: false,
-                        polygons: {
-                          ..._polygons,
-                          ...addressController.gridPolygons,
-                        },
-                        markers: {
-                          ..._markers,
-                          if (_currentZoom > 14)
-                            ...addressController.gridMarkers,
-                        },
-                        polylines: _polylines,
-                        padding: EdgeInsets.only(
-                          bottom:
-                              (_activeOrders.isNotEmpty ||
-                                  _pendingRequest != null)
-                              ? 350
-                              : 0,
-                        ),
+                      GetBuilder<HomeController>(
+                        id: 'map',
+                        builder: (homeController) {
+                          return GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target:
+                                  currentLatLng ??
+                                  const LatLng(
+                                    19.4326,
+                                    -99.1332,
+                                  ), // Default to CDMX if location unknown
+                              zoom: 16,
+                            ),
+                            myLocationEnabled: true,
+                            myLocationButtonEnabled: false,
+                            zoomControlsEnabled: false,
+                            trafficEnabled: _isTrafficEnabled,
+                            polygons: {
+                              ...homeController.polygons,
+                              ...addressController.gridPolygons,
+                            },
+                            markers: {
+                              ...homeController.markers,
+                              if (homeController.currentZoom > 14)
+                                ...addressController.gridMarkers,
+                            },
+                            polylines: homeController.polylines,
+                            padding: EdgeInsets.only(
+                              bottom:
+                                  (_activeOrders.isNotEmpty ||
+                                      _pendingRequest != null)
+                                  ? 350
+                                  : 0,
+                            ),
 
-                        onCameraMove: (position) {
-                          // Only trigger setState if we cross the zoom threshold (14.5)
-                          bool wasVisible = _currentZoom > 14.5;
-                          bool isVisible = position.zoom > 14.5;
+                            onCameraMove: (position) {
+                              homeController.setZoom(position.zoom);
+                            },
+                            onMapCreated: (controller) {
+                              _mapController = controller;
+                              _mapController?.setMapStyle(AppConstants.darkStyle);
 
-                          if (wasVisible != isVisible) {
-                            setState(() {
-                              _currentZoom = position.zoom;
-                            });
-                          }
-                        },
-                        onMapCreated: (controller) {
-                          _mapController = controller;
-                          _mapController?.setMapStyle(AppConstants.darkStyle);
-
-                          // Animate to current location once map is ready
-                          if (profileController.recordLocationBody != null) {
-                            _mapController?.animateCamera(
-                              CameraUpdate.newLatLng(
-                                LatLng(
-                                  profileController
-                                      .recordLocationBody!
-                                      .latitude!,
-                                  profileController
-                                      .recordLocationBody!
-                                      .longitude!,
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                              // Animate to current location once map is ready
+                              if (profileController.recordLocationBody != null) {
+                                _mapController?.animateCamera(
+                                  CameraUpdate.newLatLng(
+                                    LatLng(
+                                      profileController
+                                          .recordLocationBody!
+                                          .latitude!,
+                                      profileController
+                                          .recordLocationBody!
+                                          .longitude!,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        }
                       ),
 
                       // Menu Button
@@ -747,7 +749,7 @@ class HomeScreenState extends State<HomeScreen> {
                         },
                       ),
 
-                      if (!_isNotificationPermissionGranted)
+                      if (!Get.find<HomeController>().isNotificationPermissionGranted)
                         Positioned(
                           top: 70,
                           left: 0,
@@ -757,14 +759,12 @@ class HomeScreenState extends State<HomeScreen> {
                             isBatteryPermission: false,
                             onTap: requestNotificationPermission,
                             closeOnTap: () {
-                              setState(() {
-                                _isNotificationPermissionGranted = true;
-                              });
+                              Get.find<HomeController>().setNotificationPermissionGranted(true);
                             },
                           ),
                         ),
 
-                      if (!_isBatteryOptimizationGranted)
+                      if (!Get.find<HomeController>().isBatteryOptimizationGranted)
                         Positioned(
                           top: 70,
                           left: 0,
@@ -774,9 +774,7 @@ class HomeScreenState extends State<HomeScreen> {
                             isBatteryPermission: true,
                             onTap: requestBatteryOptimization,
                             closeOnTap: () {
-                              setState(() {
-                                _isBatteryOptimizationGranted = true;
-                              });
+                              Get.find<HomeController>().setBatteryOptimizationGranted(true);
                             },
                           ),
                         ),
@@ -790,7 +788,9 @@ class HomeScreenState extends State<HomeScreen> {
           );
         },
       ),
-      bottomSheet: (_pendingRequest != null || _activeOrders.isNotEmpty)
+      bottomSheet: GetBuilder<OrderController>(
+        builder: (orderController) {
+          return (_pendingRequest != null || _activeOrders.isNotEmpty)
           ? (_pendingRequest != null
                 ? () {
                     double? storeLat = double.tryParse(
@@ -891,7 +891,9 @@ class HomeScreenState extends State<HomeScreen> {
                       }
                     },
                   ))
-          : null,
+          : const SizedBox();
+        },
+      ),
     );
   }
 
@@ -984,6 +986,8 @@ class HomeScreenState extends State<HomeScreen> {
       Get.find<OrderController>().ignoreOrderApi(targetOrder.id!);
     }
 
+    widget.onOrderDismissed?.call(targetOrder.id, targetOrder.transactionReference);
+
     setState(() {
       if (_pendingRequest?.id == targetOrder.id) {
         _pendingRequest = null;
@@ -992,8 +996,7 @@ class HomeScreenState extends State<HomeScreen> {
 
       if (_activeOrders.isEmpty) {
         _orderPhase = 'none';
-        _polylines.clear();
-        _markers.clear();
+        Get.find<HomeController>().clearMapData();
         _estimatedArrivalTime = null;
         _stopMovementTimer();
         widget.onOrderActiveStatusChanged?.call(false);
@@ -1212,8 +1215,8 @@ class HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    _polylines.clear();
-    _markers.clear();
+    Get.find<HomeController>().clearMapData();
+    
 
     LatLng lastPoint = LatLng(
       Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
@@ -1252,7 +1255,7 @@ class HomeScreenState extends State<HomeScreen> {
       );
 
       setState(() {
-        _polylines.add(
+        Get.find<HomeController>().polylines.add(
           Polyline(
             polylineId: PolylineId('segment_$polylineIndex'),
             points: segmentPoints,
@@ -1263,7 +1266,7 @@ class HomeScreenState extends State<HomeScreen> {
           ),
         );
 
-        _markers.add(
+        Get.find<HomeController>().markers.add(
           Marker(
             markerId: MarkerId(point.id!),
             position: currentPoint,
@@ -1288,7 +1291,7 @@ class HomeScreenState extends State<HomeScreen> {
   bool get isOrderActive => _activeOrders.isNotEmpty || _pendingRequest != null;
 
   void setPolyline(OrderModel order) async {
-    _polylines.clear();
+    Get.find<HomeController>().clearMapData();
     bool parcel = order.orderType == 'parcel';
 
     // ── Diagnóstico de coordenadas ──────────────────────────────
@@ -1500,8 +1503,8 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Si es multi-pedido y tenemos secuencia, dibujamos los marcadores numerados
     if (route != null && route.sequence != null && route.sequence!.isNotEmpty) {
-      _markers.clear();
-      _polylines.clear();
+      
+      Get.find<HomeController>().clearMapData();
 
       LatLng lastPoint = dmLocation;
       int stopIndex = 1;
@@ -1529,7 +1532,7 @@ class HomeScreenState extends State<HomeScreen> {
           markerColor,
         );
 
-        _markers.add(
+        Get.find<HomeController>().markers.add(
           Marker(
             markerId: MarkerId(point.id!),
             position: currentPoint,
@@ -1559,7 +1562,7 @@ class HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          _polylines.add(
+          Get.find<HomeController>().polylines.add(
             Polyline(
               polylineId: PolylineId('segment_${point.id}'),
               points: segment,
@@ -1586,15 +1589,15 @@ class HomeScreenState extends State<HomeScreen> {
       }
     } else {
       // Lógica original para un solo pedido
-      _markers.clear();
-      _polylines.clear();
+      
+      Get.find<HomeController>().clearMapData();
 
       if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
         Uint8List customMarker = await _createNumberedMarkerBitmap(
           1,
           const Color(0xFFF39C12), // Orange for store
         );
-        _markers.add(
+        Get.find<HomeController>().markers.add(
           Marker(
             markerId: const MarkerId('store'),
             position: storeLocation,
@@ -1608,7 +1611,7 @@ class HomeScreenState extends State<HomeScreen> {
           1,
           const Color(0xFF2ECC71), // Green for customer
         );
-        _markers.add(
+        Get.find<HomeController>().markers.add(
           Marker(
             markerId: const MarkerId('destination'),
             position: destinationLocation,
@@ -1619,7 +1622,7 @@ class HomeScreenState extends State<HomeScreen> {
 
       if (drawPolylines) {
         if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
-          _polylines.add(
+          Get.find<HomeController>().polylines.add(
             Polyline(
               polylineId: const PolylineId('delivery_to_store'),
               points: segment1Points,
@@ -1629,7 +1632,7 @@ class HomeScreenState extends State<HomeScreen> {
           );
         }
         if (_orderPhase == 'going_to_customer') {
-          _polylines.add(
+          Get.find<HomeController>().polylines.add(
             Polyline(
               polylineId: const PolylineId('store_to_destination'),
               points: segment2Points,
@@ -1640,7 +1643,7 @@ class HomeScreenState extends State<HomeScreen> {
         }
       }
     }
-    if (mounted) setState(() {});
+    if (mounted) { setState(() {}); Get.find<HomeController>().update(['map']); }
   }
 
   void _fitCamera(

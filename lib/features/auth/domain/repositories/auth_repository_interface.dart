@@ -4,7 +4,9 @@ import 'package:sixam_mart_delivery/features/auth/domain/models/register_dm_resu
 import 'package:sixam_mart_delivery/interface/repository_interface.dart';
 
 abstract class AuthRepositoryInterface implements RepositoryInterface {
-  Future<dynamic> login(String phone, String password);
+  Future<dynamic> login(String phone, String password, {String? deviceId});
+  Future<dynamic> sendOtp(String phone);
+  Future<dynamic> verifyOtp(String phone, String otp, {String? deviceId});
   Future<dynamic> updateToken();
   Future<bool> saveUserToken(String token, String zoneTopic, String vehicleWiseTopic);
   String getUserToken();
@@ -24,4 +26,6 @@ abstract class AuthRepositoryInterface implements RepositoryInterface {
     List<MultipartBody> multiParts,
     Map<String, String> revisionExtras,
   );
+  Future<dynamic> requestDeviceMigrationOtp(String phone, String password);
+  Future<dynamic> verifyDeviceMigration(String phone, String password, String otp, String deviceId);
 }

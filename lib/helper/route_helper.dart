@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:sixam_mart_delivery/features/auth/screens/dm_registration_success_screen.dart';
+import 'package:sixam_mart_delivery/features/auth/screens/dm_kyc_screen.dart';
 import 'package:sixam_mart_delivery/features/disbursement/domain/models/disbursement_method_model.dart';
 import 'package:sixam_mart_delivery/features/my_account/screens/edit_withdraw_method_screen.dart';
 import 'package:sixam_mart_delivery/features/my_account/screens/my_earning_filter_screen.dart';
@@ -31,6 +32,7 @@ import 'package:sixam_mart_delivery/features/profile/screens/update_profile_scre
 import 'package:sixam_mart_delivery/features/splash/screens/splash_screen.dart';
 import 'package:sixam_mart_delivery/features/update/screens/update_screen.dart';
 import 'package:sixam_mart_delivery/features/mission/screens/mission_screen.dart';
+import 'package:sixam_mart_delivery/features/auth/screens/device_blocked_screen.dart';
 import 'package:get/get.dart';
 
 // Create a file: lib/util/app_constants.dart or add to existing constants
@@ -67,8 +69,13 @@ class RouteHelper {
   static const String myEarning = '/my-earning';
   static const String myEarningFilter = '/my-earning-filter';
   static const String dmRegistrationSuccess = '/dm-registration-success';
+  static const String dmKyc = '/dm-kyc';
   static const String editWithdrawMethod = '/edit-withdraw-method';
   static const String mission = '/mission';
+  static const String deviceBlocked = '/device-blocked';
+
+  static String getDeviceBlockedRoute({String? phone, bool? lostNumber}) =>
+      '$deviceBlocked?phone=$phone&lost_number=${lostNumber ?? false}';
 
   static String getInitialRoute({bool? fromOrderDetails}) =>
       '$initial?from_order_details=${fromOrderDetails.toString()}';
@@ -151,6 +158,7 @@ class RouteHelper {
   static String getMyEarningRoute() => myEarning;
   static String getMyEarningFilterRoute() => myEarningFilter;
   static String getDmRegistrationSuccessRoute() => dmRegistrationSuccess;
+  static String getDmKycRoute() => dmKyc;
   static String getEditWithdrawMethodRoute({required Methods method}) {
     String method0 = base64Encode(utf8.encode(jsonEncode(method.toJson())));
     return '$editWithdrawMethod?method=$method0';
@@ -350,6 +358,10 @@ class RouteHelper {
       page: () => const DmRegistrationSuccessScreen(),
     ),
     GetPage(
+      name: dmKyc,
+      page: () => const KycIntroScreen(),
+    ),
+    GetPage(
       name: editWithdrawMethod,
       page: () {
         Methods method = Methods.fromJson(
@@ -363,5 +375,12 @@ class RouteHelper {
       },
     ),
     GetPage(name: mission, page: () => const MissionScreen()),
+    GetPage(
+      name: deviceBlocked,
+      page: () => DeviceBlockedScreen(
+        phone: Get.parameters['phone'],
+        lostNumber: Get.parameters['lost_number'] == 'true',
+      ),
+    ),
   ];
 }

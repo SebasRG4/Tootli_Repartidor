@@ -15,10 +15,27 @@ class AuthRepository implements AuthRepositoryInterface {
   AuthRepository({required this.apiClient, required this.sharedPreferences});
 
   @override
-  Future<Response> login(String phone, String password) async {
+  Future<Response> login(String phone, String password, {String? deviceId}) async {
     return await apiClient.postData(AppConstants.loginUri, {
       "phone": phone,
       "password": password,
+      if (deviceId != null) "device_id": deviceId,
+    }, handleError: false);
+  }
+
+  @override
+  Future<Response> sendOtp(String phone) async {
+    return await apiClient.postData(AppConstants.sendOtpUri, {
+      "phone": phone,
+    }, handleError: false);
+  }
+
+  @override
+  Future<Response> verifyOtp(String phone, String otp, {String? deviceId}) async {
+    return await apiClient.postData(AppConstants.verifyOtpUri, {
+      "phone": phone,
+      "otp": otp,
+      if (deviceId != null) "device_id": deviceId,
     }, handleError: false);
   }
 
@@ -285,5 +302,23 @@ class AuthRepository implements AuthRepositoryInterface {
   @override
   Future update(Map<String, dynamic> body) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<Response> requestDeviceMigrationOtp(String phone, String password) async {
+    return await apiClient.postData('/api/v1/auth/delivery-man/request-device-migration', {
+      "phone": phone,
+      "password": password,
+    }, handleError: false);
+  }
+
+  @override
+  Future<Response> verifyDeviceMigration(String phone, String password, String otp, String deviceId) async {
+    return await apiClient.postData('/api/v1/auth/delivery-man/verify-device-migration', {
+      "phone": phone,
+      "password": password,
+      "reset_token": otp,
+      "device_id": deviceId,
+    }, handleError: false);
   }
 }

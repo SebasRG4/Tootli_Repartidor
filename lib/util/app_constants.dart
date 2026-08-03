@@ -1,3 +1,5 @@
+import 'package:get/get.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sixam_mart_delivery/features/language/domain/models/language_model.dart';
 import 'package:sixam_mart_delivery/util/images.dart';
 
@@ -8,8 +10,16 @@ class AppConstants {
   ///Flutter sdk 3.41.1
   static const String fontFamily = 'Roboto';
 
-  static const String baseUrl = 'https://tootli.mx';
-  static const String mapKey = 'AIzaSyA-o6RpcHXEHwHyKECCTDjKL0trpZEMqhw';
+  static String get baseUrl {
+    try {
+      final SharedPreferences prefs = Get.find<SharedPreferences>();
+      return prefs.getString('tootli_base_url') ?? 'https://tootli.mx';
+    } catch (_) {
+      return 'https://tootli.mx';
+    }
+  }
+  static const String mapKey = 'AIzaSyA9Ed3wGMFVZqgFpJFqOu2UeWMQshC5ozE';
+
 
   /// Ruta por carretera (Mapbox vía backend; sin token en el cliente).
   static const String drivingRouteUri = '/api/v1/delivery-man/driving-route';
@@ -21,6 +31,8 @@ class AppConstants {
   static const String resetPasswordUri =
       '/api/v1/auth/delivery-man/reset-password';
   static const String loginUri = '/api/v1/auth/delivery-man/login';
+  static const String sendOtpUri = '/api/v1/auth/delivery-man/send-otp';
+  static const String verifyOtpUri = '/api/v1/auth/delivery-man/verify-otp';
   static const String tokenUri = '/api/v1/delivery-man/update-fcm-token';
   static const String currentOrdersUri =
       '/api/v1/delivery-man/current-orders?token=';
@@ -95,6 +107,7 @@ class AppConstants {
   static const String addParcelReturnDate =
       '/api/v1/delivery-man/add-return-date';
   static const String parcelReturn = '/api/v1/delivery-man/parcel-return';
+  static const String parcelReceiptPhotoUri = '/api/v1/parcel/receipt-photo';
   static const String getWithdrawList =
       '/api/v1/delivery-man/get-withdraw-list';
   static const String withdrawRequest = '/api/v1/delivery-man/request-withdraw';
@@ -120,6 +133,8 @@ class AppConstants {
   /// Registro de intentos de contacto (declaración al volver de tel:).
   static const String logCustomerCallAttemptUri =
       '/api/v1/delivery-man/log-customer-call-attempt';
+  static const String orderCallsCountUri =
+      '/api/v1/delivery-man/order-calls-count';
 
   ///chat url
   static const String getConversationListUri =
