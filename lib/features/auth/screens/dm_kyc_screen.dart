@@ -35,7 +35,7 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
       );
 
       if (Get.arguments != null && Get.arguments['phone'] != null) {
-        Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
+        Get.offAllNamed(RouteHelper.getInitialRoute());
       } else {
         await Get.find<ProfileController>().getProfile();
         if (mounted) Navigator.pop(context);
@@ -83,7 +83,7 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
         );
 
         if (Get.arguments != null && Get.arguments['phone'] != null) {
-          Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
+          Get.offAllNamed(RouteHelper.getInitialRoute());
         } else {
           await Get.find<ProfileController>().getProfile();
           if (mounted) Navigator.pop(context);
