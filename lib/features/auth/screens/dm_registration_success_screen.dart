@@ -52,23 +52,30 @@ class DmRegistrationSuccessScreen extends StatelessWidget {
           const SizedBox(height: Dimensions.paddingSizeLarge),
 
           Text(
-            'registration_successful'.tr,
-            style: robotoBold.copyWith(fontSize: Dimensions.fontSizeLarge, color: Theme.of(context).textTheme.bodyLarge!.color),
+            '¡Solicitud Enviada con Éxito!',
+            style: robotoBold.copyWith(
+              fontSize: Dimensions.fontSizeExtraLarge,
+              color: const Color(0xFF003822),
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: Dimensions.paddingSizeSmall),
 
           Text(
-            'registration_successful_message'.tr,
-            style: robotoRegular.copyWith(fontSize: Dimensions.fontSizeSmall, color: Theme.of(context).hintColor),
+            'Hemos recibido tus documentos correctamente. Tu cuenta se encuentra en proceso de revisión por el equipo de administración de Tootli.\n\nTe notificaremos en cuanto tus credenciales y vehículo sean aprobados.',
+            style: robotoRegular.copyWith(
+              fontSize: Dimensions.fontSizeDefault,
+              color: const Color(0xFF64748B),
+              height: 1.4,
+            ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 50),
+          const SizedBox(height: 40),
 
           CustomButtonWidget(
-            buttonText: 'Ir al Inicio / Dashboard',
+            buttonText: 'Volver al Inicio de Sesión',
             onPressed: () {
-              Get.offAllNamed(RouteHelper.getInitialRoute());
+              Get.offAllNamed(RouteHelper.getSignInRoute());
             },
           ),
 
