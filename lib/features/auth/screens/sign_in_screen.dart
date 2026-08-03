@@ -42,18 +42,8 @@ class _SignInScreenState extends State<SignInScreen> {
   @override
   void initState() {
     super.initState();
-    final configModel = Get.find<SplashController>().configModel;
-    _countryDialCode =
-        Get.find<AuthController>().getUserCountryDialCode().isNotEmpty
-            ? Get.find<AuthController>().getUserCountryDialCode()
-            : (configModel != null
-                ? CountryCode.fromCountryCode(configModel.country!).dialCode
-                : '+52');
-    _countryCode = Get.find<AuthController>().getUserCountryCode().isNotEmpty
-        ? Get.find<AuthController>().getUserCountryCode()
-        : (configModel != null
-            ? CountryCode.fromCountryCode(configModel.country!).code
-            : 'MX');
+    _countryDialCode = '+52';
+    _countryCode = 'MX';
 
     _phoneController.text = Get.find<AuthController>().getUserNumber();
   }
