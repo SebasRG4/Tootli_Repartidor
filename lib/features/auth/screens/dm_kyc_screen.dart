@@ -155,113 +155,127 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
           }
 
           return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
-              child: Column(
-                children: [
-                  const Spacer(),
-
-                  // Circular badge based on status
-                  _buildShieldBadge(status),
-                  const SizedBox(height: 20),
-
-                  // Main Title
-                  Text(
-                    _getStatusTitle(status),
-                    style: robotoBold.copyWith(
-                      fontSize: 22,
-                      color: const Color(0xFF1D2125),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
+                    child: IntrinsicHeight(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+                        child: Column(
+                          children: [
+                            const Spacer(),
 
-                  // Subtitle / Description
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Text(
-                      _getStatusDescription(status),
-                      style: robotoRegular.copyWith(
-                        fontSize: 14,
-                        color: const Color(0xFF626F84),
-                        height: 1.35,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
+                            // Circular badge based on status
+                            _buildShieldBadge(status),
+                            const SizedBox(height: 16),
 
-                  // Requirement steps card (only show if none or rejected)
-                  if (status == 'none' || status == 'rejected') ...[
-                    _buildRequirementCard(),
-                    const SizedBox(height: 16),
-                  ],
-
-                  const Spacer(),
-
-                  // Bottom actions section
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Action Button
-                      if (status == 'none' || status == 'rejected')
-                        _buildActionButton(
-                          text: status == 'rejected'
-                              ? 'Reintentar verificación'
-                              : 'Verificar identidad',
-                          isLoading: _isProcessing,
-                          onPressed: _startNativeVerification,
-                          color: const Color(0xFF006A4E),
-                          showChevron: true,
-                        )
-                      else if (status == 'pending')
-                        _buildActionButton(
-                          text: 'Actualizar estado',
-                          isLoading: _isProcessing,
-                          onPressed: () async {
-                            setState(() => _isProcessing = true);
-                            await profileController.getProfile();
-                            setState(() => _isProcessing = false);
-                            showCustomSnackBar(
-                              'Estado del perfil actualizado.',
-                              isError: false,
-                            );
-                          },
-                          color: const Color(0xFFD97706),
-                          showChevron: false,
-                        )
-                      else
-                        _buildActionButton(
-                          text: 'Entendido',
-                          isLoading: _isProcessing,
-                          onPressed: _handleBackNavigation,
-                          color: const Color(0xFF006A4E),
-                          showChevron: false,
-                        ),
-
-                      if (status == 'none' || status == 'rejected') ...[
-                        const SizedBox(height: 6),
-                        TextButton.icon(
-                          onPressed: _isProcessing ? null : _simulateVerificationSuccess,
-                          icon: const Icon(Icons.science_rounded, size: 18, color: Color(0xFF0284C7)),
-                          label: Text(
-                            'Simular Verificación (Modo Simulador / Test)',
-                            style: robotoMedium.copyWith(
-                              fontSize: 13,
-                              color: const Color(0xFF0284C7),
+                            // Main Title
+                            Text(
+                              _getStatusTitle(status),
+                              style: robotoBold.copyWith(
+                                fontSize: 22,
+                                color: const Color(0xFF1D2125),
+                              ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
+                            const SizedBox(height: 8),
+
+                            // Subtitle / Description
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                              child: Text(
+                                _getStatusDescription(status),
+                                style: robotoRegular.copyWith(
+                                  fontSize: 14,
+                                  color: const Color(0xFF626F84),
+                                  height: 1.35,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Requirement steps card (only show if none or rejected)
+                            if (status == 'none' || status == 'rejected') ...[
+                              _buildRequirementCard(),
+                              const SizedBox(height: 12),
+                            ],
+
+                            const Spacer(),
+
+                            // Bottom actions section
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Action Button
+                                if (status == 'none' || status == 'rejected')
+                                  _buildActionButton(
+                                    text: status == 'rejected'
+                                        ? 'Reintentar verificación'
+                                        : 'Verificar identidad',
+                                    isLoading: _isProcessing,
+                                    onPressed: _startNativeVerification,
+                                    color: const Color(0xFF006A4E),
+                                    showChevron: true,
+                                  )
+                                else if (status == 'pending')
+                                  _buildActionButton(
+                                    text: 'Actualizar estado',
+                                    isLoading: _isProcessing,
+                                    onPressed: () async {
+                                      setState(() => _isProcessing = true);
+                                      await profileController.getProfile();
+                                      setState(() => _isProcessing = false);
+                                      showCustomSnackBar(
+                                        'Estado del perfil actualizado.',
+                                        isError: false,
+                                      );
+                                    },
+                                    color: const Color(0xFFD97706),
+                                    showChevron: false,
+                                  )
+                                else
+                                  _buildActionButton(
+                                    text: 'Entendido',
+                                    isLoading: _isProcessing,
+                                    onPressed: _handleBackNavigation,
+                                    color: const Color(0xFF006A4E),
+                                    showChevron: false,
+                                  ),
+
+                                if (status == 'none' || status == 'rejected') ...[
+                                  const SizedBox(height: 4),
+                                  TextButton.icon(
+                                    onPressed: _isProcessing ? null : _simulateVerificationSuccess,
+                                    icon: const Icon(Icons.science_rounded, size: 18, color: Color(0xFF0284C7)),
+                                    label: Text(
+                                      'Simular Verificación (Modo Simulador / Test)',
+                                      style: robotoMedium.copyWith(
+                                        fontSize: 13,
+                                        color: const Color(0xFF0284C7),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+
+                                const SizedBox(height: 8),
+
+                                // Encrypted disclaimer footer
+                                _buildFooter(),
+                              ],
+                            ),
+                          ],
                         ),
-                      ],
-
-                      const SizedBox(height: 10),
-
-                      // Encrypted disclaimer footer
-                      _buildFooter(),
-                    ],
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           );
         },
