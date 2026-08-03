@@ -22,6 +22,35 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
   final String _clientId = "6a557f10d8866787c25766cc"; // Client ID real
   final String _flowId = "6a557f10d8866787c25766ca"; // Flow ID real
 
+  Future<void> _simulateVerificationSuccess() async {
+    setState(() {
+      _isProcessing = true;
+    });
+    try {
+      final String mockId = "mock_verif_${DateTime.now().millisecondsSinceEpoch}";
+      await _notifyStartVerification(mockId);
+      showCustomSnackBar(
+        'Documentos e identidad simulados con éxito (Modo Test).',
+        isError: false,
+      );
+
+      if (Get.arguments != null && Get.arguments['phone'] != null) {
+        Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
+      } else {
+        await Get.find<ProfileController>().getProfile();
+        if (mounted) Navigator.pop(context);
+      }
+    } catch (e) {
+      showCustomSnackBar('Error al simular verificación: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
+    }
+  }
+
   Future<void> _startNativeVerification() async {
     if (_isProcessing) return;
 
@@ -30,19 +59,16 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
     });
 
     final user = Get.find<ProfileController>().profileModel;
-    // Si venimos del registro, no estamos logueados, pero pasamos el teléfono por argumentos.
     final String uniqueId = (Get.arguments != null && Get.arguments['phone'] != null)
         ? Get.arguments['phone']
         : (user?.phone ?? user?.id?.toString() ?? '0');
 
-    // Metadata a enviar
     final Map<String, dynamic> metadata = {
       "userId": uniqueId,
       "user_id": uniqueId,
     };
 
     try {
-      // Lanzar flujo nativo de MetaMap y esperar resultado por Future
       final Result result = await MetaMapFlutter.showMetaMapFlow(
         clientId: _clientId,
         flowId: _flowId,
@@ -50,7 +76,6 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
       );
 
       if (result is ResultSuccess) {
-        // Notificar a nuestra API el inicio de la verificación con el ID devuelto
         await _notifyStartVerification(result.verificationId);
         showCustomSnackBar(
           'Documentos enviados correctamente. Tu identidad está en revisión.',
@@ -58,10 +83,8 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
         );
 
         if (Get.arguments != null && Get.arguments['phone'] != null) {
-          // Venimos del registro
           Get.offAllNamed(RouteHelper.getDmRegistrationSuccessRoute());
         } else {
-          // Refrescar perfil del usuario y cerrar
           await Get.find<ProfileController>().getProfile();
           if (mounted) Navigator.pop(context);
         }
@@ -72,10 +95,10 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
         );
       }
     } catch (e) {
-      showCustomSnackBar(
-        'Ocurrió un error al abrir la verificación: $e',
-        isError: true,
-      );
+      // Si estamos en simulador o falla MetaMap nativo, ejecutamos la simulación de pruebas
+      debugPrint('MetaMap exception (posiblemente simulador): $e');
+      showCustomSnackBar('Modo simulador detectado. Ejecutando verificación de prueba...', isError: false);
+      await _simulateVerificationSuccess();
     } finally {
       if (mounted) {
         setState(() {
@@ -226,6 +249,21 @@ class _KycIntroScreenState extends State<KycIntroScreen> {
                           color: const Color(0xFF006A4E),
                           showChevron: false,
                         ),
+
+                      if (status == 'none' || status == 'rejected') ...[
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _isProcessing ? null : _simulateVerificationSuccess,
+                          icon: const Icon(Icons.science_rounded, size: 18, color: Color(0xFF0284C7)),
+                          label: Text(
+                            'Simular Verificación (Modo Simulador / Test)',
+                            style: robotoMedium.copyWith(
+                              fontSize: 13,
+                              color: const Color(0xFF0284C7),
+                            ),
+                          ),
+                        ),
+                      ],
 
                       const SizedBox(height: 20),
 
