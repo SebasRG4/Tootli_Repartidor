@@ -9,6 +9,6 @@ class MissionRepository implements MissionRepositoryInterface {
 
   @override
   Future<Response> getMissionList() async {
-    return await apiClient.getData(AppConstants.missionUri);
+    return await apiClient.getData(AppConstants.missionUri, handleError: false);
   }
 }

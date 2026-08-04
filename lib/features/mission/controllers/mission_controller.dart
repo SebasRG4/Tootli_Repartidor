@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/mission/domain/models/mission_model.dart';
 import '../domain/services/mission_service_interface.dart';
 
@@ -13,6 +14,9 @@ class MissionController extends GetxController implements GetxService {
   bool get isLoading => _isLoading;
 
   Future<void> getMissionList() async {
+    if (!Get.find<AuthController>().isLoggedIn()) {
+      return;
+    }
     _isLoading = true;
     update();
 
