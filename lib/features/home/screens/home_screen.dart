@@ -134,7 +134,9 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _refreshOptimizedRoute() async {
-    debugPrint('[Routing] Intentando refrescar ruta optimizada... Pedidos activos: ${_activeOrders.length}');
+    debugPrint(
+      '[Routing] Intentando refrescar ruta optimizada... Pedidos activos: ${_activeOrders.length}',
+    );
     Position pos = await Geolocator.getCurrentPosition();
     await Get.find<OrderController>().getOptimizedRoute(
       pos.latitude,
@@ -282,7 +284,7 @@ class HomeScreenState extends State<HomeScreen> {
         if (_activeOrders.isEmpty) {
           _orderPhase = 'none';
           Get.find<HomeController>().clearMapData();
-          }
+        }
       });
       if (_activeOrders.isEmpty) widget.onOrderActiveStatusChanged?.call(false);
       return;
@@ -504,10 +506,13 @@ class HomeScreenState extends State<HomeScreen> {
                             },
                             onMapCreated: (controller) {
                               _mapController = controller;
-                              _mapController?.setMapStyle(AppConstants.darkStyle);
+                              _mapController?.setMapStyle(
+                                AppConstants.darkStyle,
+                              );
 
                               // Animate to current location once map is ready
-                              if (profileController.recordLocationBody != null) {
+                              if (profileController.recordLocationBody !=
+                                  null) {
                                 _mapController?.animateCamera(
                                   CameraUpdate.newLatLng(
                                     LatLng(
@@ -523,7 +528,7 @@ class HomeScreenState extends State<HomeScreen> {
                               }
                             },
                           );
-                        }
+                        },
                       ),
 
                       // Menu Button
@@ -538,7 +543,9 @@ class HomeScreenState extends State<HomeScreen> {
                                   orderController.latestOrderList!.isNotEmpty);
 
                           return Positioned(
-                            top: context.mediaQueryPadding.top + Dimensions.paddingSizeSmall,
+                            top:
+                                context.mediaQueryPadding.top +
+                                Dimensions.paddingSizeSmall,
                             left: Dimensions.paddingSizeDefault,
                             right: Dimensions.paddingSizeDefault + 48,
                             child: SingleChildScrollView(
@@ -555,7 +562,9 @@ class HomeScreenState extends State<HomeScreen> {
                                       borderRadius: BorderRadius.circular(14),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withValues(alpha: 0.1),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.1,
+                                          ),
                                           blurRadius: 10,
                                           offset: const Offset(0, 4),
                                         ),
@@ -564,7 +573,8 @@ class HomeScreenState extends State<HomeScreen> {
                                     child: IconButton(
                                       padding: EdgeInsets.zero,
                                       icon: Icon(
-                                        (_activeOrders.isNotEmpty || _pendingRequest != null)
+                                        (_activeOrders.isNotEmpty ||
+                                                _pendingRequest != null)
                                             ? Icons.close
                                             : Icons.grid_view_rounded,
                                         size: 22,
@@ -572,7 +582,9 @@ class HomeScreenState extends State<HomeScreen> {
                                       ),
                                       onPressed: () {
                                         if (_pendingRequest != null) {
-                                          _performCancellation(order: _pendingRequest);
+                                          _performCancellation(
+                                            order: _pendingRequest,
+                                          );
                                         } else if (_activeOrders.isNotEmpty) {
                                           cancelOrderRequest();
                                         } else if (!hasActiveOrder) {
@@ -586,16 +598,23 @@ class HomeScreenState extends State<HomeScreen> {
                                   // Pastilla de Estado Flotante (Conectado / Desconectado con Switch)
                                   GetBuilder<ProfileController>(
                                     builder: (profileController) {
-                                      final bool isOnline = profileController.isOnline;
+                                      final bool isOnline =
+                                          profileController.isOnline;
                                       return Container(
                                         height: 44,
-                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(24),
+                                          borderRadius: BorderRadius.circular(
+                                            24,
+                                          ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.1),
+                                              color: Colors.black.withValues(
+                                                alpha: 0.1,
+                                              ),
                                               blurRadius: 10,
                                               offset: const Offset(0, 4),
                                             ),
@@ -608,13 +627,17 @@ class HomeScreenState extends State<HomeScreen> {
                                               width: 8,
                                               height: 8,
                                               decoration: BoxDecoration(
-                                                color: isOnline ? const Color(0xFF006837) : const Color(0xFFDC2626),
+                                                color: isOnline
+                                                    ? const Color(0xFF006837)
+                                                    : const Color(0xFFDC2626),
                                                 shape: BoxShape.circle,
                                               ),
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
-                                              isOnline ? 'Conectado' : 'Desconectado',
+                                              isOnline
+                                                  ? 'Conectado'
+                                                  : 'Desconectado',
                                               style: robotoBold.copyWith(
                                                 fontSize: 14,
                                                 color: const Color(0xFF0F172A),
@@ -626,10 +649,16 @@ class HomeScreenState extends State<HomeScreen> {
                                               child: Switch(
                                                 value: isOnline,
                                                 activeColor: Colors.white,
-                                                activeTrackColor: const Color(0xFF006837),
-                                                inactiveThumbColor: Colors.white,
-                                                inactiveTrackColor: const Color(0xFFCBD5E1),
-                                                onChanged: (_) => _toggleOnlineStatus(),
+                                                activeTrackColor: const Color(
+                                                  0xFF006837,
+                                                ),
+                                                inactiveThumbColor:
+                                                    Colors.white,
+                                                inactiveTrackColor: const Color(
+                                                  0xFFCBD5E1,
+                                                ),
+                                                onChanged: (_) =>
+                                                    _toggleOnlineStatus(),
                                               ),
                                             ),
                                           ],
@@ -639,45 +668,68 @@ class HomeScreenState extends State<HomeScreen> {
                                   ),
                                   const SizedBox(width: 8),
 
-                                  // Pastilla de Ganancias / Balance
+                                  // Pastilla de Ganancias / Balance (con opción de Ocultar / Mostrar)
                                   if (!hasActiveOrder)
-                                    GestureDetector(
-                                      onTap: () => _showEarningsBottomSheet(context, profileController),
-                                      child: Container(
-                                        height: 44,
-                                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(24),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withValues(alpha: 0.1),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 4),
+                                    GetBuilder<HomeController>(
+                                      builder: (homeController) {
+                                        return Container(
+                                          height: 44,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(
+                                              24,
                                             ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(
-                                              Icons.account_balance_wallet_rounded,
-                                              size: 18,
-                                              color: Color(0xFF006837),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              PriceConverterHelper.convertPrice(
-                                                profileController.profileModel?.balance ?? 0,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black.withValues(
+                                                  alpha: 0.1,
+                                                ),
+                                                blurRadius: 10,
+                                                offset: const Offset(0, 4),
                                               ),
-                                              style: robotoBold.copyWith(
-                                                color: const Color(0xFF0F172A),
-                                                fontSize: 14,
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () => _showEarningsBottomSheet(
+                                                  context,
+                                                  profileController,
+                                                ),
+                                                child: Text(
+                                                  homeController.showEarnings
+                                                      ? PriceConverterHelper.convertPrice(
+                                                          profileController
+                                                                  .profileModel
+                                                                  ?.balance ??
+                                                              0,
+                                                        )
+                                                      : '••••••',
+                                                  style: robotoBold.copyWith(
+                                                    color: const Color(0xFF0F172A),
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                              const SizedBox(width: 8),
+                                              GestureDetector(
+                                                onTap: () => homeController.toggleShowEarnings(),
+                                                child: Icon(
+                                                  homeController.showEarnings
+                                                      ? Icons.visibility_rounded
+                                                      : Icons.visibility_off_rounded,
+                                                  size: 18,
+                                                  color: const Color(0xFF64748B),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
                                     ),
                                 ],
                               ),
@@ -775,7 +827,8 @@ class HomeScreenState extends State<HomeScreen> {
                         child: CashProgressWidget(),
                       ),
 
-                      if (!Get.find<HomeController>().isNotificationPermissionGranted)
+                      if (!Get.find<HomeController>()
+                          .isNotificationPermissionGranted)
                         Positioned(
                           top: 70,
                           left: 0,
@@ -785,12 +838,14 @@ class HomeScreenState extends State<HomeScreen> {
                             isBatteryPermission: false,
                             onTap: requestNotificationPermission,
                             closeOnTap: () {
-                              Get.find<HomeController>().setNotificationPermissionGranted(true);
+                              Get.find<HomeController>()
+                                  .setNotificationPermissionGranted(true);
                             },
                           ),
                         ),
 
-                      if (!Get.find<HomeController>().isBatteryOptimizationGranted)
+                      if (!Get.find<HomeController>()
+                          .isBatteryOptimizationGranted)
                         Positioned(
                           top: 70,
                           left: 0,
@@ -800,7 +855,8 @@ class HomeScreenState extends State<HomeScreen> {
                             isBatteryPermission: true,
                             onTap: requestBatteryOptimization,
                             closeOnTap: () {
-                              Get.find<HomeController>().setBatteryOptimizationGranted(true);
+                              Get.find<HomeController>()
+                                  .setBatteryOptimizationGranted(true);
                             },
                           ),
                         ),
@@ -817,109 +873,114 @@ class HomeScreenState extends State<HomeScreen> {
       bottomSheet: GetBuilder<OrderController>(
         builder: (orderController) {
           return (_pendingRequest != null || _activeOrders.isNotEmpty)
-          ? (_pendingRequest != null
-                ? () {
-                    double? storeLat = double.tryParse(
-                      _pendingRequest!.storeLat ?? '',
-                    );
-                    double? storeLng = double.tryParse(
-                      _pendingRequest!.storeLng ?? '',
-                    );
-                    double? dmLat = Get.find<ProfileController>()
-                        .recordLocationBody
-                        ?.latitude;
-                    double? dmLng = Get.find<ProfileController>()
-                        .recordLocationBody
-                        ?.longitude;
-                    double? distance;
-                    if (storeLat != null &&
-                        storeLng != null &&
-                        dmLat != null &&
-                        dmLng != null) {
-                      distance =
-                          _calculateDistance(dmLat, dmLng, storeLat, storeLng) /
-                          1000;
-                    }
+              ? (_pendingRequest != null
+                    ? () {
+                        double? storeLat = double.tryParse(
+                          _pendingRequest!.storeLat ?? '',
+                        );
+                        double? storeLng = double.tryParse(
+                          _pendingRequest!.storeLng ?? '',
+                        );
+                        double? dmLat = Get.find<ProfileController>()
+                            .recordLocationBody
+                            ?.latitude;
+                        double? dmLng = Get.find<ProfileController>()
+                            .recordLocationBody
+                            ?.longitude;
+                        double? distance;
+                        if (storeLat != null &&
+                            storeLng != null &&
+                            dmLat != null &&
+                            dmLng != null) {
+                          distance =
+                              _calculateDistance(
+                                dmLat,
+                                dmLng,
+                                storeLat,
+                                storeLng,
+                              ) /
+                              1000;
+                        }
 
-                    return PremiumOrderRequestWidget(
-                      orderModel: _pendingRequest!,
-                      distance: distance,
-                      isTaken: _isOrderTakenByOther,
-                      onAccept: () {
-                        final orderToAccept = _pendingRequest!;
-                        setState(() {
-                          _activeOrders.add(orderToAccept);
-                          _pendingRequest = null;
-                          if (_activeOrders.length == 1) {
-                            _orderPhase = 'going_to_store';
-                            _startMovementTimer();
-                          }
-                        });
-
-                        Get.find<OrderController>()
-                            .acceptOrder(orderToAccept.id, 0, orderToAccept)
-                            .then((isSuccess) {
-                              if (isSuccess) {
-                                Get.find<OrderController>().getOrderDetails(
-                                  orderToAccept.id,
-                                  orderToAccept.orderType == 'parcel',
-                                );
-                                _updateMultiOrderRoute();
-                              } else {
-                                setState(() {
-                                  _activeOrders.removeWhere(
-                                    (o) => o.id == orderToAccept.id,
-                                  );
-                                  if (_activeOrders.isEmpty) {
-                                    _orderPhase = 'none';
-                                    _stopMovementTimer();
-                                  }
-                                });
+                        return PremiumOrderRequestWidget(
+                          orderModel: _pendingRequest!,
+                          distance: distance,
+                          isTaken: _isOrderTakenByOther,
+                          onAccept: () {
+                            final orderToAccept = _pendingRequest!;
+                            setState(() {
+                              _activeOrders.add(orderToAccept);
+                              _pendingRequest = null;
+                              if (_activeOrders.length == 1) {
+                                _orderPhase = 'going_to_store';
+                                _startMovementTimer();
                               }
                             });
-                      },
-                      onReject: () =>
-                          _performCancellation(order: _pendingRequest),
-                    );
-                  }()
-                : AcceptedOrderWidget(
-                    activeOrders: _activeOrders,
 
-                    phase: _orderPhase,
-                    estimatedArrivalTime: _estimatedArrivalTime,
-                    onOrderSelected: (index) {
-                      _selectedOrderIndex = index;
-                    },
-                    onHandover: (order) async {
-                      bool success = await Get.find<OrderController>()
-                          .updateOrderStatus(order, 'handover');
-                      if (success) {
-                        setState(() {
-                          _orderPhase = 'at_store';
-                        });
-                      }
-                    },
-                    onPickedUp: (order) async {
-                      bool success = await Get.find<OrderController>()
-                          .updateOrderStatus(order, 'picked_up');
-                      if (success) {
-                        setState(() {
-                          _orderPhase = 'going_to_customer';
-                        });
-                        _updateMultiOrderRoute();
-                      }
-                    },
-                    onDelivered: (order) async {
-                      bool success = await Get.find<OrderController>()
-                          .updateOrderStatus(order, 'delivered');
-                      if (success) {
-                        _performCancellation(order: order, callApi: false);
-                      }
-                    },
-                  ))
-          : V2HomeBottomPanelWidget(
-              onToggleConnection: _toggleOnlineStatus,
-            );
+                            Get.find<OrderController>()
+                                .acceptOrder(orderToAccept.id, 0, orderToAccept)
+                                .then((isSuccess) {
+                                  if (isSuccess) {
+                                    Get.find<OrderController>().getOrderDetails(
+                                      orderToAccept.id,
+                                      orderToAccept.orderType == 'parcel',
+                                    );
+                                    _updateMultiOrderRoute();
+                                  } else {
+                                    setState(() {
+                                      _activeOrders.removeWhere(
+                                        (o) => o.id == orderToAccept.id,
+                                      );
+                                      if (_activeOrders.isEmpty) {
+                                        _orderPhase = 'none';
+                                        _stopMovementTimer();
+                                      }
+                                    });
+                                  }
+                                });
+                          },
+                          onReject: () =>
+                              _performCancellation(order: _pendingRequest),
+                        );
+                      }()
+                    : AcceptedOrderWidget(
+                        activeOrders: _activeOrders,
+
+                        phase: _orderPhase,
+                        estimatedArrivalTime: _estimatedArrivalTime,
+                        onOrderSelected: (index) {
+                          _selectedOrderIndex = index;
+                        },
+                        onHandover: (order) async {
+                          bool success = await Get.find<OrderController>()
+                              .updateOrderStatus(order, 'handover');
+                          if (success) {
+                            setState(() {
+                              _orderPhase = 'at_store';
+                            });
+                          }
+                        },
+                        onPickedUp: (order) async {
+                          bool success = await Get.find<OrderController>()
+                              .updateOrderStatus(order, 'picked_up');
+                          if (success) {
+                            setState(() {
+                              _orderPhase = 'going_to_customer';
+                            });
+                            _updateMultiOrderRoute();
+                          }
+                        },
+                        onDelivered: (order) async {
+                          bool success = await Get.find<OrderController>()
+                              .updateOrderStatus(order, 'delivered');
+                          if (success) {
+                            _performCancellation(order: order, callApi: false);
+                          }
+                        },
+                      ))
+              : V2HomeBottomPanelWidget(
+                  onToggleConnection: _toggleOnlineStatus,
+                );
         },
       ),
     );
@@ -941,11 +1002,12 @@ class HomeScreenState extends State<HomeScreen> {
   }
 
   void cancelOrderRequest({OrderModel? order, bool callApi = true}) {
-    final targetOrder = order ??
+    final targetOrder =
+        order ??
         (_activeOrders.isNotEmpty
             ? (_selectedOrderIndex < _activeOrders.length
-                ? _activeOrders[_selectedOrderIndex]
-                : _activeOrders.first)
+                  ? _activeOrders[_selectedOrderIndex]
+                  : _activeOrders.first)
             : null);
     if (targetOrder == null) return;
 
@@ -1029,7 +1091,10 @@ class HomeScreenState extends State<HomeScreen> {
       Get.find<OrderController>().ignoreOrderApi(targetOrder.id!);
     }
 
-    widget.onOrderDismissed?.call(targetOrder.id, targetOrder.transactionReference);
+    widget.onOrderDismissed?.call(
+      targetOrder.id,
+      targetOrder.transactionReference,
+    );
 
     setState(() {
       if (_pendingRequest?.id == targetOrder.id) {
@@ -1259,7 +1324,6 @@ class HomeScreenState extends State<HomeScreen> {
     }
 
     Get.find<HomeController>().clearMapData();
-    
 
     LatLng lastPoint = LatLng(
       Get.find<ProfileController>().recordLocationBody?.latitude ?? 0,
@@ -1288,8 +1352,8 @@ class HomeScreenState extends State<HomeScreen> {
         }
       }
 
-      Color markerColor = point.type == 'pickup' 
-          ? const Color(0xFFF39C12) 
+      Color markerColor = point.type == 'pickup'
+          ? const Color(0xFFF39C12)
           : const Color(0xFF2ECC71);
 
       Uint8List customMarker = await _createNumberedMarkerBitmap(
@@ -1546,7 +1610,6 @@ class HomeScreenState extends State<HomeScreen> {
 
     // Si es multi-pedido y tenemos secuencia, dibujamos los marcadores numerados
     if (route != null && route.sequence != null && route.sequence!.isNotEmpty) {
-      
       Get.find<HomeController>().clearMapData();
 
       LatLng lastPoint = dmLocation;
@@ -1560,15 +1623,16 @@ class HomeScreenState extends State<HomeScreen> {
 
       for (var point in route.sequence!) {
         LatLng currentPoint = LatLng(point.latitude!, point.longitude!);
-        
+
         // Asignar número de pedido (1 para el primer pedido encontrado, 2 para el segundo, etc)
         if (!orderIdToDisplayNumber.containsKey(point.orderId)) {
           orderIdToDisplayNumber[point.orderId!] = nextDisplayNumber++;
         }
         int displayNumber = orderIdToDisplayNumber[point.orderId!]!;
 
-        Color markerColor =
-            point.type == 'pickup' ? const Color(0xFFF39C12) : const Color(0xFF2ECC71);
+        Color markerColor = point.type == 'pickup'
+            ? const Color(0xFFF39C12)
+            : const Color(0xFF2ECC71);
 
         Uint8List customMarker = await _createNumberedMarkerBitmap(
           displayNumber,
@@ -1609,9 +1673,9 @@ class HomeScreenState extends State<HomeScreen> {
             Polyline(
               polylineId: PolylineId('segment_${point.id}'),
               points: segment,
-              color: stopIndex == 1 
-                ? const Color(0xFF3498DB) 
-                : const Color(0xFF3498DB).withValues(alpha: 0.4),
+              color: stopIndex == 1
+                  ? const Color(0xFF3498DB)
+                  : const Color(0xFF3498DB).withValues(alpha: 0.4),
               width: 6,
             ),
           );
@@ -1623,16 +1687,19 @@ class HomeScreenState extends State<HomeScreen> {
       }
 
       // Actualizar ETA basado en la ruta completa
-      int travelMinutes = (multiRouteTotalDistance / 333).ceil(); // 20km/h aprox
+      int travelMinutes = (multiRouteTotalDistance / 333)
+          .ceil(); // 20km/h aprox
       int totalMinutes = travelMinutes + totalWaitTime.toInt();
-      
+
       if (totalMinutes > 0) {
-        DateTime arrivalTime = DateTime.now().add(Duration(minutes: totalMinutes));
+        DateTime arrivalTime = DateTime.now().add(
+          Duration(minutes: totalMinutes),
+        );
         _estimatedArrivalTime = DateFormat('HH:mm').format(arrivalTime);
       }
     } else {
       // Lógica original para un solo pedido
-      
+
       Get.find<HomeController>().clearMapData();
 
       if (_orderPhase == 'going_to_store' || _orderPhase == 'none') {
@@ -1686,7 +1753,10 @@ class HomeScreenState extends State<HomeScreen> {
         }
       }
     }
-    if (mounted) { setState(() {}); Get.find<HomeController>().update(['map']); }
+    if (mounted) {
+      setState(() {});
+      Get.find<HomeController>().update(['map']);
+    }
   }
 
   void _fitCamera(

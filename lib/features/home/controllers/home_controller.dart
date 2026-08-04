@@ -33,7 +33,7 @@ class HomeController extends GetxController {
 
   void toggleShowEarnings() {
     _showEarnings = !_showEarnings;
-    update(['earnings']);
+    update();
   }
 
   void setZoom(double zoom) {
