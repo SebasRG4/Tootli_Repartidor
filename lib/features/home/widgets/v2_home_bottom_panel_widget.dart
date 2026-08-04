@@ -138,7 +138,7 @@ class _V2HomeBottomPanelWidgetState extends State<V2HomeBottomPanelWidget> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Today\'s earnings',
+                              'Ganancias de hoy',
                               style: robotoRegular.copyWith(
                                 fontSize: 12,
                                 color: const Color(0xFF64748B),
@@ -162,7 +162,7 @@ class _V2HomeBottomPanelWidgetState extends State<V2HomeBottomPanelWidget> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Trips',
+                              'Viajes',
                               style: robotoRegular.copyWith(
                                 fontSize: 12,
                                 color: const Color(0xFF64748B),
@@ -193,7 +193,7 @@ class _V2HomeBottomPanelWidgetState extends State<V2HomeBottomPanelWidget> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Rating',
+                              'Calificación',
                               style: robotoRegular.copyWith(
                                 fontSize: 12,
                                 color: const Color(0xFF64748B),
