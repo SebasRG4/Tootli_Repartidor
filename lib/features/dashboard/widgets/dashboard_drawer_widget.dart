@@ -43,7 +43,7 @@ class DashboardDrawerWidget extends StatelessWidget {
 
             // Encabezado del Perfil del Conductor
             Padding(
-              padding: const EdgeInsets.horizontal(24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -119,7 +119,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                     label: 'Insignias y niveles',
                     onTap: () {
                       Get.back();
-                      Get.toNamed(RouteHelper.getIncentiveRoute());
+                      Get.toNamed(RouteHelper.getMissionRoute());
                     },
                   ),
                   _DrawerMenuItem(
@@ -159,7 +159,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                     label: 'Ajustes',
                     onTap: () {
                       Get.back();
-                      Get.toNamed(RouteHelper.getLanguageRoute());
+                      Get.toNamed(RouteHelper.getUpdateProfileRoute());
                     },
                   ),
                   _DrawerMenuItem(
@@ -167,7 +167,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                     label: 'Acerca de',
                     onTap: () {
                       Get.back();
-                      Get.toNamed(RouteHelper.getHtmlRoute('about-us'));
+                      Get.toNamed(RouteHelper.getTermsRoute());
                     },
                   ),
                   _DrawerMenuItem(
@@ -175,7 +175,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                     label: 'Política de privacidad',
                     onTap: () {
                       Get.back();
-                      Get.toNamed(RouteHelper.getHtmlRoute('privacy-policy'));
+                      Get.toNamed(RouteHelper.getPrivacyRoute());
                     },
                   ),
                   _DrawerMenuItem(
@@ -183,7 +183,7 @@ class DashboardDrawerWidget extends StatelessWidget {
                     label: 'Términos y condiciones',
                     onTap: () {
                       Get.back();
-                      Get.toNamed(RouteHelper.getHtmlRoute('terms-and-condition'));
+                      Get.toNamed(RouteHelper.getTermsRoute());
                     },
                   ),
                   _DrawerMenuItem(
