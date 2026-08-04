@@ -547,7 +547,7 @@ class HomeScreenState extends State<HomeScreen> {
                                 context.mediaQueryPadding.top +
                                 Dimensions.paddingSizeSmall,
                             left: Dimensions.paddingSizeDefault,
-                            right: Dimensions.paddingSizeDefault + 48,
+                            right: Dimensions.paddingSizeDefault,
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
@@ -738,87 +738,7 @@ class HomeScreenState extends State<HomeScreen> {
                         },
                       ),
 
-                      // Notification Button
-                      if (!profileController.isPendingRegistrationDashboard)
-                        Positioned(
-                          top:
-                              context.mediaQueryPadding.top +
-                              Dimensions.paddingSizeSmall,
-                          right: Dimensions.paddingSizeDefault,
-                          child: GetBuilder<OrderController>(
-                            builder: (orderController) {
-                              return (orderController.latestOrderList != null &&
-                                      orderController
-                                          .latestOrderList!
-                                          .isNotEmpty)
-                                  ? const SizedBox()
-                                  : GetBuilder<NotificationController>(
-                                      builder: (notificationController) {
-                                        return InkWell(
-                                          onTap: () => Get.toNamed(
-                                            RouteHelper.getNotificationRoute(),
-                                          ),
-                                          child: Container(
-                                            height: 40,
-                                            width: 40,
-                                            decoration: BoxDecoration(
-                                              color: Theme.of(
-                                                context,
-                                              ).cardColor,
-                                              shape: BoxShape.circle,
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black
-                                                      .withValues(alpha: 0.1),
-                                                  blurRadius: 10,
-                                                  offset: const Offset(0, 5),
-                                                ),
-                                              ],
-                                            ),
-                                            child: Stack(
-                                              clipBehavior: Clip.none,
-                                              children: [
-                                                Center(
-                                                  child: Icon(
-                                                    Icons.notifications,
-                                                    size: 25,
-                                                    color: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyLarge!
-                                                        .color,
-                                                  ),
-                                                ),
-                                                if (notificationController
-                                                    .hasNotification)
-                                                  Positioned(
-                                                    top: 5,
-                                                    right: 5,
-                                                    child: Container(
-                                                      height: 10,
-                                                      width: 10,
-                                                      decoration: BoxDecoration(
-                                                        color: Theme.of(
-                                                          context,
-                                                        ).colorScheme.error,
-                                                        shape: BoxShape.circle,
-                                                        border: Border.all(
-                                                          width: 1,
-                                                          color: Theme.of(
-                                                            context,
-                                                          ).cardColor,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                            },
-                          ),
-                        ),
+
 
                       const Positioned(
                         top: 0,
