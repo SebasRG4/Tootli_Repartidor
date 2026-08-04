@@ -537,106 +537,151 @@ class HomeScreenState extends State<HomeScreen> {
                               (orderController.latestOrderList != null &&
                                   orderController.latestOrderList!.isNotEmpty);
 
-                          return Stack(
-                            children: [
-                              Positioned(
-                                top: context.mediaQueryPadding.top + Dimensions.paddingSizeSmall,
-                                left: Dimensions.paddingSizeDefault,
-                                child: Container(
-                                  height: 44,
-                                  width: 44,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(14),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.1),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ],
-                                  ),
-                                  child: IconButton(
-                                    padding: EdgeInsets.zero,
-                                    icon: Icon(
-                                      (_activeOrders.isNotEmpty || _pendingRequest != null)
-                                          ? Icons.close
-                                          : Icons.grid_view_rounded,
-                                      size: 22,
-                                      color: const Color(0xFF0F172A),
+                          return Positioned(
+                            top: context.mediaQueryPadding.top + Dimensions.paddingSizeSmall,
+                            left: Dimensions.paddingSizeDefault,
+                            right: Dimensions.paddingSizeDefault + 48,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: Row(
+                                children: [
+                                  // Menu Button
+                                  Container(
+                                    height: 44,
+                                    width: 44,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
                                     ),
-                                    onPressed: () {
-                                      if (_pendingRequest != null) {
-                                        _performCancellation(order: _pendingRequest);
-                                      } else if (_activeOrders.isNotEmpty) {
-                                        cancelOrderRequest();
-                                      } else if (!hasActiveOrder) {
-                                        widget.onTapMenu?.call();
-                                      }
+                                    child: IconButton(
+                                      padding: EdgeInsets.zero,
+                                      icon: Icon(
+                                        (_activeOrders.isNotEmpty || _pendingRequest != null)
+                                            ? Icons.close
+                                            : Icons.grid_view_rounded,
+                                        size: 22,
+                                        color: const Color(0xFF0F172A),
+                                      ),
+                                      onPressed: () {
+                                        if (_pendingRequest != null) {
+                                          _performCancellation(order: _pendingRequest);
+                                        } else if (_activeOrders.isNotEmpty) {
+                                          cancelOrderRequest();
+                                        } else if (!hasActiveOrder) {
+                                          widget.onTapMenu?.call();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+
+                                  // Pastilla de Estado Flotante (Conectado / Desconectado con Switch)
+                                  GetBuilder<ProfileController>(
+                                    builder: (profileController) {
+                                      final bool isOnline = profileController.isOnline;
+                                      return Container(
+                                        height: 44,
+                                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(24),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.1),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(
+                                                color: isOnline ? const Color(0xFF006837) : const Color(0xFFDC2626),
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              isOnline ? 'Conectado' : 'Desconectado',
+                                              style: robotoBold.copyWith(
+                                                fontSize: 14,
+                                                color: const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Transform.scale(
+                                              scale: 0.85,
+                                              child: Switch(
+                                                value: isOnline,
+                                                activeColor: Colors.white,
+                                                activeTrackColor: const Color(0xFF006837),
+                                                inactiveThumbColor: Colors.white,
+                                                inactiveTrackColor: const Color(0xFFCBD5E1),
+                                                onChanged: (_) => _toggleOnlineStatus(),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
                                     },
                                   ),
-                                ),
-                              ),
+                                  const SizedBox(width: 8),
 
-                              // Pastilla de Estado Flotante (Conectado / Desconectado con Switch)
-                              Positioned(
-                                top: context.mediaQueryPadding.top + Dimensions.paddingSizeSmall,
-                                left: 74,
-                                child: GetBuilder<ProfileController>(
-                                  builder: (profileController) {
-                                    final bool isOnline = profileController.isOnline;
-                                    return Container(
-                                      height: 44,
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(24),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.1),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 4),
-                                          ),
-                                        ],
+                                  // Pastilla de Ganancias / Balance
+                                  if (!hasActiveOrder)
+                                    GestureDetector(
+                                      onTap: () => _showEarningsBottomSheet(context, profileController),
+                                      child: Container(
+                                        height: 44,
+                                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(24),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.1),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 4),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(
+                                              Icons.account_balance_wallet_rounded,
+                                              size: 18,
+                                              color: Color(0xFF006837),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              PriceConverterHelper.convertPrice(
+                                                profileController.profileModel?.balance ?? 0,
+                                              ),
+                                              style: robotoBold.copyWith(
+                                                color: const Color(0xFF0F172A),
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Container(
-                                            width: 8,
-                                            height: 8,
-                                            decoration: BoxDecoration(
-                                              color: isOnline ? const Color(0xFF006837) : const Color(0xFFDC2626),
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            isOnline ? 'Conectado' : 'Desconectado',
-                                            style: robotoBold.copyWith(
-                                              fontSize: 14,
-                                              color: const Color(0xFF0F172A),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Transform.scale(
-                                            scale: 0.85,
-                                            child: Switch(
-                                              value: isOnline,
-                                              activeColor: Colors.white,
-                                              activeTrackColor: const Color(0xFF006837),
-                                              inactiveThumbColor: Colors.white,
-                                              inactiveTrackColor: const Color(0xFFCBD5E1),
-                                              onChanged: (_) => _toggleOnlineStatus(),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
+                                    ),
+                                ],
                               ),
-                            ],
+                            ),
                           );
                         },
                       ),
@@ -723,81 +768,11 @@ class HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
 
-                      // Earnings and Cash Button (Hidden if there is an active order)
-                      GetBuilder<OrderController>(
-                        builder: (orderController) {
-                          bool hasActiveOrder =
-                              (orderController.currentOrderList != null &&
-                                  orderController
-                                      .currentOrderList!
-                                      .isNotEmpty) ||
-                              (orderController.latestOrderList != null &&
-                                  orderController.latestOrderList!.isNotEmpty);
-
-                          if (hasActiveOrder) {
-                            return const SizedBox();
-                          }
-                          return Positioned(
-                            top:
-                                context.mediaQueryPadding.top +
-                                Dimensions.paddingSizeSmall,
-                            left: 0,
-                            right: 0,
-                            child: Column(
-                              children: [
-                                Center(
-                                  child: GestureDetector(
-                                    onTap: () => _showEarningsBottomSheet(
-                                      context,
-                                      profileController,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: Dimensions.paddingSizeLarge,
-                                        vertical: Dimensions.paddingSizeSmall,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black,
-                                        borderRadius: BorderRadius.circular(50),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.3,
-                                            ),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 5),
-                                          ),
-                                        ],
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            PriceConverterHelper.convertPrice(
-                                              profileController
-                                                      .profileModel
-                                                      ?.balance ??
-                                                  0,
-                                            ),
-                                            style: robotoMedium.copyWith(
-                                              color: Colors.white,
-                                              fontSize:
-                                                  Dimensions.fontSizeSmall,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(
-                                  height: Dimensions.paddingSizeSmall,
-                                ),
-                                const CashProgressWidget(),
-                              ],
-                            ),
-                          );
-                        },
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: CashProgressWidget(),
                       ),
 
                       if (!Get.find<HomeController>().isNotificationPermissionGranted)
