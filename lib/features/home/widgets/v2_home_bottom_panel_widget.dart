@@ -67,38 +67,36 @@ class _V2HomeBottomPanelWidgetState extends State<V2HomeBottomPanelWidget> {
                 ),
                 const SizedBox(height: 14),
 
-                // Banner de Cuenta en Revisión (si la cuenta está en revisión)
-                if (isPending) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFFCD34D)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.hourglass_top_rounded,
-                          size: 20,
-                          color: Color(0xFFD97706),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Cuenta en revisión, te avisaremos cuando esté aprobada',
-                            style: robotoMedium.copyWith(
-                              fontSize: 13,
-                              color: const Color(0xFF92400E),
-                            ),
+                // Banner de Cuenta en Revisión (siempre visible en la parte superior del widget)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFCD34D)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.hourglass_top_rounded,
+                        size: 20,
+                        color: Color(0xFFD97706),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Cuenta en revisión, te avisaremos cuando esté aprobada',
+                          style: robotoMedium.copyWith(
+                            fontSize: 13,
+                            color: const Color(0xFF92400E),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                ],
+                ),
+                const SizedBox(height: 14),
 
                 // Fila de Estado: Desconectado · no recibe solicitudes
                 Row(
