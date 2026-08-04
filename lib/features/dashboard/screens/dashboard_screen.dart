@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:sixam_mart_delivery/common/widgets/custom_snackbar_widget.dart';
+import 'package:sixam_mart_delivery/features/auth/controllers/auth_controller.dart';
 import 'package:sixam_mart_delivery/features/order/controllers/order_controller.dart';
 import 'package:sixam_mart_delivery/features/order/domain/models/order_model.dart';
 import 'package:sixam_mart_delivery/features/disbursement/helper/disbursement_helper.dart';
@@ -39,7 +40,8 @@ class DashboardScreen extends StatefulWidget {
   DashboardScreenState createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+class DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   PageController? _pageController;
   int _pageIndex = 0;
   late List<Widget> _screens;
@@ -53,10 +55,13 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<HomeScreenState> _homeScreenKey =
       GlobalKey<HomeScreenState>();
+
   /// IDs de pedidos ya enviados al HomeScreen para evitar duplicados
   final Set<int> _shownOrderIds = {};
+
   /// transactionReferences de grupos multitienda ya mostrados (bloquea hermanos individuales)
   final Set<String> _shownTransactionRefs = {};
+
   /// Mapa transactionRef → orderIds del grupo (para limpiar _shownOrderIds en reoferta)
   final Map<String, Set<int>> _transactionRefOrderIds = {};
 
@@ -73,7 +78,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     NotificationHelper.setAppInForeground(true);
 
     showDisbursementWarningMessage();
-    final bool canFetchData = Get.find<AuthController>().isLoggedIn() &&
+    final bool canFetchData =
+        Get.find<AuthController>().isLoggedIn() &&
         !Get.find<ProfileController>().isPendingRegistrationDashboard;
 
     if (canFetchData) {
@@ -84,7 +90,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       Get.find<OrderController>().getLatestOrders().then((_) {
         if (!mounted) return;
         final latestOrders = Get.find<OrderController>().latestOrderList;
-        if (latestOrders != null && latestOrders.isNotEmpty && _pageIndex == 0) {
+        if (latestOrders != null &&
+            latestOrders.isNotEmpty &&
+            _pageIndex == 0) {
           // Usar _dispatchOrderToHome en vez de showOrderRequest directo.
           // Esto asegura que pase por la deduplicación de _shownOrderIds:
           // si el FCM ya mostró este pedido, el initState no lo mostrará de nuevo.
@@ -97,7 +105,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             final runningOrders = Get.find<OrderController>().currentOrderList;
             if (runningOrders != null && runningOrders.isNotEmpty) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                _homeScreenKey.currentState?.restoreActiveOrder(runningOrders.first);
+                _homeScreenKey.currentState?.restoreActiveOrder(
+                  runningOrders.first,
+                );
               });
             }
           });
@@ -112,12 +122,16 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     // centralizadas en NotificationHelper vía OrderNotificationService.
     OrderNotificationService.instance.onOrderRequestTapped = (int orderId) {
       if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
-      debugPrint("[Dashboard] 📩 CALLBACK FIRED for order $orderId. Current page: $_pageIndex");
+      debugPrint(
+        "[Dashboard] 📩 CALLBACK FIRED for order $orderId. Current page: $_pageIndex",
+      );
       if (!mounted) return;
-      
+
       // Si ya está en la pantalla de Centro de Pedidos, solo refrescamos la lista.
       if (_pageIndex == 1) {
-        debugPrint("[Dashboard] Already in OrderRequestScreen, just refreshing latest orders...");
+        debugPrint(
+          "[Dashboard] Already in OrderRequestScreen, just refreshing latest orders...",
+        );
         Get.find<OrderController>().getLatestOrders(filterIgnored: false);
       } else {
         // Si está en otra pantalla, lo llevamos a Home (página 0) para mostrar el Bottom Sheet
@@ -133,7 +147,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       debugPrint("[Dashboard] 📩 INACTIVITY CALLBACK for order $orderId");
       if (!mounted) return;
       _setPage(0);
-      _homeScreenKey.currentState?.showInactivityWarningFromNotification(orderId);
+      _homeScreenKey.currentState?.showInactivityWarningFromNotification(
+        orderId,
+      );
     };
 
     OrderNotificationService.instance.onOrderUnassigned = (int orderId) {
@@ -141,18 +157,20 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       debugPrint("[Dashboard] 📩 UNASSIGNED CALLBACK for order $orderId");
       if (!mounted) return;
       _setPage(0);
-      _homeScreenKey.currentState?.showUnassignedDialogFromNotification(orderId);
+      _homeScreenKey.currentState?.showUnassignedDialogFromNotification(
+        orderId,
+      );
     };
 
     // Escuchar cambios en OrderController para auto-restaurar pedidos activos si aparecen (ej. por FCM)
     Get.find<OrderController>().addListener(() {
       if (!mounted || _pageIndex != 0) return;
-      
+
       final runningOrders = Get.find<OrderController>().currentOrderList;
       if (runningOrders != null && runningOrders.isNotEmpty) {
         // Restaurar el primer pedido si HomeScreen no tiene nada
         _homeScreenKey.currentState?.restoreActiveOrder(runningOrders.first);
-        
+
         // Si hay un segundo pedido en la lista, también intentar restaurarlo
         if (runningOrders.length > 1) {
           _homeScreenKey.currentState?.restoreActiveOrder(runningOrders[1]);
@@ -175,7 +193,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
   /// el bottom sheet al detectar pedidos en `latest-orders`.
   void _startLatestOrdersPolling() {
     _latestOrdersPoller?.cancel();
-    _latestOrdersPoller = Timer.periodic(const Duration(seconds: 15), (_) async {
+    _latestOrdersPoller = Timer.periodic(const Duration(seconds: 15), (
+      _,
+    ) async {
       if (!mounted) return;
       if (Get.find<ProfileController>().isPendingRegistrationDashboard) return;
       // Solo cuando el usuario está en Home y no hay pedido activo
@@ -202,8 +222,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     // ── Paso 0b: Deduplicación por transactionReference (multitienda) ──────
     // Si la caché ya tiene este pedido y pertenece a un grupo ya mostrado, omitir.
-    final cachedForRef = Get.find<OrderController>()
-        .latestOrderList
+    final cachedForRef = Get.find<OrderController>().latestOrderList
         ?.firstWhereOrNull((o) => o.id == orderId);
     if (cachedForRef != null &&
         cachedForRef.transactionReference != null &&
@@ -225,10 +244,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
 
     // ── Paso 1: Respuesta Instantánea (Shell Loading) ──────────────────────
     debugPrint("[FCM] orderId=$orderId disparando UI instantánea...");
-    
+
     // Buscar en caché primero para evitar el shell si ya los tenemos
-    final cachedOrder = Get.find<OrderController>()
-        .latestOrderList
+    final cachedOrder = Get.find<OrderController>().latestOrderList
         ?.firstWhereOrNull((o) => o.id == orderId);
 
     if (cachedOrder != null) {
@@ -243,11 +261,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
       _dispatchOrderToHome(dummyOrder);
 
       // ── Paso 2: Fetch de datos reales en segundo plano ────────────────────
-      debugPrint("[FCM] orderId=$orderId consultando latest-orders en segundo plano...");
+      debugPrint(
+        "[FCM] orderId=$orderId consultando latest-orders en segundo plano...",
+      );
       Get.find<OrderController>().getLatestOrders().then((_) {
         if (!mounted) return;
-        final order = Get.find<OrderController>()
-            .latestOrderList
+        final order = Get.find<OrderController>().latestOrderList
             ?.firstWhereOrNull((o) => o.id == orderId);
 
         if (order != null) {
@@ -262,17 +281,23 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
             return;
           }
           _registerTransactionRef(order);
-          debugPrint("[FCM] orderId=$orderId datos obtenidos de latest-orders. Actualizando UI...");
+          debugPrint(
+            "[FCM] orderId=$orderId datos obtenidos de latest-orders. Actualizando UI...",
+          );
           _dispatchOrderToHome(order);
           _refreshCounters();
         } else {
           // Fallback a fetch directo si no está en latest-orders (asignado)
-          Get.find<OrderController>().fetchOrderForNotification(orderId).then((fetched) {
+          Get.find<OrderController>().fetchOrderForNotification(orderId).then((
+            fetched,
+          ) {
             if (!mounted) return;
             if (fetched != null) {
               if (fetched.transactionReference != null &&
                   fetched.transactionReference!.isNotEmpty &&
-                  _shownTransactionRefs.contains(fetched.transactionReference)) {
+                  _shownTransactionRefs.contains(
+                    fetched.transactionReference,
+                  )) {
                 debugPrint(
                   "[Dashboard] ⛔ orderId=$orderId BLOCKED fallback (transactionRef=${fetched.transactionReference} ya mostrado)",
                 );
@@ -280,7 +305,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 return;
               }
               _registerTransactionRef(fetched);
-              debugPrint("[FCM] orderId=$orderId datos obtenidos por fetch directo. Actualizando UI...");
+              debugPrint(
+                "[FCM] orderId=$orderId datos obtenidos por fetch directo. Actualizando UI...",
+              );
               _dispatchOrderToHome(fetched);
             }
             _refreshCounters();
@@ -341,7 +368,6 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     );
   }
 
-
   /// Refresca contadores y lista de corridas en paralelo, sin bloquear el bottom sheet.
   void _refreshCounters() {
     Get.find<OrderController>().getRunningOrders(
@@ -353,20 +379,19 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     );
   }
 
-
-
-
   /// Envía el [order] al HomeScreen asegurando que el key y el state existen.
   /// Implementa deduplicación estricta por ID y manejo de race conditions.
   void _dispatchOrderToHome(OrderModel order) {
     if (!mounted) return;
-    
+
     final id = order.id;
     if (id == null) return;
 
-    debugPrint("[Dashboard] 📨 _dispatchOrderToHome called for order $id (Current page: $_pageIndex)");
+    debugPrint(
+      "[Dashboard] 📨 _dispatchOrderToHome called for order $id (Current page: $_pageIndex)",
+    );
 
-    // 🔊 Si es un pedido nuevo detectado por Polling/Init (no por FCM/Pusher), 
+    // 🔊 Si es un pedido nuevo detectado por Polling/Init (no por FCM/Pusher),
     // forzamos el sonido para que el repartidor no lo pierda.
     if (!_shownOrderIds.contains(id)) {
       debugPrint("****************************************************");
@@ -377,21 +402,24 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
     }
 
     final homeState = _homeScreenKey.currentState;
-    
-    debugPrint("[Dashboard] _dispatchOrderToHome($id) - homeState=${homeState != null ? 'ok' : 'null'}");
-    
+
+    debugPrint(
+      "[Dashboard] _dispatchOrderToHome($id) - homeState=${homeState != null ? 'ok' : 'null'}",
+    );
+
     if (homeState == null) {
-      debugPrint("[Dashboard] ⚠️ HomeScreenState es null, reintentando en siguiente frame para order $id");
+      debugPrint(
+        "[Dashboard] ⚠️ HomeScreenState es null, reintentando en siguiente frame para order $id",
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _dispatchOrderToHome(order);
       });
       return;
     }
-    
+
     debugPrint("[Dashboard] ✅ DISPATCHING order $id a HomeScreen");
     homeState.showOrderRequest(order);
   }
-
 
   Future<void> showDisbursementWarningMessage() async {
     if (!widget.fromOrderDetails) {
@@ -436,8 +464,8 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           });
         });
       }
-
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       NotificationHelper.setAppInForeground(false);
     }
   }
@@ -534,7 +562,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
           bool showBottomBar = isOffline || _isBottomBarVisible;
           bool hasSlider = isHome && profileController.profileModel != null;
 
-          debugPrint('[Dashboard Build Debug] isHome=$isHome, hasSlider=$hasSlider, active=${profileController.profileModel?.active}, appStatus=${profileController.profileModel?.applicationStatus}, _isOrderActive=$_isOrderActive, pendingReg=$pendingReg, isOffline=$isOffline');
+          debugPrint(
+            '[Dashboard Build Debug] isHome=$isHome, hasSlider=$hasSlider, active=${profileController.profileModel?.active}, appStatus=${profileController.profileModel?.applicationStatus}, _isOrderActive=$_isOrderActive, pendingReg=$pendingReg, isOffline=$isOffline',
+          );
 
           return Scaffold(
             key: _scaffoldKey,
@@ -548,49 +578,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                 _setPage(index);
               },
             ),
-            bottomNavigationBar: (!_isOrderActive && !pendingReg && (_pageIndex == 0 || _pageIndex == 3 || _pageIndex == 4))
-                ? Theme(
-                    data: Theme.of(context).copyWith(
-                      canvasColor: const Color(0xFF0A0A0A),
-                    ),
-                    child: BottomNavigationBar(
-                      currentIndex: _pageIndex == 0
-                          ? 0
-                          : _pageIndex == 4
-                              ? 1
-                              : 2, // Maps index 0 -> 0, 4 -> 1, 3 -> 2
-                      onTap: (index) {
-                        if (index == 0) {
-                          _setPage(0);
-                        } else if (index == 1) {
-                          _setPage(4); // MyEarnings
-                        } else if (index == 2) {
-                          _setPage(3); // Profile
-                        }
-                      },
-                      backgroundColor: const Color(0xFF0A0A0A),
-                      selectedItemColor: const Color(0xFF5EC44B),
-                      unselectedItemColor: Colors.white38,
-                      selectedLabelStyle: robotoMedium.copyWith(fontSize: 12),
-                      unselectedLabelStyle: robotoRegular.copyWith(fontSize: 11),
-                      type: BottomNavigationBarType.fixed,
-                      items: const [
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.home_filled),
-                          label: 'Inicio',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.bar_chart),
-                          label: 'Ganancias',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.person_outline),
-                          label: 'Cuenta',
-                        ),
-                      ],
-                    ),
-                  )
-                : null,
+            bottomNavigationBar: null,
             body: Stack(
               children: [
                 PageView.builder(
@@ -666,19 +654,24 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                               color: Colors.white,
                               size: 20,
                             ),
-                            onPressed: () => _homeScreenKey.currentState?.animateToMyLocation(),
+                            onPressed: () => _homeScreenKey.currentState
+                                ?.animateToMyLocation(),
                           ),
                         ),
                         const SizedBox(height: 12),
                         // Traffic toggle Button
                         Builder(
                           builder: (context) {
-                            final bool trafficActive = _homeScreenKey.currentState?.isTrafficEnabled ?? false;
+                            final bool trafficActive =
+                                _homeScreenKey.currentState?.isTrafficEnabled ??
+                                false;
                             return Container(
                               height: 40,
                               width: 40,
                               decoration: BoxDecoration(
-                                color: trafficActive ? const Color(0xFF5EC44B) : const Color(0xFF0F161E),
+                                color: trafficActive
+                                    ? const Color(0xFF5EC44B)
+                                    : const Color(0xFF0F161E),
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
@@ -692,7 +685,9 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                                 padding: EdgeInsets.zero,
                                 icon: Icon(
                                   Icons.layers,
-                                  color: trafficActive ? Colors.black : Colors.white,
+                                  color: trafficActive
+                                      ? Colors.black
+                                      : Colors.white,
                                   size: 20,
                                 ),
                                 onPressed: () {
@@ -711,9 +706,7 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                     initialChildSize: pendingReg
                         ? 0.28
                         : (isOffline ? 0.35 : 0.25),
-                    minChildSize: pendingReg
-                        ? 0.22
-                        : (isOffline ? 0.35 : 0.25),
+                    minChildSize: pendingReg ? 0.22 : (isOffline ? 0.35 : 0.25),
                     maxChildSize: 0.85,
                     snap: true,
                     builder: (context, scrollController) {
@@ -721,9 +714,12 @@ class DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObs
                         return PendingRegistrationPanelWidget(
                           scrollController: scrollController,
                           adminRevisionMessage: profileController
-                              .profileModel?.registrationRevisionMessage,
-                          showRevisionFootnote: profileController
-                                  .profileModel?.registrationRevisionRequired ==
+                              .profileModel
+                              ?.registrationRevisionMessage,
+                          showRevisionFootnote:
+                              profileController
+                                  .profileModel
+                                  ?.registrationRevisionRequired ==
                               true,
                         );
                       }
